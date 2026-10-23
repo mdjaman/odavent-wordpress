@@ -26,7 +26,7 @@ class PayloadShapeTest extends RenderTestCase {
 		'showDescription'  => true,
 		'showAvailability' => true,
 		'showSpeakers'     => true,
-		'speakerId'        => 301,
+		'speakerId'        => 0, // 0: every speaker, so a drifted row (speakers[0]) always reaches the renderer
 		'limit'            => 2,
 		'columns'          => 2,
 		'groupByType'      => false,

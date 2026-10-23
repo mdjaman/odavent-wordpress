@@ -27,7 +27,8 @@ final class Sponsors implements Renderer {
 		$show_description = Attributes::flag( $atts, 'showDescription', false );
 		$group_by_type    = Attributes::flag( $atts, 'groupByType', true );
 
-		$buckets = array();
+		// Every partner with a name, in payload order (Odavent puts featured placements first).
+		$partners = array();
 		foreach ( $view->partners() as $partner ) {
 			$name = Sanitizer::text( $partner['name'] ?? null );
 			if ( '' === $name ) {
@@ -39,9 +40,8 @@ final class Sponsors implements Renderer {
 				$link = Sanitizer::url( $partner['website'] ?? null );
 			}
 
-			$type = self::type_key( $partner['type'] ?? null );
-
-			$buckets[ $type ][] = array(
+			$partners[] = array(
+				'type'        => self::type_key( $partner['type'] ?? null ),
 				'name'        => $name,
 				'logo_url'    => Sanitizer::url( $partner['logo_url'] ?? null ),
 				'link_url'    => $link,
@@ -50,12 +50,17 @@ final class Sponsors implements Renderer {
 			);
 		}
 
-		if ( array() === $buckets ) {
+		if ( array() === $partners ) {
 			return '';
 		}
 
-		$groups = array();
 		if ( $group_by_type ) {
+			// Groups in a fixed order; payload order inside each group.
+			$buckets = array();
+			foreach ( $partners as $partner ) {
+				$buckets[ $partner['type'] ][] = $partner;
+			}
+			$groups = array();
 			foreach ( self::ordered_types( array_keys( $buckets ) ) as $type ) {
 				$groups[] = array(
 					'title' => self::type_label( $type ),
@@ -63,13 +68,12 @@ final class Sponsors implements Renderer {
 				);
 			}
 		} else {
-			$items = array();
-			foreach ( $buckets as $bucket ) {
-				$items = array_merge( $items, $bucket );
-			}
-			$groups[] = array(
-				'title' => '',
-				'items' => $items,
+			// One flat list, exactly the payload order: a featured exhibitor is never moved behind a sponsor.
+			$groups = array(
+				array(
+					'title' => '',
+					'items' => $partners,
+				),
 			);
 		}
 
@@ -91,7 +95,8 @@ final class Sponsors implements Renderer {
 	 * @param mixed $type Payload `type`.
 	 */
 	private static function type_key( $type ): string {
-		$text = strtolower( Sanitizer::text( $type ) );
+		// ASCII-only folding: strtolower() depends on the process locale and must not touch UTF-8 bytes.
+		$text = strtr( Sanitizer::text( $type ), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz' );
 
 		return '' === $text ? 'partner' : $text;
 	}

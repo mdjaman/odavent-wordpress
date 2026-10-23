@@ -14,7 +14,9 @@ use Odavent\Events\Render\Template;
  * to the "live" and "ended" labels at the right moments, which also corrects a cached page.
  *
  * It promises a start to wait for, so it is hidden when that promise is unreliable: a cancelled or archived
- * event, a paused event whose start has passed, a stale copy, or a missing/invalid start date.
+ * event, a paused event whose start has passed, a stale copy, or a missing/invalid start date. A paused event
+ * that is still upcoming carries data-odv-paused so the script hides the block itself when the start passes
+ * (a page left open, or served from a page cache, must not announce "Live now" for a paused event).
  */
 final class Countdown implements Renderer {
 
@@ -57,6 +59,7 @@ final class Countdown implements Renderer {
 				'ends_at'     => null !== $ends ? $ends->format( 'c' ) : '',
 				'state'       => $state,
 				'ended_flag'  => $flagged_ended,
+				'paused'      => Event_View::PAUSED === $view->state(),
 				'label_live'  => self::label( $atts, 'labelLive', __( 'Live now', 'odavent-events' ) ),
 				'label_ended' => self::label( $atts, 'labelEnded', __( 'Event ended', 'odavent-events' ) ),
 				'days'        => (string) intdiv( $left, 86400 ),

@@ -11,4 +11,8 @@
             <directory suffix="Test.php">tests/Unit</directory>
         </testsuite>
     </testsuites>
+    <php>
+        <!-- The drift walk renders thousands of templates; Brain Monkey/Patchwork keep memory until the run ends. -->
+        <ini name="memory_limit" value="512M"/>
+    </php>
 </phpunit>

@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Runs the browser scripts' tests (tests/js/*.test.js) with plain node: no npm dependencies.
+# Uses a local node when there is one, otherwise node:lts-alpine in Docker.
+# Usage: bin/test-js
+set -e
+cd "$(dirname "$0")/.."
+
+RUN='for f in tests/js/*.test.js; do node "$f" || exit 1; done'
+
+if command -v node >/dev/null 2>&1; then
+  sh -c "$RUN"
+else
+  docker run --rm -v "$PWD":/app -w /app node:lts-alpine sh -c "$RUN"
+fi

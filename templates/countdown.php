@@ -11,6 +11,7 @@
  * @var string                          $ends_at     End, ISO 8601 with offset ('' when unknown).
  * @var string                          $state       upcoming, live or ended (as of the page being built).
  * @var bool                            $ended_flag  Odavent says the event has ended.
+ * @var bool                            $paused      The event is paused: the script hides the block once the start has passed.
  * @var string                          $label_live  Text shown while the event is live.
  * @var string                          $label_ended Text shown once it has ended.
  * @var string                          $days        Whole days left (numbers are meaningful while upcoming).
@@ -26,7 +27,7 @@ defined( 'ABSPATH' ) || exit;
 
 $odv_message = 'live' === $state ? $label_live : ( 'ended' === $state ? $label_ended : '' );
 ?>
-<section class="<?php echo esc_attr( $classes ); ?>" data-odv-event="<?php echo esc_attr( (string) $event_id ); ?>" data-starts-at="<?php echo esc_attr( $starts_at ); ?>"<?php echo '' !== $ends_at ? ' data-ends-at="' . esc_attr( $ends_at ) . '"' : ''; ?><?php echo $ended_flag ? ' data-ended="true"' : ''; ?> data-state="<?php echo esc_attr( $state ); ?>" data-label-live="<?php echo esc_attr( $label_live ); ?>" data-label-ended="<?php echo esc_attr( $label_ended ); ?>">
+<section class="<?php echo esc_attr( $classes ); ?>" data-odv-event="<?php echo esc_attr( (string) $event_id ); ?>" data-starts-at="<?php echo esc_attr( $starts_at ); ?>"<?php echo '' !== $ends_at ? ' data-ends-at="' . esc_attr( $ends_at ) . '"' : ''; ?><?php echo $ended_flag ? ' data-ended="true"' : ''; ?><?php echo $paused ? ' data-odv-paused="1"' : ''; ?> data-state="<?php echo esc_attr( $state ); ?>" data-label-live="<?php echo esc_attr( $label_live ); ?>" data-label-ended="<?php echo esc_attr( $label_ended ); ?>">
 <?php if ( 'upcoming' === $state ) : ?>
 	<div class="odv-countdown__timer">
 		<div class="odv-countdown__unit"><span class="odv-countdown__value" data-unit="days"><?php echo esc_html( $days ); ?></span><span class="odv-countdown__label"><?php esc_html_e( 'Days', 'odavent-events' ); ?></span></div>

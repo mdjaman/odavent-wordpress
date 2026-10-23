@@ -139,6 +139,15 @@ class CountdownTest extends BlockTestCase {
 		$this->assertSame( '', $this->render( $paused ) );
 	}
 
+	public function test_only_a_paused_event_carries_the_paused_flag_for_the_script(): void {
+		$this->freeze( '2026-11-10T09:00:00+00:00' );
+
+		$this->assertStringContainsString( ' data-odv-paused="1"', $this->render( $this->payload( self::state_overrides()['paused'] ) ) );
+		foreach ( array( 'live', 'live closed', 'ended open', 'draft' ) as $state ) {
+			$this->assertStringNotContainsString( 'data-odv-paused', $this->render( $this->payload( self::state_overrides()[ $state ] ) ), $state );
+		}
+	}
+
 	public function test_nothing_without_a_usable_start_date(): void {
 		$this->freeze( '2026-11-10T09:00:00+00:00' );
 

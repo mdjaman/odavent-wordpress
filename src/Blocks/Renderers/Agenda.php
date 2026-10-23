@@ -142,7 +142,7 @@ final class Agenda implements Renderer {
 			}
 		}
 
-		$build = function ( array $indexes ) use ( &$build, $nodes, $children ): array {
+		$build = function ( array $indexes, ?string $parent_day ) use ( &$build, $nodes, $children ): array {
 			usort(
 				$indexes,
 				static function ( $a, $b ) use ( $nodes ) {
@@ -152,15 +152,19 @@ final class Agenda implements Renderer {
 
 			$built = array();
 			foreach ( $indexes as $index ) {
-				$node          = $nodes[ $index ];
-				$node['rooms'] = isset( $children[ $index ] ) ? $build( $children[ $index ] ) : array();
+				$node = $nodes[ $index ];
+				if ( null !== $parent_day && '' !== $node['time'] && $node['day_key'] !== $parent_day ) {
+					// A room on another day than its parent says which day.
+					$node['time'] = $node['day'] . ' ' . $node['time'];
+				}
+				$node['rooms'] = isset( $children[ $index ] ) ? $build( $children[ $index ], $node['day_key'] ) : array();
 				$built[]       = $node;
 			}
 
 			return $built;
 		};
 
-		return $build( $top_level );
+		return $build( $top_level, null );
 	}
 
 	/**

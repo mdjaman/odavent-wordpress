@@ -54,7 +54,7 @@ $odv_session = static function ( array $session, bool $is_room ) use ( &$odv_ses
 ?>
 <section class="<?php echo esc_attr( $classes ); ?>" data-odv-event="<?php echo esc_attr( (string) $event_id ); ?>">
 <?php if ( array() !== $tracks ) : ?>
-	<div class="odv-agenda__filters">
+	<div class="odv-agenda__filters" role="group" aria-label="<?php esc_attr_e( 'Filter by track', 'odavent-events' ); ?>">
 		<button type="button" class="odv-agenda__filter" data-track="" aria-pressed="true"><?php esc_html_e( 'All', 'odavent-events' ); ?></button>
 <?php foreach ( $tracks as $track ) : ?>
 		<button type="button" class="odv-agenda__filter" data-track="<?php echo esc_attr( $track ); ?>" aria-pressed="false"><?php echo esc_html( $track ); ?></button>

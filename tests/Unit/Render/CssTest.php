@@ -23,7 +23,7 @@ class CssTest extends TestCase {
 
 	public function test_hidden_elements_stay_hidden_despite_display_rules(): void {
 		// The filter script and the countdown script toggle the hidden attribute; a display rule on the same element would beat it.
-		foreach ( array( '.odv-agenda__session[hidden]', '.odv-agenda__day[hidden]', '.odv-countdown [hidden]' ) as $selector ) {
+		foreach ( array( '.odv-agenda__session[hidden]', '.odv-agenda__day[hidden]', '.odv-countdown [hidden]', '.odv-countdown[hidden]' ) as $selector ) {
 			$this->assertStringContainsString( $selector, $this->css );
 		}
 	}

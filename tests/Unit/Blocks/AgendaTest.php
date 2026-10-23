@@ -255,7 +255,7 @@ class AgendaTest extends BlockTestCase {
 	public function test_track_filter_buttons_need_two_tracks_and_the_attribute(): void {
 		$html = $this->render( $this->payload() );
 
-		$this->assertStringContainsString( '<div class="odv-agenda__filters">', $html );
+		$this->assertStringContainsString( '<div class="odv-agenda__filters" role="group" aria-label="Filter by track">', $html );
 		$xpath   = $this->xpath( $html );
 		$buttons = $xpath->query( '//div[contains(@class,"odv-agenda__filters")]/button' );
 		$this->assertSame( 3, $buttons->length, 'All + two tracks' );
@@ -277,6 +277,65 @@ class AgendaTest extends BlockTestCase {
 
 		$none = $this->with_sessions( array( $this->session( 1 ), $this->session( 2, array( 'track' => '' ) ) ) );
 		$this->assertStringNotContainsString( 'odv-agenda__filters', $this->render( $none ) );
+	}
+
+	public function test_a_room_on_another_day_than_its_parent_shows_its_date(): void {
+		$payload = $this->with_sessions(
+			array(
+				$this->session( 1, array( 'starts_at' => '2026-11-12T09:00:00+00:00', 'ends_at' => '2026-11-12T10:00:00+00:00' ) ),
+				$this->session( 2, array( 'parent_id' => 1, 'name' => 'Same day room', 'starts_at' => '2026-11-12T09:30:00+00:00', 'ends_at' => '2026-11-12T10:00:00+00:00' ) ),
+				$this->session( 3, array( 'parent_id' => 1, 'name' => 'Next day room', 'starts_at' => '2026-11-13T09:30:00+00:00', 'ends_at' => '2026-11-13T10:00:00+00:00' ) ),
+			),
+			array( 'timezone' => 'UTC' )
+		);
+		$html = $this->render( $payload );
+
+		$this->assertStringContainsString( '<p class="odv-agenda__time">09:30 – 10:00</p>', $html, 'same day: time only' );
+		$this->assertStringContainsString( '<p class="odv-agenda__time">2026-11-13 09:30 – 10:00</p>', $html, 'another day: date and time' );
+		$this->assertStringContainsString( '<p class="odv-agenda__time">09:00 – 10:00</p>', $html, 'the parent shows no date' );
+	}
+
+	public function test_days_and_local_times_across_daylight_saving_changes(): void {
+		// Europe/Paris springs forward on 2026-03-29 at 01:00 UTC (02:00 -> 03:00) and falls back on 2026-10-25 at 01:00 UTC (03:00 -> 02:00).
+		$sessions = array(
+			$this->session( 1, array( 'name' => 'Spring A', 'starts_at' => '2026-03-28T23:30:00+00:00', 'ends_at' => '2026-03-29T00:15:00+00:00' ) ),
+			$this->session( 2, array( 'name' => 'Spring B', 'starts_at' => '2026-03-29T00:30:00+00:00', 'ends_at' => '2026-03-29T01:15:00+00:00' ) ),
+			$this->session( 3, array( 'name' => 'Spring C', 'starts_at' => '2026-03-29T01:30:00+00:00', 'ends_at' => '2026-03-29T02:00:00+00:00' ) ),
+			$this->session( 4, array( 'name' => 'Spring D', 'starts_at' => '2026-03-29T21:30:00+00:00', 'ends_at' => '2026-03-29T22:15:00+00:00' ) ),
+			$this->session( 5, array( 'name' => 'Spring E', 'starts_at' => '2026-03-29T22:30:00+00:00', 'ends_at' => '2026-03-29T23:00:00+00:00' ) ),
+		);
+		$html = $this->render( $this->with_sessions( $sessions, array( 'timezone' => 'Europe/Paris' ) ) );
+
+		$this->assertSame( array( '2026-03-29', '2026-03-30' ), $this->days( $html ), 'A, B, C, D on the 29th; E on the 30th' );
+		foreach ( array(
+			'00:30 – 01:15' => 'Spring A',
+			'01:30 – 03:15' => 'Spring B',
+			'03:30 – 04:00' => 'Spring C',
+			'23:30 – 2026-03-30 00:15' => 'Spring D',
+			'00:30 – 01:00' => 'Spring E',
+		) as $range => $name ) {
+			$this->assertMatchesRegularExpression( '#<p class="odv-agenda__time">' . preg_quote( $range, '#' ) . '</p>\s*<h4 class="odv-agenda__title">' . $name . '</h4>#', $html, $name );
+		}
+
+		$sessions = array(
+			$this->session( 1, array( 'name' => 'Fall A', 'starts_at' => '2026-10-24T22:30:00+00:00', 'ends_at' => '2026-10-24T23:30:00+00:00' ) ),
+			$this->session( 2, array( 'name' => 'Fall B', 'starts_at' => '2026-10-25T00:30:00+00:00', 'ends_at' => '2026-10-25T01:00:00+00:00' ) ),
+			$this->session( 3, array( 'name' => 'Fall C', 'starts_at' => '2026-10-25T01:30:00+00:00', 'ends_at' => '2026-10-25T02:30:00+00:00' ) ),
+			$this->session( 4, array( 'name' => 'Fall D', 'starts_at' => '2026-10-25T22:30:00+00:00', 'ends_at' => '2026-10-25T23:00:00+00:00' ) ),
+			$this->session( 5, array( 'name' => 'Fall E', 'starts_at' => '2026-10-25T23:30:00+00:00', 'ends_at' => '2026-10-26T00:00:00+00:00' ) ),
+		);
+		$html = $this->render( $this->with_sessions( $sessions, array( 'timezone' => 'Europe/Paris' ) ) );
+
+		$this->assertSame( array( '2026-10-25', '2026-10-26' ), $this->days( $html ), 'A to D on the 25th; E on the 26th' );
+		foreach ( array(
+			'00:30 – 01:30' => 'Fall A',
+			'02:30 – 02:00' => 'Fall B',
+			'02:30 – 03:30' => 'Fall C',
+			'23:30 – 2026-10-26 00:00' => 'Fall D',
+			'00:30 – 01:00' => 'Fall E',
+		) as $range => $name ) {
+			$this->assertMatchesRegularExpression( '#<p class="odv-agenda__time">' . preg_quote( $range, '#' ) . '</p>\s*<h4 class="odv-agenda__title">' . $name . '</h4>#', $html, $name );
+		}
 	}
 
 	public function test_filters_come_before_the_days(): void {

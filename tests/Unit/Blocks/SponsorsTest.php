@@ -56,6 +56,83 @@ class SponsorsTest extends BlockTestCase {
 		$this->assertSame( 1, substr_count( $html, 'odv-sponsors__item--featured' ) );
 	}
 
+	/**
+	 * @return array[] Interleaved types, featured rows first as Odavent sends them.
+	 */
+	private function interleaved(): array {
+		return $this->with_partners(
+			array(
+				$this->partner( array( 'id' => 1, 'name' => 'S1 featured sponsor', 'type' => 'sponsor', 'is_featured' => true ) ),
+				$this->partner( array( 'id' => 2, 'name' => 'E1 featured exhibitor', 'type' => 'exhibitor', 'is_featured' => true ) ),
+				$this->partner( array( 'id' => 3, 'name' => 'S2 sponsor', 'type' => 'sponsor' ) ),
+				$this->partner( array( 'id' => 4, 'name' => 'E2 exhibitor', 'type' => 'exhibitor' ) ),
+				$this->partner( array( 'id' => 5, 'name' => 'M1 media', 'type' => 'media' ) ),
+				$this->partner( array( 'id' => 6, 'name' => 'S3 sponsor', 'type' => 'sponsor' ) ),
+			)
+		);
+	}
+
+	/**
+	 * @return string[] Partner names (alt text or name text) in rendered order.
+	 */
+	private function rendered_names( string $html ): array {
+		$names = array();
+		foreach ( $this->xpath_items( $html ) as $item ) {
+			$names[] = $item;
+		}
+
+		return $names;
+	}
+
+	/**
+	 * @return string[]
+	 */
+	private function xpath_items( string $html ): array {
+		$xpath = new \DOMXPath( $this->dom( $html ) );
+		$out   = array();
+		foreach ( $xpath->query( '//li[contains(@class,"odv-sponsors__item")]' ) as $li ) {
+			$img   = $xpath->query( './/img', $li )->item( 0 );
+			$out[] = null !== $img ? $img->getAttribute( 'alt' ) : trim( $xpath->query( './/span[contains(@class,"odv-sponsors__name")]', $li )->item( 0 )->textContent );
+		}
+
+		return $out;
+	}
+
+	public function test_ungrouped_mode_is_one_flat_list_in_payload_order(): void {
+		$html = $this->render( $this->interleaved(), array( 'groupByType' => false ) );
+
+		$this->assertSame( array( 'S1 featured sponsor', 'E1 featured exhibitor', 'S2 sponsor', 'E2 exhibitor', 'M1 media', 'S3 sponsor' ), $this->rendered_names( $html ) );
+		$this->assertSame( 1, substr_count( $html, '<ul class=' ), 'one list' );
+		$this->assertStringNotContainsString( 'odv-sponsors__group', $html );
+	}
+
+	public function test_grouped_mode_orders_the_groups_but_keeps_payload_order_inside_each(): void {
+		$html = $this->render( $this->interleaved() );
+
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $html, $m );
+		$this->assertSame( array( 'Sponsors', 'Exhibitors', 'Media partners' ), $m[1] );
+		$this->assertSame( array( 'S1 featured sponsor', 'S2 sponsor', 'S3 sponsor', 'E1 featured exhibitor', 'E2 exhibitor', 'M1 media' ), $this->rendered_names( $html ) );
+	}
+
+	public function test_a_non_ascii_type_is_lower_cased_safely(): void {
+		$payload = $this->with_partners(
+			array(
+				$this->partner( array( 'id' => 1, 'name' => 'A', 'type' => 'SPONSOR' ) ),
+				$this->partner( array( 'id' => 2, 'name' => 'B', 'type' => 'Sponsor' ) ),
+				$this->partner( array( 'id' => 3, 'name' => 'C', 'type' => 'ÉCOLES' ) ),
+				$this->partner( array( 'id' => 4, 'name' => 'D', 'type' => 'écoles' ) ),
+			)
+		);
+		$html = $this->render( $payload );
+
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $html, $m );
+		$this->assertSame( 'Sponsors', $m[1][0], 'ASCII types still fold case' );
+		$this->assertCount( 3, $m[1], 'SPONSOR and Sponsor share a group; the two accented spellings are never mangled into byte garbage' );
+		foreach ( $m[1] as $title ) {
+			$this->assertSame( 1, preg_match( '//u', $title ), 'valid UTF-8: ' . $title );
+		}
+	}
+
 	public function test_known_groups_come_in_a_fixed_order_then_unknown_types_by_appearance(): void {
 		$payload = $this->with_partners(
 			array(

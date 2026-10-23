@@ -36,3 +36,6 @@ jobs:
 
       - name: JS syntax (node --check)
         run: bin/lint-js
+
+      - name: JS tests (plain node)
+        run: bin/test-js

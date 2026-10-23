@@ -250,6 +250,7 @@
 
 .odv-calendar__list { margin: 0; padding: 0; list-style: none; }
 
+.odv-countdown[hidden],
 .odv-countdown [hidden] { display: none; }
 
 .odv-countdown__message { margin: 0; font-size: 1.25em; font-weight: 600; }
