@@ -287,8 +287,24 @@ class SettingsPageTest extends TestCase {
 		$this->assertSame( 'odavent_events', $group );
 		$this->assertSame( Options::OPTION, $name );
 		$this->assertSame( 'array', $args['type'] );
-		$this->assertSame( array(), $args['default'] );
 		$this->assertSame( array( $page, 'sanitize' ), $args['sanitize_callback'] );
+	}
+
+	public function test_register_setting_declares_no_default_that_would_autoload_the_first_save(): void {
+		// Core's update_option(): when the stored value === apply_filters( "default_option_{$option}" ), the
+		// option counts as missing and is re-added by add_option() with NO autoload argument (autoload `yes`,
+		// or `auto` on 6.6+). register_setting() 'default' feeds that filter, and ensure_exists() stores
+		// array(), so a default equal to it put the site key back into autoload on the first save (found on
+		// a real WordPress 7.1 by bin/smoke.sh check 9).
+		$page = $this->page();
+		$page->register();
+		$this->run_hook( 'admin_init' );
+
+		$args = $this->registered[0][2];
+		$this->assertFalse(
+			array_key_exists( 'default', $args ) && array() === $args['default'],
+			'The registered default must not equal the placeholder ensure_exists() stores.'
+		);
 	}
 
 	public function test_plugin_action_links_adds_one_settings_link(): void {

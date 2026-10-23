@@ -76,13 +76,16 @@ class Settings_Page {
 	}
 
 	public function register_settings(): void {
+		// No 'default': update_option() treats an option whose stored value equals the registered default
+		// as missing and re-adds it with add_option() and no autoload argument (autoloaded: `yes`, or `auto`
+		// since WordPress 6.6). ensure_exists() stores array(), so a default of array() would autoload the
+		// site key on the first save.
 		register_setting(
 			self::GROUP,
 			Options::OPTION,
 			array(
 				'type'              => 'array',
 				'sanitize_callback' => array( $this, 'sanitize' ),
-				'default'           => array(),
 			)
 		);
 
