@@ -11,6 +11,7 @@ use Odavent\Events\Rest\Editor_Controller;
 use Odavent\Events\Settings\Options;
 use Odavent\Events\Settings\Settings_Page;
 use Odavent\Events\Shortcodes\Shortcodes;
+use Odavent\Events\Updates\Update_Checker;
 
 /**
  * Plugin entry point. Later tasks register their components in boot().
@@ -40,6 +41,9 @@ final class Plugin {
 
 	/** @var Shortcodes|null */
 	private $shortcodes = null;
+
+	/** @var Update_Checker|null */
+	private $updates = null;
 
 	private function __construct() {
 	}
@@ -88,6 +92,11 @@ final class Plugin {
 				return $this->blocks()->add_category( $categories );
 			}
 		);
+
+		// Update checks only where WordPress runs them: wp-admin and cron, never a front-end request.
+		if ( is_admin() || wp_doing_cron() ) {
+			$this->updates()->register();
+		}
 
 		add_action(
 			'rest_api_init',
@@ -166,6 +175,14 @@ final class Plugin {
 		}
 
 		return $this->shortcodes;
+	}
+
+	public function updates(): Update_Checker {
+		if ( null === $this->updates ) {
+			$this->updates = new Update_Checker( $this->client() );
+		}
+
+		return $this->updates;
 	}
 
 	public function version(): string {

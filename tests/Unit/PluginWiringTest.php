@@ -9,6 +9,7 @@ use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Plugin;
 use Odavent\Events\Refresh\Page_Cache_Purger;
 use Odavent\Events\Tests\TestCase;
+use Odavent\Events\Updates\Update_Checker;
 
 class PluginWiringTest extends TestCase {
 
@@ -28,6 +29,7 @@ class PluginWiringTest extends TestCase {
 			}
 		);
 		Functions\when( 'add_filter' )->justReturn( true );
+		Functions\when( 'wp_doing_cron' )->justReturn( false );
 		Functions\when( 'plugin_basename' )->justReturn( 'odavent-events/odavent-events.php' );
 	}
 
@@ -60,6 +62,45 @@ class PluginWiringTest extends TestCase {
 		Functions\when( 'is_admin' )->justReturn( false );
 		$this->fresh_plugin()->boot();
 		$this->assertNotContains( 'admin_menu', $this->hooks );
+	}
+
+	/**
+	 * Runs boot() and returns the filters it registered.
+	 */
+	private function boot_and_collect_filters( bool $is_admin, bool $is_cron ): array {
+		Functions\when( 'is_admin' )->justReturn( $is_admin );
+		Functions\when( 'wp_doing_cron' )->justReturn( $is_cron );
+		$filters = array();
+		Functions\when( 'add_filter' )->alias(
+			function ( $hook ) use ( &$filters ) {
+				$filters[] = $hook;
+				return true;
+			}
+		);
+		$this->fresh_plugin()->boot();
+
+		return $filters;
+	}
+
+	public function test_updates_are_wired_in_admin_and_in_cron_but_not_on_the_front_end(): void {
+		$admin = $this->boot_and_collect_filters( true, false );
+		$this->assertContains( 'pre_set_site_transient_update_plugins', $admin );
+		$this->assertContains( 'plugins_api', $admin );
+
+		$cron = $this->boot_and_collect_filters( false, true );
+		$this->assertContains( 'pre_set_site_transient_update_plugins', $cron );
+		$this->assertContains( 'plugins_api', $cron );
+
+		$front = $this->boot_and_collect_filters( false, false );
+		$this->assertNotContains( 'pre_set_site_transient_update_plugins', $front );
+		$this->assertNotContains( 'plugins_api', $front );
+	}
+
+	public function test_the_update_checker_is_a_lazy_singleton_inside_the_plugin(): void {
+		$plugin = $this->fresh_plugin();
+
+		$this->assertInstanceOf( Update_Checker::class, $plugin->updates() );
+		$this->assertSame( $plugin->updates(), $plugin->updates() );
 	}
 
 	public function test_boot_registers_the_refresh_route_on_rest_api_init(): void {
