@@ -10,6 +10,7 @@ use Odavent\Events\Render\Assets;
 use Odavent\Events\Rest\Editor_Controller;
 use Odavent\Events\Settings\Options;
 use Odavent\Events\Settings\Settings_Page;
+use Odavent\Events\Shortcodes\Shortcodes;
 
 /**
  * Plugin entry point. Later tasks register their components in boot().
@@ -37,6 +38,9 @@ final class Plugin {
 	/** @var Block_Registry|null */
 	private $blocks = null;
 
+	/** @var Shortcodes|null */
+	private $shortcodes = null;
+
 	private function __construct() {
 	}
 
@@ -60,6 +64,15 @@ final class Plugin {
 				$this->assets()->register_styles();
 				$this->blocks()->register();
 			}
+		);
+
+		// After the blocks (priority 10), so the block.json files are the source for both.
+		add_action(
+			'init',
+			function () {
+				$this->shortcodes()->register();
+			},
+			11
 		);
 
 		add_action(
@@ -145,6 +158,14 @@ final class Plugin {
 		}
 
 		return $this->blocks;
+	}
+
+	public function shortcodes(): Shortcodes {
+		if ( null === $this->shortcodes ) {
+			$this->shortcodes = new Shortcodes( $this->blocks() );
+		}
+
+		return $this->shortcodes;
 	}
 
 	public function version(): string {

@@ -115,6 +115,31 @@ class Block_Registry {
 	}
 
 	/**
+	 * The attribute schema of a block (name => definition with `type` and `default`) from its block.json,
+	 * so shortcodes and docs derive from the same file the editor uses. Empty for an unknown slug.
+	 *
+	 * @param string $slug Block slug (`speakers`).
+	 * @return array<string, array>
+	 */
+	public function block_attributes( string $slug ): array {
+		if ( ! isset( $this->renderers()[ $slug ] ) ) {
+			return array();
+		}
+
+		$json       = $this->read_json( $this->blocks_dir . '/' . $slug . '/block.json' );
+		$attributes = is_array( $json ) && isset( $json['attributes'] ) && is_array( $json['attributes'] ) ? $json['attributes'] : array();
+
+		$clean = array();
+		foreach ( $attributes as $name => $definition ) {
+			if ( is_string( $name ) && is_array( $definition ) ) {
+				$clean[ $name ] = $definition;
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
 	 * @internal Tests only: replaces the renderer of one block.
 	 *
 	 * @param string   $slug     Block slug.

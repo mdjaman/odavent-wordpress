@@ -93,8 +93,13 @@ class PluginWiringTest extends TestCase {
 		Functions\when( 'is_admin' )->justReturn( false );
 		$actions = array();
 		$filters = array();
+		$late_init = null;
 		Functions\when( 'add_action' )->alias(
-			function ( $hook, $callback ) use ( &$actions ) {
+			function ( $hook, $callback, $priority = 10 ) use ( &$actions, &$late_init ) {
+				if ( 'init' === $hook && 11 === $priority ) {
+					$late_init = $callback;
+					return true;
+				}
 				$actions[ $hook ] = $callback;
 				return true;
 			}
@@ -162,5 +167,19 @@ class PluginWiringTest extends TestCase {
 
 		$categories = call_user_func( $filters['block_categories_all'], array() );
 		$this->assertSame( 'odavent-events', $categories[0]['slug'] );
+
+		// Shortcodes: init at priority 11, after the blocks, one per block.
+		$this->assertNotNull( $late_init );
+		$tags = array();
+		Functions\when( 'add_shortcode' )->alias(
+			function ( $tag ) use ( &$tags ) {
+				$tags[] = $tag;
+			}
+		);
+		call_user_func( $late_init );
+		$this->assertCount( 10, $tags );
+		$this->assertContains( 'odavent_speakers', $tags );
+		$this->assertInstanceOf( \Odavent\Events\Shortcodes\Shortcodes::class, $plugin->shortcodes() );
+		$this->assertSame( $plugin->shortcodes(), $plugin->shortcodes() );
 	}
 }
