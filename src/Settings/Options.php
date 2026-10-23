@@ -16,6 +16,9 @@ class Options {
 	const MAX_CACHE_TTL       = 86400;
 	const SETTINGS_ERROR_NAME = 'odavent_events_settings';
 
+	/** @var bool Whether add_error() raises settings errors during the current sanitize() pass. */
+	private $report_errors = true;
+
 	/**
 	 * Default settings.
 	 *
@@ -84,6 +87,13 @@ class Options {
 		return is_string( $stored ) && self::is_valid_key( $stored ) ? $stored : '';
 	}
 
+	/**
+	 * Whether the ODAVENT_SITE_KEY constant is set (then it wins and the settings field is read-only).
+	 */
+	public function is_key_from_constant(): bool {
+		return '' !== $this->constant_key();
+	}
+
 	public function has_key(): bool {
 		return '' !== $this->site_key();
 	}
@@ -138,11 +148,14 @@ class Options {
 	 *
 	 * Invalid base URLs and keys are rejected (the current value is kept) with a settings error.
 	 *
-	 * @param array $input   Raw submitted values.
-	 * @param array $current Currently stored settings.
+	 * @param array $input         Raw submitted values.
+	 * @param array $current       Currently stored settings.
+	 * @param bool  $report_errors Whether to raise settings errors (false for a repeat pass in the same request).
 	 * @return array
 	 */
-	public function sanitize( array $input, array $current ): array {
+	public function sanitize( array $input, array $current, bool $report_errors = true ): array {
+		$this->report_errors = $report_errors;
+
 		$current = array_merge( self::defaults(), array_intersect_key( $current, self::defaults() ) );
 		$out     = $current;
 
@@ -176,6 +189,8 @@ class Options {
 
 		// Checkbox: absent means unchecked.
 		$out['load_css'] = ! empty( $input['load_css'] ) && '0' !== $input['load_css'] && 'false' !== $input['load_css'];
+
+		$this->report_errors = true;
 
 		return $out;
 	}
@@ -275,7 +290,7 @@ class Options {
 	}
 
 	private function add_error( string $code, string $message ): void {
-		if ( function_exists( 'add_settings_error' ) ) {
+		if ( $this->report_errors && function_exists( 'add_settings_error' ) ) {
 			add_settings_error( self::SETTINGS_ERROR_NAME, $code, $message, 'error' );
 		}
 	}

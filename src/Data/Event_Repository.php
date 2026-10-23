@@ -21,6 +21,8 @@ use Odavent\Events\Settings\Options;
  * - `odavent_events_backoff` transient, 60 s: circuit breaker. After an Odavent failure, page
  *   views skip HTTP (stale or UNAVAILABLE) instead of each waiting for the 8 s timeout.
  * - `odavent_events_invalid_key_notice` transient, 12 h: the settings page shows a notice.
+ * - `odavent_events_contract_notice` transient, 12 h: a payload declared a newer contract than
+ *   Client::SUPPORTED_CONTRACT; the payload is still used and the settings page asks for an update.
  *
  * Nothing about a draft is written outside the preview transient, and only for an editor.
  */
@@ -34,6 +36,7 @@ class Event_Repository {
 	const INDEX_OPTION       = 'odavent_events_lastgood_index';
 	const BACKOFF            = 'odavent_events_backoff';
 	const INVALID_KEY_NOTICE = 'odavent_events_invalid_key_notice';
+	const CONTRACT_NOTICE    = 'odavent_events_contract_notice';
 
 	const PREVIEW_TTL     = 60;
 	const LIST_TTL        = 300;
@@ -170,7 +173,7 @@ class Event_Repository {
 	}
 
 	/**
-	 * Forgets everything this plugin cached, plus the breaker and the invalid-key notice.
+	 * Forgets everything this plugin cached, plus the breaker and the key/contract notices.
 	 */
 	public function purge_all(): void {
 		foreach ( $this->index() as $event_id ) {
@@ -180,6 +183,7 @@ class Event_Repository {
 		delete_transient( self::LIST_TRANSIENT );
 		delete_transient( self::BACKOFF );
 		delete_transient( self::INVALID_KEY_NOTICE );
+		delete_transient( self::CONTRACT_NOTICE );
 		delete_option( self::SLUGS_OPTION );
 		delete_option( self::INDEX_OPTION );
 		$this->memo = array();
@@ -295,6 +299,11 @@ class Event_Repository {
 	 */
 	private function accept( array $payload, int $id, bool $preview_allowed, string $loc ): Event_View {
 		delete_transient( self::BACKOFF );
+
+		$contract = $payload['contract'] ?? null;
+		if ( is_int( $contract ) && $contract > Client::SUPPORTED_CONTRACT ) {
+			set_transient( self::CONTRACT_NOTICE, 1, self::NOTICE_TTL );
+		}
 
 		$state = Event_View::state_of( $payload );
 

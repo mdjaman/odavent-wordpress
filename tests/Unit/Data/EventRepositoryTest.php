@@ -1051,4 +1051,39 @@ class EventRepositoryTest extends TestCase {
 		$this->assertSame( Event_View::GONE, $this->repo()->get( -5 )->state() );
 		$this->assertSame( array(), $this->calls );
 	}
+
+	// ---- contract newer than supported -----------------------------------------
+
+	public function test_newer_contract_raises_the_notice_and_the_payload_is_still_used(): void {
+		$payload             = $this->payload();
+		$payload['contract'] = Client::SUPPORTED_CONTRACT + 1;
+		$this->answer( 'site_event', Result::ok( $payload ) );
+
+		$view = $this->repo()->get( 42 );
+
+		$this->assertSame( Event_View::LIVE, $view->state() );
+		$this->assertSame( 1, $this->transient( Event_Repository::CONTRACT_NOTICE ) );
+		$this->assertSame( 12 * 3600, $this->ttl_of( Event_Repository::CONTRACT_NOTICE ) );
+		$this->assertSame( 'odavent_events_contract_notice', Event_Repository::CONTRACT_NOTICE );
+	}
+
+	public function test_supported_or_missing_contract_raises_no_notice(): void {
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+		$this->repo()->get( 42 );
+		$this->assertNull( $this->transient( Event_Repository::CONTRACT_NOTICE ) );
+
+		$odd = $this->payload();
+		unset( $odd['contract'] );
+		$odd['event']['id'] = 43;
+		$this->answer( 'site_event', Result::ok( $odd ) );
+		$this->repo()->get( 43 );
+		$this->assertNull( $this->transient( Event_Repository::CONTRACT_NOTICE ) );
+
+		$text                = $this->payload();
+		$text['contract']    = '99';
+		$text['event']['id'] = 44;
+		$this->answer( 'site_event', Result::ok( $text ) );
+		$this->repo()->get( 44 );
+		$this->assertNull( $this->transient( Event_Repository::CONTRACT_NOTICE ), 'only an int counts' );
+	}
 }

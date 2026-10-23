@@ -485,4 +485,31 @@ echo class_exists( "Odavent\\\\Events\\\\Settings\\\\Options" ) ? "nested-ok" : 
 		$this->assertInstanceOf( Options::class, $plugin->options() );
 		$this->assertSame( $plugin->options(), $plugin->options() );
 	}
+
+	public function test_is_key_from_constant_reflects_the_constant_only(): void {
+		$this->stored( array( 'site_key' => self::KEY ) );
+
+		$this->assertFalse( ( new OptionsWithConstant() )->is_key_from_constant() );
+
+		$options           = new OptionsWithConstant();
+		$options->constant = 'odv_wp_CONSTANTKEY0987654321';
+		$this->assertTrue( $options->is_key_from_constant() );
+	}
+
+	public function test_sanitize_can_run_silently_and_reports_again_afterwards(): void {
+		$this->stored( array() );
+		$calls = 0;
+		Functions\when( 'add_settings_error' )->alias(
+			function () use ( &$calls ) {
+				++$calls;
+			}
+		);
+		$options = new Options();
+
+		$options->sanitize( array( 'base_url' => 'ftp://nope' ), array(), false );
+		$this->assertSame( 0, $calls );
+
+		$options->sanitize( array( 'base_url' => 'ftp://nope' ), array() );
+		$this->assertSame( 1, $calls, 'silence applies to one pass only' );
+	}
 }
