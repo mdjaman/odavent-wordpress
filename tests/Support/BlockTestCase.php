@@ -84,17 +84,19 @@ abstract class BlockTestCase extends RenderTestCase {
 	 * @param array|null  $payload    Payload, or null for an empty view of $empty_state.
 	 * @param string      $empty_state State of the empty view.
 	 * @param array       $slugs      slug => id for resolve_id().
+	 * @param bool        $stale      Serve the payload as a stale last-good copy.
 	 */
-	protected function repository( ?array $payload, string $empty_state = Event_View::GONE, array $slugs = array() ): Event_Repository {
+	protected function repository( ?array $payload, string $empty_state = Event_View::GONE, array $slugs = array(), bool $stale = false ): Event_Repository {
 		$repo = Mockery::mock( Event_Repository::class );
 		$repo->shouldReceive( 'get' )->andReturnUsing(
-			function ( $id, $slug = '', $preview = false ) use ( $payload, $empty_state ) {
+			function ( $id, $slug = '', $preview = false ) use ( $payload, $empty_state, $stale ) {
 				$this->repo_calls[] = array( $id, $slug, $preview );
 				if ( null === $payload ) {
 					return Event_View::empty( $empty_state );
 				}
 
-				return Event_View::from_payload( $payload, $preview );
+				// Like Event_Repository::fallback(): a last-good copy is never a preview.
+				return $stale ? Event_View::from_payload( $payload, false, true ) : Event_View::from_payload( $payload, $preview );
 			}
 		);
 		$repo->shouldReceive( 'resolve_id' )->andReturnUsing(
@@ -114,8 +116,8 @@ abstract class BlockTestCase extends RenderTestCase {
 		return $options;
 	}
 
-	protected function registry( ?array $payload, string $empty_state = Event_View::GONE, array $slugs = array(), int $default_event = 0 ): Block_Registry {
-		return new Block_Registry( $this->repository( $payload, $empty_state, $slugs ), $this->options( $default_event ) );
+	protected function registry( ?array $payload, string $empty_state = Event_View::GONE, array $slugs = array(), int $default_event = 0, bool $stale = false ): Block_Registry {
+		return new Block_Registry( $this->repository( $payload, $empty_state, $slugs, $stale ), $this->options( $default_event ) );
 	}
 
 	/**

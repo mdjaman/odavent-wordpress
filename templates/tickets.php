@@ -11,6 +11,7 @@
  * @var string                            $button_label Text of the per-ticket links.
  * @var string                            $message      Why there are no Register links ('' while registration is open).
  * @var string                            $notice       Secure-payment notice ('' when no ticket has a link).
+ * @var string                            $stale_notice Notice HTML (templates/notice.php) when the data is a stale copy, else ''.
  * @var \Odavent\Events\Data\Event_View   $view         The full event view.
  *
  * @package Odavent\Events
@@ -19,6 +20,9 @@
 defined( 'ABSPATH' ) || exit;
 ?>
 <section class="<?php echo esc_attr( $classes ); ?>" data-odv-event="<?php echo esc_attr( (string) $event_id ); ?>">
+<?php if ( '' !== $stale_notice ) : ?>
+	<?php echo $stale_notice; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered by templates/notice.php (escaped). ?>
+<?php endif; ?>
 	<ul class="odv-tickets__list">
 <?php foreach ( $tickets as $ticket ) : ?>
 		<li class="odv-tickets__item<?php echo $ticket['sold_out'] ? ' odv-tickets__item--sold-out' : ''; ?>">

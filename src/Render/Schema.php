@@ -68,7 +68,9 @@ final class Schema {
 			$data['image'] = array( $image );
 		}
 
-		$offers = self::offers( $view->tickets(), self::string_of( $event, 'currency' ), $url );
+		// Offers only while registration is really offered: a cancelled, paused, closed or stale event must
+		// not advertise tickets as InStock.
+		$offers = $view->can_register() ? self::offers( $view->tickets(), self::string_of( $event, 'currency' ), $url ) : array();
 		if ( array() !== $offers ) {
 			$data['offers'] = $offers;
 		}

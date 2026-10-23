@@ -66,8 +66,9 @@ class LifecycleMatrixTest extends BlockTestCase {
 			}
 		}
 
-		// Tickets never carry the lifecycle notice box; they replace their links with a line.
+		// Tickets never carry the lifecycle notice box (only a stale copy's notice); they replace their links with a line.
 		$this->assertStringNotContainsString( 'odv-notice', $tickets );
+		$this->assertStringNotContainsString( 'odv-notice--stale', $register . $header );
 		if ( null === $tickets_text ) {
 			$this->assertStringNotContainsString( 'odv-tickets__message', $tickets );
 		} else {
@@ -77,6 +78,56 @@ class LifecycleMatrixTest extends BlockTestCase {
 		if ( null === $notice && ! $links ) {
 			$this->assertStringContainsString( self::CLOSED, $register );
 		}
+	}
+
+	const STALE = 'Registration details could not be refreshed. Please check the event page on Odavent.';
+
+	public function stale_states(): array {
+		return array(
+			'stale LIVE'                     => array( 'live', false ),
+			'stale LIVE, editor'             => array( 'live', true ),
+			'stale ENDED, registration open' => array( 'ended open', false ),
+			'stale PAUSED'                   => array( 'paused', false ),
+			'stale CANCELLED'                => array( 'cancelled', false ),
+		);
+	}
+
+	/**
+	 * A last-good copy served because Odavent failed never offers Register: the event may have been
+	 * cancelled, paused or unpublished since. Content stays.
+	 *
+	 * @dataProvider stale_states
+	 */
+	public function test_a_stale_copy_never_offers_registration( string $state, bool $editor ): void {
+		$this->editor = $editor;
+		$payload      = $this->payload( self::state_overrides()[ $state ] );
+
+		// Not vacuous: the same payload, fresh, offers the links when its state allows them.
+		$fresh = $this->registry( $payload );
+		if ( in_array( $state, array( 'live', 'ended open' ), true ) ) {
+			$this->assertStringContainsString( 'odv-register__button', $fresh->render_block( 'odavent-events/register-button', array( 'eventId' => 42 ) ) );
+			$this->assertStringContainsString( 'odv-tickets__register', $fresh->render_block( 'odavent-events/tickets', array( 'eventId' => 42 ) ) );
+		}
+
+		$registry = $this->registry( $payload, Event_View::UNAVAILABLE, array(), 0, true );
+		$header   = $registry->render_block( 'odavent-events/event-header', array( 'eventId' => 42 ) );
+		$register = $registry->render_block( 'odavent-events/register-button', array( 'eventId' => 42 ) );
+		$tickets  = $registry->render_block( 'odavent-events/tickets', array( 'eventId' => 42 ) );
+
+		$this->assertStringContainsString( 'odv-header__title', $header );
+		$this->assertStringNotContainsString( 'odv-register__button', $register );
+		$this->assertStringNotContainsString( 'odv-tickets__register', $tickets );
+		$this->assertStringNotContainsString( 'odavent.com/events/sommet-tech-abidjan-2026/register', $register . $tickets );
+		$this->assertStringNotContainsString( 'odv-register__notice', $register . $tickets );
+
+		$this->assertStringContainsString( '<div class="odv-notice odv-notice--stale" role="status">' . self::STALE . '</div>', $register );
+		$this->assertStringContainsString( '<div class="odv-notice odv-notice--stale" role="status">' . self::STALE . '</div>', $tickets );
+		$this->assertLessThan( strpos( $tickets, 'odv-tickets__list' ), strpos( $tickets, 'odv-notice--stale' ), 'above the list' );
+		$this->assertStringContainsString( 'Pass Standard', $tickets, 'ticket names stay' );
+		$this->assertStringContainsString( 'odv-tickets__price', $tickets, 'prices stay' );
+		$this->assertStringNotContainsString( 'odv-notice--stale', $header );
+		$this->assertStringNotContainsString( 'odv-tickets__message', $tickets );
+		$this->assertStringNotContainsString( 'offers', $header, 'no JSON-LD offers from a stale copy' );
 	}
 
 	public function test_a_draft_shows_nothing_to_visitors_and_the_repository_is_asked_without_preview(): void {

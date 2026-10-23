@@ -62,6 +62,12 @@ class Block_Registry {
 	/** @var bool */
 	private $registered = false;
 
+	/** @var bool */
+	private $metadata_added = false;
+
+	/** @var array<string, array|null> Decoded block.json per path (read once per request). */
+	private $json_cache = array();
+
 	/**
 	 * @param Event_Repository $repository Event source.
 	 * @param Options          $options    Settings (default event, stylesheet switch).
@@ -97,8 +103,9 @@ class Block_Registry {
 	// ---- WordPress registration ---------------------------------------------------
 
 	/**
-	 * Registers the editor script (with every block's metadata inline) and every block type. Runs on
-	 * `init`, after the stylesheet handle is registered (block.json names it as editorStyle).
+	 * Registers the editor script and every block type. Runs on `init`, after the stylesheet handle is
+	 * registered (block.json names it as editorStyle). The editor metadata is attached later, only in the
+	 * block editor (add_editor_metadata() on `enqueue_block_editor_assets`).
 	 */
 	public function register(): void {
 		if ( $this->registered ) {
@@ -113,11 +120,6 @@ class Block_Registry {
 			ODAVENT_EVENTS_VERSION,
 			true
 		);
-
-		$json = wp_json_encode( $this->editor_metadata(), JSON_HEX_TAG | JSON_HEX_AMP );
-		if ( is_string( $json ) ) {
-			wp_add_inline_script( self::EDITOR_HANDLE, 'window.odaventEventsBlocks = ' . $json . ';', 'before' );
-		}
 
 		if ( function_exists( 'wp_set_script_translations' ) ) {
 			wp_set_script_translations( self::EDITOR_HANDLE, 'odavent-events', ODAVENT_EVENTS_DIR . 'languages' );
@@ -137,6 +139,22 @@ class Block_Registry {
 					},
 				)
 			);
+		}
+	}
+
+	/**
+	 * `enqueue_block_editor_assets`: prints `window.odaventEventsBlocks` before editor.js, once. Encoded with
+	 * JSON_HEX_TAG | JSON_HEX_AMP so no title or description can close the script element.
+	 */
+	public function add_editor_metadata(): void {
+		if ( $this->metadata_added ) {
+			return;
+		}
+		$this->metadata_added = true;
+
+		$json = wp_json_encode( $this->editor_metadata(), JSON_HEX_TAG | JSON_HEX_AMP );
+		if ( is_string( $json ) ) {
+			wp_add_inline_script( self::EDITOR_HANDLE, 'window.odaventEventsBlocks = ' . $json . ';', 'before' );
 		}
 	}
 
@@ -186,10 +204,15 @@ class Block_Registry {
 				$labels[ $attribute ] = self::label( (string) $attribute, substr( $json['name'], strlen( self::NAMESPACE_PREFIX ) ) );
 			}
 
+			// Title and description from the registered block type: WordPress translated them from block.json.
+			$registered  = class_exists( 'WP_Block_Type_Registry' ) ? \WP_Block_Type_Registry::get_instance()->get_registered( $json['name'] ) : null;
+			$title       = is_object( $registered ) && isset( $registered->title ) && is_string( $registered->title ) && '' !== $registered->title ? $registered->title : ( isset( $json['title'] ) && is_string( $json['title'] ) ? $json['title'] : $json['name'] );
+			$description = is_object( $registered ) && isset( $registered->description ) && is_string( $registered->description ) ? $registered->description : ( isset( $json['description'] ) && is_string( $json['description'] ) ? $json['description'] : '' );
+
 			$meta[] = array(
 				'name'        => $json['name'],
-				'title'       => isset( $json['title'] ) && is_string( $json['title'] ) ? $json['title'] : $json['name'],
-				'description' => isset( $json['description'] ) && is_string( $json['description'] ) ? $json['description'] : '',
+				'title'       => $title,
+				'description' => $description,
 				'icon'        => isset( $json['icon'] ) && is_string( $json['icon'] ) ? $json['icon'] : 'calendar-alt',
 				'category'    => self::CATEGORY,
 				'attributes'  => $attributes,
@@ -214,7 +237,7 @@ class Block_Registry {
 		$editor = false;
 
 		try {
-			$editor   = self::user_can_edit();
+			$editor   = self::user_can_preview();
 			$slug     = 0 === strpos( $name, self::NAMESPACE_PREFIX ) ? substr( $name, strlen( self::NAMESPACE_PREFIX ) ) : $name;
 			$renderer = $this->renderer( $slug );
 			if ( null === $renderer ) {
@@ -335,7 +358,7 @@ class Block_Registry {
 	 * response must not be cached. Headers have to go out here: by the time a block renders they are sent.
 	 */
 	public function prevent_preview_caching(): void {
-		if ( ! self::user_can_edit() || ! self::page_has_odavent_content() ) {
+		if ( ! self::user_can_preview() || ! self::page_has_odavent_content() ) {
 			return;
 		}
 
@@ -376,8 +399,22 @@ class Block_Registry {
 
 	// ---- helpers ----------------------------------------------------------------------
 
-	private static function user_can_edit(): bool {
-		return (bool) current_user_can( 'edit_posts' );
+	/**
+	 * The capability that sees draft previews and editor notices, skips page caching on pages with Odavent
+	 * content, and may list events in the editor. Filter `odavent_events_preview_capability` (default
+	 * `edit_posts`); anything but a non-blank string falls back to the default.
+	 */
+	public static function preview_capability(): string {
+		$capability = apply_filters( 'odavent_events_preview_capability', 'edit_posts' );
+
+		return is_string( $capability ) && '' !== trim( $capability ) ? trim( $capability ) : 'edit_posts';
+	}
+
+	/**
+	 * Whether the current user has the preview capability.
+	 */
+	public static function user_can_preview(): bool {
+		return (bool) current_user_can( self::preview_capability() );
 	}
 
 	/**
@@ -404,10 +441,14 @@ class Block_Registry {
 	}
 
 	private function read_json( string $file ): ?array {
-		$raw  = is_readable( $file ) ? file_get_contents( $file ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		$json = is_string( $raw ) ? json_decode( $raw, true ) : null;
+		if ( ! array_key_exists( $file, $this->json_cache ) ) {
+			$raw  = is_readable( $file ) ? file_get_contents( $file ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			$json = is_string( $raw ) ? json_decode( $raw, true ) : null;
 
-		return is_array( $json ) ? $json : null;
+			$this->json_cache[ $file ] = is_array( $json ) ? $json : null;
+		}
+
+		return $this->json_cache[ $file ];
 	}
 
 	/**

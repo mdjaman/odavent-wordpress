@@ -42,11 +42,30 @@ final class Lifecycle {
 	}
 
 	/**
+	 * Shown in place of Register links when the page shows a stale copy (Odavent could not be reached):
+	 * that copy may say "open" for an event that has since been cancelled, paused or unpublished.
+	 */
+	public static function stale_message(): string {
+		return __( 'Registration details could not be refreshed. Please check the event page on Odavent.', 'odavent-events' );
+	}
+
+	/**
+	 * The stale notice as HTML, or '' when the view is fresh.
+	 */
+	public static function stale_notice_html( Event_View $view ): string {
+		return $view->is_stale() ? self::render_notice( 'stale', self::stale_message() ) : '';
+	}
+
+	/**
 	 * Why there is no Register link ('' when registration is open). Shown in place of links.
 	 */
 	public static function closed_message( Event_View $view ): string {
 		if ( $view->can_register() ) {
 			return '';
+		}
+
+		if ( $view->is_stale() ) {
+			return self::stale_message();
 		}
 
 		switch ( $view->notice_key() ) {
@@ -75,7 +94,7 @@ final class Lifecycle {
 	/**
 	 * A notice through templates/notice.php.
 	 *
-	 * @param string $kind    Modifier: ended, paused, cancelled, draft, unavailable, choose, error.
+	 * @param string $kind    Modifier: ended, paused, cancelled, draft, stale, unavailable, choose, error.
 	 * @param string $message Plain text.
 	 */
 	public static function render_notice( string $kind, string $message ): string {

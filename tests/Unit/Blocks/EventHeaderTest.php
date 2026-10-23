@@ -28,7 +28,8 @@ class EventHeaderTest extends BlockTestCase {
 		$this->assertStringContainsString( 'class="odv-header__dates"', $html );
 		$this->assertStringContainsString( 'Sofitel Abidjan Hôtel Ivoire, Boulevard Hassan II, Cocody, Abidjan, Côte d&#039;Ivoire', $html );
 		$this->assertStringContainsString( 'class="odv-header__cover" src="https://odavent.com/storage/media/42/cover-large.webp"', $html );
-		$this->assertStringContainsString( 'class="odv-header__logo" src="https://odavent.com/storage/media/41/logo-medium.webp"', $html );
+		$this->assertStringContainsString( 'class="odv-header__logo" src="https://odavent.com/storage/media/41/logo-medium.webp" alt="Sommet Tech d&#039;Abidjan 2026"', $html );
+		$this->assertStringContainsString( 'class="odv-header__cover" src="https://odavent.com/storage/media/42/cover-large.webp" alt=""', $html );
 		$this->assertStringContainsString( '<div class="odv-header__description">Deux jours', $html );
 		$this->assertStringContainsString( '<script type="application/ld+json">', $html );
 		$this->assertStringContainsString( '"url":"https://blog.example.com/event-page/"', $html );

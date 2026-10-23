@@ -78,7 +78,8 @@ final class Tickets implements Renderer {
 				'event_id'     => Attributes::event_id( $event ),
 				'tickets'      => $rows,
 				'button_label' => $label,
-				'message'      => Lifecycle::closed_message( $view ),
+				'message'      => $view->is_stale() ? '' : Lifecycle::closed_message( $view ),
+				'stale_notice' => Lifecycle::stale_notice_html( $view ),
 				'notice'       => $any_links ? __( 'Registration and payment are handled securely by Odavent.', 'odavent-events' ) : '',
 				'view'         => $view,
 			)

@@ -26,6 +26,22 @@
 
 	var eventsRequest = null;
 
+	var STATUS_LABELS = {
+		draft: __( 'Draft', DOMAIN ),
+		published: __( 'Published', DOMAIN ),
+		paused: __( 'Paused', DOMAIN ),
+		cancelled: __( 'Cancelled', DOMAIN ),
+		archived: __( 'Archived', DOMAIN )
+	};
+
+	/**
+	 * A translated label for a known Odavent status; an unknown one is shown as sent.
+	 */
+	function statusLabel( status ) {
+		var key = String( status || '' );
+		return Object.prototype.hasOwnProperty.call( STATUS_LABELS, key ) ? STATUS_LABELS[ key ] : key;
+	}
+
 	/**
 	 * One request per editor session; a failure is forgotten so the next picker retries.
 	 */
@@ -82,24 +98,48 @@
 		}
 
 		var current = parseInt( attributes.eventId, 10 ) || 0;
+		var slugHint = typeof attributes.eventSlug === 'string' ? attributes.eventSlug : '';
 		var options = [ { label: __( 'Default event (from the settings)', DOMAIN ), value: '0' } ];
-		var known = false;
+		var byId = null;
+		var bySlug = null;
 		data.events.forEach( function ( event ) {
 			if ( event && typeof event.id === 'number' ) {
-				known = known || event.id === current;
+				if ( event.id === current ) {
+					byId = event;
+				}
+				if ( slugHint && event.slug === slugHint ) {
+					bySlug = event;
+				}
 				options.push( {
 					/* translators: 1: event name, 2: event status. */
-					label: sprintf( __( '%1$s (%2$s)', DOMAIN ), event.name || event.slug || String( event.id ), event.status || '' ),
+					label: sprintf( __( '%1$s (%2$s)', DOMAIN ), event.name || event.slug || String( event.id ), statusLabel( event.status ) ),
 					value: String( event.id )
 				} );
 			}
 		} );
-		if ( current > 0 && ! known ) {
-			options.push( {
-				/* translators: %d: event id. */
-				label: sprintf( __( 'Event #%d', DOMAIN ), current ),
-				value: String( current )
-			} );
+
+		// What the block holds: an id, else a slug (shortcode-style), else the default event.
+		var selected = '0';
+		if ( current > 0 ) {
+			selected = String( current );
+			if ( ! byId ) {
+				options.push( {
+					/* translators: %d: event id. */
+					label: sprintf( __( 'Event #%d', DOMAIN ), current ),
+					value: selected
+				} );
+			}
+		} else if ( slugHint ) {
+			if ( bySlug ) {
+				selected = String( bySlug.id );
+			} else {
+				selected = 'slug:' + slugHint;
+				options.push( {
+					/* translators: %s: event slug. */
+					label: sprintf( __( 'Event: %s', DOMAIN ), slugHint ),
+					value: selected
+				} );
+			}
 		}
 
 		var controls = [];
@@ -118,17 +158,25 @@
 		controls.push( el( components.SelectControl, {
 			key: 'event',
 			label: __( 'Event', DOMAIN ),
-			value: String( current ),
+			value: selected,
 			options: options,
 			onChange: function ( value ) {
+				if ( value === selected || value.indexOf( 'slug:' ) === 0 ) {
+					return;
+				}
 				var id = parseInt( value, 10 ) || 0;
-				var slug = '';
+				if ( id === 0 ) {
+					setAttributes( { eventId: 0, eventSlug: '' } );
+					return;
+				}
+				var found = null;
 				data.events.forEach( function ( event ) {
 					if ( event && event.id === id ) {
-						slug = event.slug || '';
+						found = event;
 					}
 				} );
-				setAttributes( { eventId: id, eventSlug: slug } );
+				// An option that is not in the list keeps the stored slug hint.
+				setAttributes( found ? { eventId: id, eventSlug: found.slug || '' } : { eventId: id } );
 			}
 		} ) );
 

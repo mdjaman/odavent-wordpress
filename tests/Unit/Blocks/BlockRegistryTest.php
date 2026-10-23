@@ -1,6 +1,7 @@
 <?php
 namespace Odavent\Events\Tests\Unit\Blocks;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use Odavent\Events\Blocks\Block_Registry;
 use Odavent\Events\Blocks\Renderer;
@@ -12,6 +13,16 @@ use Odavent\Events\Data\Event_View;
 use Odavent\Events\Tests\Support\BlockTestCase;
 
 class BlockRegistryTest extends BlockTestCase {
+
+	protected function setUp(): void {
+		parent::setUp();
+		\WP_Block_Type_Registry::$types = array();
+	}
+
+	protected function tearDown(): void {
+		\WP_Block_Type_Registry::$types = array();
+		parent::tearDown();
+	}
 
 	// ---- event resolution --------------------------------------------------------
 
@@ -242,9 +253,63 @@ class BlockRegistryTest extends BlockTestCase {
 		$this->assertFileExists( ODAVENT_EVENTS_DIR . 'assets/js/editor.js' );
 	}
 
-	public function test_the_inline_metadata_lists_every_block(): void {
+	public function test_register_alone_adds_no_inline_metadata(): void {
 		$this->capture_registration();
 		$this->registry( null )->register();
+
+		$this->assertSame( array(), $this->inline, 'Front-end requests must not build the editor metadata.' );
+	}
+
+	public function test_the_inline_metadata_is_added_once(): void {
+		$this->capture_registration();
+		$registry = $this->registry( null );
+		$registry->register();
+		$registry->add_editor_metadata();
+		$registry->add_editor_metadata();
+
+		$this->assertCount( 1, $this->inline );
+	}
+
+	public function test_the_inline_metadata_uses_the_translated_registered_titles(): void {
+		$this->capture_registration();
+		$type              = new \stdClass();
+		$type->title       = 'Billets';
+		$type->description = 'Les billets de l’événement.';
+		\WP_Block_Type_Registry::$types['odavent-events/tickets'] = $type;
+
+		$registry = $this->registry( null );
+		$registry->register();
+		$registry->add_editor_metadata();
+
+		$meta = json_decode( substr( $this->inline[0][1], strlen( 'window.odaventEventsBlocks = ' ), -1 ), true );
+		$rows = array_column( $meta, null, 'name' );
+		$this->assertSame( 'Billets', $rows['odavent-events/tickets']['title'] );
+		$this->assertSame( 'Les billets de l’événement.', $rows['odavent-events/tickets']['description'] );
+		$this->assertSame( 'Event header', $rows['odavent-events/event-header']['title'], 'Not registered: block.json title.' );
+	}
+
+	public function test_block_json_is_read_once_per_file(): void {
+		$dir = sys_get_temp_dir() . '/odv-blocks-' . uniqid();
+		mkdir( $dir . '/one', 0777, true );
+		$file = $dir . '/one/block.json';
+		file_put_contents( $file, json_encode( array( 'name' => 'odavent-events/one', 'title' => 'First', 'attributes' => array() ) ) );
+
+		$registry = new Block_Registry( $this->repository( null ), $this->options(), null, $dir );
+		$this->assertSame( 'First', $registry->editor_metadata()[0]['title'] );
+
+		file_put_contents( $file, json_encode( array( 'name' => 'odavent-events/one', 'title' => 'Second', 'attributes' => array() ) ) );
+		$this->assertSame( 'First', $registry->editor_metadata()[0]['title'], 'memoised' );
+
+		unlink( $file );
+		rmdir( $dir . '/one' );
+		rmdir( $dir );
+	}
+
+	public function test_the_inline_metadata_lists_every_block(): void {
+		$this->capture_registration();
+		$registry = $this->registry( null );
+		$registry->register();
+		$registry->add_editor_metadata();
 
 		$this->assertCount( 1, $this->inline );
 		list( $handle, $code, $position ) = $this->inline[0];
@@ -285,7 +350,9 @@ class BlockRegistryTest extends BlockTestCase {
 		);
 
 		$this->capture_registration();
-		( new Block_Registry( $this->repository( null ), $this->options(), null, $dir ) )->register();
+		$registry = new Block_Registry( $this->repository( null ), $this->options(), null, $dir );
+		$registry->register();
+		$registry->add_editor_metadata();
 
 		$code = $this->inline[0][1];
 		$this->assertStringNotContainsString( '<', $code );
@@ -379,5 +446,59 @@ class BlockRegistryTest extends BlockTestCase {
 		$this->registry( null )->enqueue_early_styles();
 
 		$this->assertSame( array(), $this->enqueued_styles );
+	}
+
+	// ---- preview capability ---------------------------------------------------------------
+
+	public function test_the_preview_capability_defaults_to_edit_posts(): void {
+		$this->assertSame( 'edit_posts', Block_Registry::preview_capability() );
+	}
+
+	public function test_a_junk_filtered_capability_falls_back_to_edit_posts(): void {
+		foreach ( array( '', '  ', array( 'x' ), null, 42 ) as $junk ) {
+			Filters\expectApplied( 'odavent_events_preview_capability' )->once()->andReturn( $junk );
+			$this->assertSame( 'edit_posts', Block_Registry::preview_capability() );
+		}
+	}
+
+	/**
+	 * The filtered capability decides preview, editor notices and the early no-cache alike.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_a_filtered_capability_is_used_by_preview_and_no_cache(): void {
+		Filters\expectApplied( 'odavent_events_preview_capability' )->andReturn( 'edit_others_posts' );
+		$asked = array();
+		Functions\when( 'current_user_can' )->alias(
+			function ( $capability ) use ( &$asked ) {
+				$asked[] = $capability;
+				return 'edit_others_posts' === $capability;
+			}
+		);
+
+		$registry = $this->registry( $this->payload( self::state_overrides()['draft'] ) );
+		$html     = $registry->render_block( 'odavent-events/event-header', array( 'eventId' => 42 ) );
+		$this->assertSame( array( array( 42, '', true ) ), $this->repo_calls );
+		$this->assertStringContainsString( 'Draft preview', $html );
+
+		$this->on_post( '<!-- wp:odavent-events/tickets /-->' );
+		Functions\expect( 'nocache_headers' )->once();
+		$registry->prevent_preview_caching();
+
+		$this->assertSame( array( 'edit_others_posts' ), array_values( array_unique( $asked ) ) );
+	}
+
+	public function test_a_user_with_only_edit_posts_is_a_visitor_when_the_capability_is_raised(): void {
+		Filters\expectApplied( 'odavent_events_preview_capability' )->andReturn( 'edit_others_posts' );
+		$this->editor = true; // Answers true for edit_posts only.
+
+		$registry = $this->registry( $this->payload( self::state_overrides()['draft'] ) );
+		$this->assertSame( '', $registry->render_block( 'odavent-events/event-header', array( 'eventId' => 42 ) ) );
+		$this->assertSame( array( array( 42, '', false ) ), $this->repo_calls );
+
+		$this->on_post( '<!-- wp:odavent-events/tickets /-->' );
+		Functions\expect( 'nocache_headers' )->never();
+		$registry->prevent_preview_caching();
 	}
 }

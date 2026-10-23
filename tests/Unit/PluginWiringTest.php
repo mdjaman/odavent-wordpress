@@ -109,7 +109,7 @@ class PluginWiringTest extends TestCase {
 		$plugin = $this->fresh_plugin();
 		$plugin->boot();
 
-		foreach ( array( 'init', 'rest_api_init', 'template_redirect', 'wp_enqueue_scripts' ) as $hook ) {
+		foreach ( array( 'init', 'rest_api_init', 'template_redirect', 'wp_enqueue_scripts', 'enqueue_block_editor_assets' ) as $hook ) {
 			$this->assertArrayHasKey( $hook, $actions, $hook );
 		}
 		$this->assertArrayHasKey( 'block_categories_all', $filters );
@@ -149,6 +149,16 @@ class PluginWiringTest extends TestCase {
 		$this->assertSame( 'style:odavent-events', $order[0] );
 		$this->assertSame( 'script:odavent-events-editor', $order[1] );
 		$this->assertContains( 'block:event-header', $order );
+
+		$inline = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			function ( $handle, $code, $position ) use ( &$inline ) {
+				$inline[] = array( $handle, $position );
+				return true;
+			}
+		);
+		call_user_func( $actions['enqueue_block_editor_assets'] );
+		$this->assertSame( array( array( 'odavent-events-editor', 'before' ) ), $inline );
 
 		$categories = call_user_func( $filters['block_categories_all'], array() );
 		$this->assertSame( 'odavent-events', $categories[0]['slug'] );

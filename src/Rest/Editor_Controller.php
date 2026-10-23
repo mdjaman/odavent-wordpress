@@ -2,15 +2,16 @@
 namespace Odavent\Events\Rest;
 
 use Odavent\Events\Api\Result;
+use Odavent\Events\Blocks\Block_Registry;
 use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Render\Sanitizer;
 
 /**
  * GET /wp-json/odavent/v1/events: the event picker of the block editor.
  *
- * Only for users who can edit posts. Answers [{id, slug, name, status}] from the site key's events list
- * (drafts included: editors choose events before they are published). Failures are generic WP_Errors that
- * never carry the key or Odavent's own text.
+ * Only for users with the preview capability (edit_posts by default). Answers [{id, slug, name, status}]
+ * from the site key's events list (drafts included: editors choose events before they are published).
+ * Failures are generic WP_Errors that never carry the key or Odavent's own text.
  */
 class Editor_Controller {
 
@@ -37,12 +38,13 @@ class Editor_Controller {
 	}
 
 	/**
-	 * Permission callback: `edit_posts`. 401 when signed out, 403 when signed in without the capability.
+	 * Permission callback: the preview capability (`edit_posts` unless filtered, see
+	 * Block_Registry::preview_capability()). 401 when signed out, 403 when signed in without it.
 	 *
 	 * @return true|\WP_Error
 	 */
 	public function can_list() {
-		if ( current_user_can( 'edit_posts' ) ) {
+		if ( Block_Registry::user_can_preview() ) {
 			return true;
 		}
 

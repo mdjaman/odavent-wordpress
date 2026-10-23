@@ -68,6 +68,36 @@ class RegisterButtonTest extends BlockTestCase {
 		$this->assertStringContainsString( 'odv-register__status', $html );
 	}
 
+	public function test_no_buyable_ticket_means_sold_out_instead_of_the_button(): void {
+		$payload                          = $this->payload();
+		$payload['tickets'][0]['is_full'] = true;
+		$html                             = $this->render( $payload );
+
+		$this->assertStringNotContainsString( 'odv-register__button', $html );
+		$this->assertStringContainsString( '<p class="odv-register__status">Sold out</p>', $html );
+
+		$payload                          = $this->payload();
+		$payload['tickets'][0]['on_sale'] = false;
+		$this->assertStringContainsString( '<p class="odv-register__status">Sold out</p>', $this->render( $payload ), 'Nothing on sale.' );
+	}
+
+	public function test_one_buyable_ticket_keeps_the_button(): void {
+		$payload                          = $this->payload();
+		$payload['tickets'][1]['is_full'] = false;
+		$payload['tickets'][1]['on_sale'] = true;
+		$payload['tickets'][0]['is_full'] = true;
+
+		$this->assertStringContainsString( 'odv-register__button', $this->render( $payload ) );
+	}
+
+	public function test_an_event_without_tickets_keeps_the_button(): void {
+		foreach ( array( array(), null ) as $tickets ) {
+			$payload            = $this->payload();
+			$payload['tickets'] = $tickets;
+			$this->assertStringContainsString( 'odv-register__button', $this->render( $payload ) );
+		}
+	}
+
 	public function test_the_label_can_be_changed_and_is_escaped(): void {
 		$html = $this->render( $this->payload(), array( 'label' => 'Book <b>now</b>' ) );
 

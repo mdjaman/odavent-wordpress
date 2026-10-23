@@ -147,6 +147,39 @@ class SchemaTest extends RenderTestCase {
 		$this->assertSame( 12.5, $data['offers'][0]['price'] );
 	}
 
+	public function no_registration(): array {
+		return array(
+			'cancelled'           => array( array( 'status' => 'cancelled' ), false ),
+			'paused'              => array( array( 'status' => 'paused' ), false ),
+			'archived'            => array( array( 'status' => 'archived' ), false ),
+			'live, closed'        => array( array( 'registration_open' => false ), false ),
+			'ended, closed'       => array( array( 'ended' => true, 'registration_open' => false ), false ),
+			'live, stale copy'    => array( array(), true ),
+		);
+	}
+
+	/**
+	 * A page must not advertise InStock offers for an event that takes no registrations.
+	 *
+	 * @dataProvider no_registration
+	 */
+	public function test_no_offers_unless_registration_is_offered( array $overrides, bool $stale ): void {
+		$payload          = $this->fixture( 'payload-v1-full' );
+		$payload['event'] = array_merge( $payload['event'], $overrides );
+		$view             = Event_View::from_payload( $payload, false, $stale );
+
+		$data = $this->decode( Schema::event_json_ld( $view, self::PERMALINK ) );
+
+		$this->assertArrayNotHasKey( 'offers', $data );
+		$this->assertSame( 'Event', $data['@type'], 'The rest of the event is still described.' );
+	}
+
+	public function test_ended_with_registration_open_keeps_offers(): void {
+		$data = $this->decode( Schema::event_json_ld( $this->view( array( 'ended' => true, 'registration_open' => true ) ), self::PERMALINK ) );
+
+		$this->assertCount( 1, $data['offers'] );
+	}
+
 	public function test_no_tickets_on_sale_means_no_offers(): void {
 		$payload            = $this->fixture( 'payload-v1-full' );
 		$payload['tickets'] = array();

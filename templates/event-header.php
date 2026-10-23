@@ -25,7 +25,7 @@ defined( 'ABSPATH' ) || exit;
 	<img class="odv-header__cover" src="<?php echo esc_url( $cover_url ); ?>" alt="" decoding="async">
 <?php endif; ?>
 <?php if ( '' !== $logo_url ) : ?>
-	<img class="odv-header__logo" src="<?php echo esc_url( $logo_url ); ?>" alt="" decoding="async">
+	<img class="odv-header__logo" src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $name ); ?>" decoding="async">
 <?php endif; ?>
 <?php if ( '' !== $name ) : ?>
 	<h2 class="odv-header__title"><?php echo esc_html( $name ); ?></h2>

@@ -239,7 +239,7 @@
 .odv-notice--paused,
 .odv-notice--draft { border-inline-start-color: #b54708; }
 
-.odv-notice--ended { border-inline-start-color: var(--_muted); }
+.odv-notice--ended, .odv-notice--stale { border-inline-start-color: var(--_muted); }
 
 /* Keyboard focus, small screens, motion */
 .odv-agenda__filter:focus-visible,

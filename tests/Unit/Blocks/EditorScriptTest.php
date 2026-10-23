@@ -38,6 +38,17 @@ class EditorScriptTest extends TestCase {
 		}
 	}
 
+	public function test_known_statuses_are_translated(): void {
+		foreach ( array( 'draft' => 'Draft', 'published' => 'Published', 'paused' => 'Paused', 'cancelled' => 'Cancelled', 'archived' => 'Archived' ) as $status => $label ) {
+			$this->assertMatchesRegularExpression( '/' . $status . ":\\s*__\\( '" . $label . "', DOMAIN \\)/", $this->js, $status );
+		}
+	}
+
+	public function test_a_slug_only_block_is_shown_by_its_slug(): void {
+		$this->assertStringContainsString( "__( 'Event: %s', DOMAIN )", $this->js );
+		$this->assertStringContainsString( "'slug:'", $this->js );
+	}
+
 	public function test_lint_js_runs_in_ci(): void {
 		$root = dirname( __DIR__, 3 );
 		$this->assertFileExists( $root . '/bin/lint-js' );

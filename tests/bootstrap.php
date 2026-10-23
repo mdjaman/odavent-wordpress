@@ -43,6 +43,29 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	}
 }
 
+// Minimal stand-in for WordPress's block type registry: tests put translated block types in $types.
+if ( ! class_exists( 'WP_Block_Type_Registry' ) ) {
+	class WP_Block_Type_Registry {
+
+		/** @var array<string, object> */
+		public static $types = array();
+
+		private static $instance = null;
+
+		public static function get_instance() {
+			if ( null === self::$instance ) {
+				self::$instance = new self();
+			}
+
+			return self::$instance;
+		}
+
+		public function get_registered( $name ) {
+			return isset( self::$types[ $name ] ) ? self::$types[ $name ] : null;
+		}
+	}
+}
+
 // Minimal stand-ins for the REST request/response classes. Header names are canonicalised the
 // way WordPress does it (lowercase, dashes to underscores).
 if ( ! class_exists( 'WP_REST_Request' ) ) {

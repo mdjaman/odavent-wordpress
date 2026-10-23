@@ -4,7 +4,7 @@
  *
  * Override in your theme as odavent/notice.php.
  *
- * @var string $kind    Modifier class suffix: ended, paused, cancelled, draft, unavailable, choose, error.
+ * @var string $kind    Modifier class suffix: ended, paused, cancelled, draft, stale, unavailable, choose, error.
  * @var string $message Plain text.
  *
  * @package Odavent\Events

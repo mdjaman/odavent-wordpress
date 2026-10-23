@@ -206,9 +206,14 @@ final class Event_View {
 	}
 
 	/**
-	 * Register is offered only for a published event (live or ended) whose registration is open.
+	 * Register is offered only for a published event (live or ended) whose registration is open, and
+	 * never from a stale copy: the event may have been cancelled, paused or unpublished since.
 	 */
 	public function can_register(): bool {
+		if ( $this->stale ) {
+			return false;
+		}
+
 		if ( self::LIVE !== $this->state && self::ENDED !== $this->state ) {
 			return false;
 		}

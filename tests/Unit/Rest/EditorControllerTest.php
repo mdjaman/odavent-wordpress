@@ -1,6 +1,7 @@
 <?php
 namespace Odavent\Events\Tests\Unit\Rest;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use Mockery;
 use Odavent\Events\Api\Result;
@@ -85,6 +86,21 @@ class EditorControllerTest extends RenderTestCase {
 
 		$this->assertNotTrue( call_user_func( $args['permission_callback'], new WP_REST_Request( 'GET', '/odavent/v1/events' ) ) );
 		$this->assertSame( array( 'edit_posts' ), $capabilities );
+	}
+
+	public function test_the_permission_callback_follows_the_preview_capability_filter(): void {
+		Filters\expectApplied( 'odavent_events_preview_capability' )->andReturn( 'edit_others_posts' );
+		$asked = array();
+		Functions\when( 'current_user_can' )->alias(
+			function ( $capability ) use ( &$asked ) {
+				$asked[] = $capability;
+				return 'edit_posts' === $capability;
+			}
+		);
+		list( , , $args ) = $this->route( Result::ok( array() ) );
+
+		$this->assertInstanceOf( WP_Error::class, call_user_func( $args['permission_callback'], new WP_REST_Request( 'GET' ) ) );
+		$this->assertSame( array( 'edit_others_posts' ), $asked );
 	}
 
 	public function test_permission_matrix(): void {

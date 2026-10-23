@@ -62,6 +62,13 @@ final class Plugin {
 			}
 		);
 
+		add_action(
+			'enqueue_block_editor_assets',
+			function () {
+				$this->blocks()->add_editor_metadata();
+			}
+		);
+
 		add_filter(
 			'block_categories_all',
 			function ( $categories ) {

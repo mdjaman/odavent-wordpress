@@ -169,6 +169,15 @@ class EventViewTest extends TestCase {
 		$this->assertSame( Event_View::LIVE, $view->state() );
 	}
 
+	public function test_a_stale_copy_never_offers_registration(): void {
+		foreach ( array( false, true ) as $ended ) {
+			$payload = $this->with_status( 'published', $ended, true );
+
+			$this->assertTrue( Event_View::from_payload( $payload )->can_register(), 'fresh copy registers' );
+			$this->assertFalse( Event_View::from_payload( $payload, false, true )->can_register(), 'stale copy does not' );
+		}
+	}
+
 	public function test_accessors_on_minimal_fixture(): void {
 		$payload                    = $this->fixture( 'payload-v1-minimal' );
 		$payload['event']['status'] = 'published';
