@@ -1,0 +1,41 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/countdown",
+	"title": "Countdown",
+	"category": "odavent-events",
+	"icon": "clock",
+	"description": "A live countdown to the start of the event.",
+	"keywords": [
+		"odavent",
+		"event",
+		"timer",
+		"start"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"labelLive": {
+			"type": "string",
+			"default": ""
+		},
+		"labelEnded": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

@@ -1,6 +1,7 @@
 <?php
 namespace Odavent\Events\Tests\Unit\Blocks;
 
+use Brain\Monkey\Filters;
 use Odavent\Events\Data\Event_View;
 use Odavent\Events\Tests\Support\BlockTestCase;
 
@@ -15,6 +16,12 @@ class LifecycleMatrixTest extends BlockTestCase {
 	const CANCELLED = 'This event has been cancelled';
 	const DRAFT     = 'Draft preview';
 	const CLOSED    = 'Registration is closed';
+
+	/** The blocks that show event content and never a Register link. */
+	const CONTENT_BLOCKS = array( 'speakers', 'agenda', 'sponsors', 'countdown', 'venue', 'add-to-calendar' );
+
+	/** Every block, for the tests that must hold for all of them. */
+	const ALL_BLOCKS = array( 'event-header', 'register-button', 'tickets', 'find-registration', 'speakers', 'agenda', 'sponsors', 'countdown', 'venue', 'add-to-calendar' );
 
 	/**
 	 * state label, editor?, links expected?, lifecycle text expected on header/register (null: none), text on tickets.
@@ -134,7 +141,7 @@ class LifecycleMatrixTest extends BlockTestCase {
 		$this->editor = false;
 		$registry     = $this->registry( $this->payload( self::state_overrides()['draft'] ) );
 
-		foreach ( array( 'event-header', 'register-button', 'tickets', 'find-registration' ) as $block ) {
+		foreach ( self::ALL_BLOCKS as $block ) {
 			$this->assertSame( '', $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42 ) ), $block );
 		}
 		foreach ( $this->repo_calls as $call ) {
@@ -165,7 +172,7 @@ class LifecycleMatrixTest extends BlockTestCase {
 	public function test_an_empty_view_is_blank_for_visitors( string $state ): void {
 		$registry = $this->registry( null, $state );
 
-		foreach ( array( 'event-header', 'register-button', 'tickets', 'find-registration' ) as $block ) {
+		foreach ( self::ALL_BLOCKS as $block ) {
 			$this->assertSame( '', $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42 ) ), $block );
 		}
 		$this->assertSame( array(), $this->enqueued_styles, 'Nothing rendered: no stylesheet.' );
@@ -178,7 +185,7 @@ class LifecycleMatrixTest extends BlockTestCase {
 		$this->editor = true;
 		$registry     = $this->registry( null, $state );
 
-		foreach ( array( 'event-header', 'register-button', 'tickets', 'find-registration' ) as $block ) {
+		foreach ( self::ALL_BLOCKS as $block ) {
 			$html = $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42 ) );
 			$this->assertStringStartsWith( '<div class="odv-notice odv-notice--', $html, $block );
 			$this->assertStringContainsString( 'role="status"', $html );
@@ -194,7 +201,7 @@ class LifecycleMatrixTest extends BlockTestCase {
 				// Safe register URLs here, so the links themselves are exercised with hostile text around them.
 				$payload  = $this->payload( $overrides + array( 'register_url' => "https://odavent.com/register?x='onfocus=alert(1)", 'find_registration_url' => "https://odavent.com/f'onmouseover=alert(1)" ), 'payload-v1-hostile' );
 				$registry = $this->registry( $payload );
-				foreach ( array( 'event-header', 'register-button', 'tickets', 'find-registration' ) as $block ) {
+				foreach ( self::ALL_BLOCKS as $block ) {
 					$html = $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42, 'showAvailability' => true, 'className' => '"><script>' ) );
 					$this->assertSafeHtml( $html );
 					$this->assertStringNotContainsString( 'javascript:', $html, $state . ' ' . $block );
@@ -209,6 +216,65 @@ class LifecycleMatrixTest extends BlockTestCase {
 			$html = $this->registry( $this->payload( self::state_overrides()[ $state ] ) )->render_block( 'odavent-events/find-registration', array( 'eventId' => 42 ) );
 			$this->assertStringContainsString( 'href="https://odavent.com/events/sommet-tech-abidjan-2026/find-registration"', $html, $state );
 			$this->assertStringNotContainsString( 'odv-notice', $html, 'No lifecycle notice on other blocks.' );
+		}
+	}
+
+	// ---- content blocks ------------------------------------------------------------------------
+
+	/**
+	 * Speakers, agenda, sponsors, venue and calendar keep showing their content when the event is paused,
+	 * cancelled, archived, ended, a draft preview or a stale copy, and never offer registration. The
+	 * countdown goes away when its promise (a start to wait for) is false.
+	 */
+	public function test_content_blocks_keep_their_content_and_never_offer_registration(): void {
+		Filters\expectApplied( 'odavent_events_now' )->zeroOrMoreTimes()->andReturn( strtotime( '2026-11-01T00:00:00Z' ) );
+
+		$expect_countdown = array( 'live' => true, 'live closed' => true, 'ended open' => true, 'ended closed' => true, 'paused' => true, 'cancelled' => false, 'archived' => false, 'draft' => true );
+		$markers          = array( 'speakers' => 'odv-speakers__item', 'agenda' => 'odv-agenda__session', 'sponsors' => 'odv-sponsors__item', 'countdown' => 'odv-countdown', 'venue' => 'odv-venue__name', 'add-to-calendar' => 'odv-calendar__link' );
+
+		foreach ( self::state_overrides() as $state => $overrides ) {
+			$this->editor = 'draft' === $state;
+			$registry     = $this->registry( $this->payload( $overrides ) );
+
+			foreach ( self::CONTENT_BLOCKS as $block ) {
+				$html = $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42 ) );
+
+				if ( 'countdown' === $block && ! $expect_countdown[ $state ] ) {
+					$this->assertSame( '', $html, $state . ' ' . $block );
+					continue;
+				}
+
+				$this->assertStringContainsString( $markers[ $block ], $html, $state . ' ' . $block );
+				$this->assertStringNotContainsString( 'odv-register__button', $html, $state . ' ' . $block );
+				$this->assertStringNotContainsString( 'odv-tickets__register', $html, $state . ' ' . $block );
+				$this->assertStringNotContainsString( 'odv-notice', $html, $state . ' ' . $block . ': lifecycle notices belong to header/register only' );
+				$this->assertStringNotContainsString( '/register', $html, $state . ' ' . $block );
+			}
+		}
+	}
+
+	public function test_content_blocks_from_a_stale_copy_keep_their_content_without_a_notice(): void {
+		Filters\expectApplied( 'odavent_events_now' )->zeroOrMoreTimes()->andReturn( strtotime( '2026-11-01T00:00:00Z' ) );
+
+		foreach ( array( 'live', 'cancelled', 'paused' ) as $state ) {
+			$registry = $this->registry( $this->payload( self::state_overrides()[ $state ] ), Event_View::UNAVAILABLE, array(), 0, true );
+
+			foreach ( array( 'speakers', 'agenda', 'sponsors', 'venue', 'add-to-calendar' ) as $block ) {
+				$html = $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42 ) );
+				$this->assertNotSame( '', $html, $state . ' ' . $block );
+				$this->assertStringNotContainsString( 'odv-notice', $html, $state . ' ' . $block );
+				$this->assertStringNotContainsString( 'register', $html, $state . ' ' . $block );
+			}
+			$this->assertSame( '', $registry->render_block( 'odavent-events/countdown', array( 'eventId' => 42 ) ), 'a stale copy may be out of date about the start: ' . $state );
+		}
+	}
+
+	public function test_content_blocks_leave_no_empty_wrapper_when_there_is_nothing_to_show(): void {
+		$this->editor = true; // The minimal fixture is a draft: an editor sees it.
+		$registry     = $this->registry( $this->payload( array(), 'payload-v1-minimal' ) );
+
+		foreach ( array( 'speakers', 'agenda', 'sponsors', 'venue', 'countdown' ) as $block ) {
+			$this->assertSame( '', $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42 ) ), $block );
 		}
 	}
 }

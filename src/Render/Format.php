@@ -50,6 +50,26 @@ final class Format {
 	}
 
 	/**
+	 * The date part (the site's date format) in the event's timezone.
+	 *
+	 * @param mixed $iso      ISO 8601 date-time (anything but a valid string gives '').
+	 * @param mixed $timezone IANA timezone of the event (anything invalid: UTC).
+	 */
+	public static function date( $iso, $timezone ): string {
+		return self::datetime( $iso, $timezone, self::date_format() );
+	}
+
+	/**
+	 * The time part (the site's time format) in the event's timezone.
+	 *
+	 * @param mixed $iso      ISO 8601 date-time (anything but a valid string gives '').
+	 * @param mixed $timezone IANA timezone of the event (anything invalid: UTC).
+	 */
+	public static function time( $iso, $timezone ): string {
+		return self::datetime( $iso, $timezone, self::time_format() );
+	}
+
+	/**
 	 * "Y-m-d" of the moment in the event's timezone, to group sessions by local day.
 	 *
 	 * @param mixed $iso      ISO 8601 date-time (anything but a valid string gives '').

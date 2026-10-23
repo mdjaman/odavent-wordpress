@@ -21,7 +21,7 @@ class BlockJsonTest extends TestCase {
 
 	public function test_the_four_core_blocks_exist(): void {
 		$slugs = array_keys( $this->blocks() );
-		foreach ( array( 'event-header', 'register-button', 'tickets', 'find-registration' ) as $slug ) {
+		foreach ( array( 'event-header', 'register-button', 'tickets', 'find-registration', 'speakers', 'agenda', 'sponsors', 'countdown', 'venue', 'add-to-calendar' ) as $slug ) {
 			$this->assertContains( $slug, $slugs );
 		}
 	}
@@ -62,12 +62,39 @@ class BlockJsonTest extends TestCase {
 		}
 	}
 
+	/**
+	 * assets/js/editor.js builds the Inspector from the attribute schema and knows only these four types:
+	 * anything else would get no control at all.
+	 *
+	 * @dataProvider blocks
+	 */
+	public function test_every_attribute_has_a_type_the_generic_editor_can_edit( string $file ): void {
+		$json = json_decode( (string) file_get_contents( $file ), true );
+
+		foreach ( $json['attributes'] as $name => $schema ) {
+			$this->assertContains( $schema['type'], array( 'boolean', 'integer', 'string', 'number' ), basename( dirname( $file ) ) . '.' . $name );
+			$this->assertArrayHasKey( 'default', $schema, $name . ' needs a default so the block and the editor agree' );
+			if ( isset( $schema['minimum'] ) || isset( $schema['maximum'] ) ) {
+				$this->assertIsNumeric( $schema['minimum'] ?? 0 );
+				$this->assertIsNumeric( $schema['maximum'] ?? 0 );
+				$this->assertGreaterThanOrEqual( $schema['minimum'] ?? $schema['default'], $schema['default'], $name );
+				$this->assertLessThanOrEqual( $schema['maximum'] ?? $schema['default'], $schema['default'], $name );
+			}
+		}
+	}
+
 	public function attribute_sets(): array {
 		return array(
 			'event-header'      => array( 'event-header', array( 'showCover' => true, 'showLogo' => true, 'showDescription' => true, 'showVenue' => true, 'showJsonLd' => true ) ),
 			'register-button'   => array( 'register-button', array( 'label' => '', 'ticketId' => 0 ) ),
 			'tickets'           => array( 'tickets', array( 'showDescription' => true, 'showAvailability' => false, 'buttonLabel' => '' ) ),
 			'find-registration' => array( 'find-registration', array( 'label' => '' ) ),
+			'speakers'          => array( 'speakers', array( 'columns' => 3, 'showBio' => false, 'showCompany' => true, 'limit' => 0, 'speakerId' => 0 ) ),
+			'agenda'            => array( 'agenda', array( 'showSpeakers' => true, 'showDescription' => false, 'trackFilter' => true ) ),
+			'sponsors'          => array( 'sponsors', array( 'groupByType' => true, 'showDescription' => false, 'columns' => 4 ) ),
+			'countdown'         => array( 'countdown', array( 'labelLive' => '', 'labelEnded' => '' ) ),
+			'venue'             => array( 'venue', array( 'showMapLink' => true ) ),
+			'add-to-calendar'   => array( 'add-to-calendar', array( 'showGoogle' => true, 'showOutlook' => true, 'showIcs' => true ) ),
 		);
 	}
 

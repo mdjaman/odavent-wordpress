@@ -25,12 +25,22 @@ abstract class BlockTestCase extends RenderTestCase {
 	/** @var array[] Every Event_Repository::get() call: [id, slug, preview_allowed]. */
 	protected $repo_calls = array();
 
+	/** @var string[] Handles passed to wp_enqueue_script. */
+	protected $enqueued_scripts = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 		$this->editor          = false;
 		$this->enqueued_styles = array();
 		$this->repo_calls      = array();
+		$this->enqueued_scripts = array();
 
+		Functions\when( 'wp_script_is' )->justReturn( true );
+		Functions\when( 'wp_enqueue_script' )->alias(
+			function ( $handle ) {
+				$this->enqueued_scripts[] = $handle;
+			}
+		);
 		Functions\when( 'current_user_can' )->alias(
 			function ( $capability ) {
 				return 'edit_posts' === $capability && $this->editor;
@@ -147,6 +157,43 @@ abstract class BlockTestCase extends RenderTestCase {
 		$this->assertStringNotContainsString( '<iframe', $html );
 		foreach ( $this->urls_in( $html ) as $url ) {
 			$this->assertMatchesRegularExpression( '#^https?://#i', $url, 'Only http(s) URLs in href/src.' );
+		}
+	}
+
+	/**
+	 * Parses an HTML fragment (the renderers' output) into a document whose body holds it.
+	 */
+	protected function dom( string $html ): \DOMDocument {
+		$doc = new \DOMDocument();
+		$old = libxml_use_internal_errors( true );
+		$doc->loadHTML( '<?xml encoding="UTF-8"><body>' . $html . '</body>' );
+		libxml_clear_errors();
+		libxml_use_internal_errors( $old );
+
+		return $doc;
+	}
+
+	/**
+	 * Walks the parsed output of a block fed with hostile data: no script, no event handler or style
+	 * attribute, every <img> is one of the plugin's own, and every href/src is an absolute http(s) URL.
+	 */
+	protected function assertDomSafe( string $html ): void {
+		$doc   = $this->dom( $html );
+		$xpath = new \DOMXPath( $doc );
+
+		$this->assertSame( 0, $xpath->query( '//script|//iframe|//svg|//object|//embed|//style|//link|//form' )->length, 'No active element.' );
+		foreach ( $xpath->query( '//*' ) as $element ) {
+			foreach ( $element->attributes as $attribute ) {
+				$name = strtolower( $attribute->name );
+				$this->assertDoesNotMatchRegularExpression( '/^on/', $name, 'No event handler on <' . $element->nodeName . '>.' );
+				$this->assertNotSame( 'style', $name );
+				if ( in_array( $name, array( 'href', 'src', 'action', 'formaction', 'srcset', 'poster' ), true ) ) {
+					$this->assertMatchesRegularExpression( '#^https?://[^\s]+$#i', $attribute->value, $name . ' must be an http(s) URL.' );
+				}
+			}
+			if ( 'img' === $element->nodeName ) {
+				$this->assertStringStartsWith( 'odv-', $element->getAttribute( 'class' ), 'Only the plugin\'s own images.' );
+			}
 		}
 	}
 }

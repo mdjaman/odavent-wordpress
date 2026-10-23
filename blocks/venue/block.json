@@ -1,0 +1,38 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/venue",
+	"title": "Venue",
+	"category": "odavent-events",
+	"icon": "location",
+	"description": "The event venue with its address and a link to a map.",
+	"keywords": [
+		"odavent",
+		"event",
+		"location",
+		"address",
+		"map"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"showMapLink": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

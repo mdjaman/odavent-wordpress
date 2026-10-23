@@ -97,6 +97,32 @@
 
 .odv-speakers__photo { width: 6rem; height: 6rem; object-fit: cover; border-radius: 50%; }
 
+.odv-speakers__photo--placeholder {
+	display: grid;
+	place-items: center;
+	background: var(--_accent);
+	color: var(--_contrast);
+	font-size: 1.5rem;
+	font-weight: 600;
+}
+
+/* Column count: --_cols applies once there is room; narrower screens keep the auto-fit grid above. */
+.odv-speakers__list--cols-2 { --_cols: 2; }
+.odv-speakers__list--cols-3 { --_cols: 3; }
+.odv-speakers__list--cols-4 { --_cols: 4; }
+.odv-speakers__list--single { --_cols: 1; max-width: 20rem; }
+.odv-sponsors__list--cols-1 { --_cols: 1; }
+.odv-sponsors__list--cols-2 { --_cols: 2; }
+.odv-sponsors__list--cols-3 { --_cols: 3; }
+.odv-sponsors__list--cols-4 { --_cols: 4; }
+.odv-sponsors__list--cols-5 { --_cols: 5; }
+.odv-sponsors__list--cols-6 { --_cols: 6; }
+
+@media (min-width: 48rem) {
+	.odv-speakers__list,
+	.odv-sponsors__list { grid-template-columns: repeat(var(--_cols, 3), minmax(0, 1fr)); }
+}
+
 .odv-speakers__name,
 .odv-sponsors__name,
 .odv-tickets__name,
@@ -104,12 +130,17 @@
 .odv-venue__name { margin: 0; font-weight: 600; }
 
 .odv-speakers__role,
+.odv-speakers__company,
 .odv-speakers__bio,
+.odv-sponsors__description,
+.odv-agenda__description,
 .odv-tickets__description,
 .odv-tickets__status,
 .odv-venue__address { margin: 0; color: var(--_muted); }
 
-.odv-sponsors__tier-title {
+.odv-sponsors__group { margin-block-end: var(--_gap); }
+
+.odv-sponsors__group-title {
 	margin-block: var(--_gap) 0.5rem;
 	color: var(--_muted);
 	font-size: 0.85em;
@@ -120,6 +151,10 @@
 .odv-sponsors__logo { max-height: 5rem; width: auto; margin-inline: auto; object-fit: contain; }
 
 .odv-sponsors a { color: inherit; text-decoration: none; }
+
+.odv-sponsors__item { justify-items: center; text-align: center; }
+
+.odv-sponsors__link { display: block; }
 
 /* Agenda */
 .odv-agenda__filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-block-end: var(--_gap); }
@@ -159,9 +194,23 @@
 
 .odv-agenda__session--child { margin-inline-start: var(--_gap); border-inline-start-color: var(--_border); }
 
-.odv-agenda__session[hidden] { display: none; }
+.odv-agenda__session[hidden],
+.odv-agenda__day[hidden] { display: none; }
 
-.odv-agenda__time { color: var(--_muted); font-variant-numeric: tabular-nums; }
+.odv-agenda__time { grid-column: 1; grid-row: 1; margin: 0; color: var(--_muted); font-variant-numeric: tabular-nums; }
+
+.odv-agenda__title { grid-column: 2; grid-row: 1; }
+
+.odv-agenda__description { grid-column: 2; margin: 0; }
+
+.odv-agenda__rooms {
+	display: grid;
+	grid-column: 1 / -1;
+	gap: 0.75rem;
+	margin: 0.5rem 0 0;
+	padding: 0;
+	list-style: none;
+}
 
 .odv-agenda__location,
 .odv-agenda__track,
@@ -196,8 +245,14 @@
 .odv-register__notice, .odv-register__status, .odv-tickets__message { margin: 0.5rem 0 0; color: var(--_muted); font-size: 0.875em; }
 .odv-find-registration__link { font-weight: 600; }
 
-.odv-countdown,
-.odv-calendar { display: flex; flex-wrap: wrap; gap: var(--_gap); }
+.odv-countdown__timer,
+.odv-calendar__list { display: flex; flex-wrap: wrap; gap: var(--_gap); }
+
+.odv-calendar__list { margin: 0; padding: 0; list-style: none; }
+
+.odv-countdown [hidden] { display: none; }
+
+.odv-countdown__message { margin: 0; font-size: 1.25em; font-weight: 600; }
 
 .odv-countdown__unit {
 	display: grid;
@@ -223,6 +278,9 @@
 
 .odv-calendar .odv-calendar__link:hover { border-color: var(--_accent); }
 
+/* Venue */
+.odv-venue__map { font-weight: 600; }
+
 /* Notices */
 .odv-notice {
 	padding: var(--_gap);
@@ -246,11 +304,13 @@
 .odv-register .odv-register__button:focus-visible,
 .odv-tickets .odv-tickets__register:focus-visible,
 .odv-calendar .odv-calendar__link:focus-visible,
-.odv-sponsors a:focus-visible { outline: 3px solid var(--odv-accent, #3730a3); outline-offset: 2px; }
+.odv-sponsors a:focus-visible,
+.odv-venue__map:focus-visible { outline: 3px solid var(--odv-accent, #3730a3); outline-offset: 2px; }
 
 @media (max-width: 36rem) {
 	.odv-agenda__session { grid-template-columns: 1fr; }
-	.odv-agenda__location, .odv-agenda__track, .odv-agenda__speakers { grid-column: 1; }
+	.odv-agenda__time, .odv-agenda__title { grid-row: auto; }
+	.odv-agenda__time, .odv-agenda__title, .odv-agenda__description, .odv-agenda__location, .odv-agenda__track, .odv-agenda__speakers { grid-column: 1; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

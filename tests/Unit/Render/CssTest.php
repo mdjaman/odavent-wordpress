@@ -17,8 +17,24 @@ class CssTest extends TestCase {
 	}
 
 	public function test_it_stays_small_and_balanced(): void {
-		$this->assertLessThanOrEqual( 260, substr_count( $this->css, "\n" ) );
+		$this->assertLessThanOrEqual( 330, substr_count( $this->css, "\n" ) );
 		$this->assertSame( substr_count( $this->css, '{' ), substr_count( $this->css, '}' ) );
+	}
+
+	public function test_hidden_elements_stay_hidden_despite_display_rules(): void {
+		// The filter script and the countdown script toggle the hidden attribute; a display rule on the same element would beat it.
+		foreach ( array( '.odv-agenda__session[hidden]', '.odv-agenda__day[hidden]', '.odv-countdown [hidden]' ) as $selector ) {
+			$this->assertStringContainsString( $selector, $this->css );
+		}
+	}
+
+	public function test_column_modifiers_set_a_variable_for_every_value_the_renderers_allow(): void {
+		foreach ( range( 2, 4 ) as $n ) {
+			$this->assertStringContainsString( ".odv-speakers__list--cols-{$n} { --_cols: {$n}; }", $this->css );
+		}
+		foreach ( range( 1, 6 ) as $n ) {
+			$this->assertStringContainsString( ".odv-sponsors__list--cols-{$n} { --_cols: {$n}; }", $this->css );
+		}
 	}
 
 	public function test_it_never_uses_important_inline_styles_or_external_assets(): void {

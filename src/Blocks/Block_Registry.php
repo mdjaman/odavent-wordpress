@@ -1,10 +1,16 @@
 <?php
 namespace Odavent\Events\Blocks;
 
+use Odavent\Events\Blocks\Renderers\Add_To_Calendar;
+use Odavent\Events\Blocks\Renderers\Agenda;
+use Odavent\Events\Blocks\Renderers\Countdown;
 use Odavent\Events\Blocks\Renderers\Event_Header;
 use Odavent\Events\Blocks\Renderers\Find_Registration;
 use Odavent\Events\Blocks\Renderers\Register_Button;
+use Odavent\Events\Blocks\Renderers\Speakers;
+use Odavent\Events\Blocks\Renderers\Sponsors;
 use Odavent\Events\Blocks\Renderers\Tickets;
+use Odavent\Events\Blocks\Renderers\Venue;
 use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Data\Event_View;
 use Odavent\Events\Render\Assets;
@@ -33,7 +39,7 @@ class Block_Registry {
 	const EDITOR_MANAGED = array( 'eventId', 'eventSlug', 'className', 'lock', 'metadata' );
 
 	/**
-	 * Block slug => renderer class. Later blocks are added here.
+	 * Block slug => renderer class. Every entry needs a blocks/{slug}/block.json, and the other way round.
 	 *
 	 * @var array<string, string>
 	 */
@@ -42,6 +48,24 @@ class Block_Registry {
 		'register-button'   => Register_Button::class,
 		'tickets'           => Tickets::class,
 		'find-registration' => Find_Registration::class,
+		'speakers'          => Speakers::class,
+		'agenda'            => Agenda::class,
+		'sponsors'          => Sponsors::class,
+		'countdown'         => Countdown::class,
+		'venue'             => Venue::class,
+		'add-to-calendar'   => Add_To_Calendar::class,
+	);
+
+	/**
+	 * Browser scripts a block needs, by block slug => [script handle, marker that must be in the HTML].
+	 * The script is enqueued only when the rendered block contains the marker (the agenda needs its script
+	 * only when it shows filter buttons).
+	 *
+	 * @var array<string, array{0: string, 1: string}>
+	 */
+	private const SCRIPTS = array(
+		'countdown' => array( 'countdown', 'odv-countdown' ),
+		'agenda'    => array( 'agenda-filter', 'odv-agenda__filters' ),
 	);
 
 	/** @var Event_Repository */
@@ -261,6 +285,9 @@ class Block_Registry {
 
 			if ( '' !== $html ) {
 				$this->assets->enqueue_styles();
+				if ( isset( self::SCRIPTS[ $slug ] ) && false !== strpos( $html, self::SCRIPTS[ $slug ][1] ) ) {
+					$this->assets->enqueue_script( self::SCRIPTS[ $slug ][0] );
+				}
 			}
 
 			return $html;
@@ -471,6 +498,20 @@ class Block_Registry {
 			'ticketId'         => __( 'Preselect ticket (ID, 0 for none)', 'odavent-events' ),
 			'showAvailability' => __( 'Show remaining places', 'odavent-events' ),
 			'buttonLabel'      => __( 'Button text', 'odavent-events' ),
+			'columns'          => __( 'Columns', 'odavent-events' ),
+			'showBio'          => __( 'Show biography', 'odavent-events' ),
+			'showCompany'      => __( 'Show company', 'odavent-events' ),
+			'limit'            => __( 'Maximum number to show (0 for all)', 'odavent-events' ),
+			'speakerId'        => __( 'Show only one speaker (ID, 0 for all)', 'odavent-events' ),
+			'showSpeakers'     => __( 'Show speakers', 'odavent-events' ),
+			'trackFilter'      => __( 'Show track filter buttons', 'odavent-events' ),
+			'groupByType'      => __( 'Group by type (sponsors, exhibitors...)', 'odavent-events' ),
+			'labelLive'        => __( 'Text while the event is live (blank for the default)', 'odavent-events' ),
+			'labelEnded'       => __( 'Text once the event has ended (blank for the default)', 'odavent-events' ),
+			'showMapLink'      => __( 'Show map link', 'odavent-events' ),
+			'showGoogle'       => __( 'Google Calendar link', 'odavent-events' ),
+			'showOutlook'      => __( 'Outlook link', 'odavent-events' ),
+			'showIcs'          => __( 'Calendar file (.ics) link', 'odavent-events' ),
 		);
 
 		foreach ( array( $block . '.' . $attribute, $attribute ) as $key ) {

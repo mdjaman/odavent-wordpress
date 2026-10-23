@@ -166,6 +166,29 @@ class BlockRegistryTest extends BlockTestCase {
 		}
 	}
 
+	public function test_renderers_map_the_content_blocks(): void {
+		$map = $this->registry( null )->renderers();
+
+		$this->assertSame( 'Odavent\\Events\\Blocks\\Renderers\\Speakers', $map['speakers'] );
+		$this->assertSame( 'Odavent\\Events\\Blocks\\Renderers\\Agenda', $map['agenda'] );
+		$this->assertSame( 'Odavent\\Events\\Blocks\\Renderers\\Sponsors', $map['sponsors'] );
+		$this->assertSame( 'Odavent\\Events\\Blocks\\Renderers\\Countdown', $map['countdown'] );
+		$this->assertSame( 'Odavent\\Events\\Blocks\\Renderers\\Venue', $map['venue'] );
+		$this->assertSame( 'Odavent\\Events\\Blocks\\Renderers\\Add_To_Calendar', $map['add-to-calendar'] );
+	}
+
+	public function test_every_renderer_has_a_block_json_and_every_block_json_a_renderer(): void {
+		$slugs = array();
+		foreach ( glob( ODAVENT_EVENTS_DIR . 'blocks/*/block.json' ) as $file ) {
+			$slugs[] = basename( dirname( $file ) );
+		}
+		$mapped = array_keys( $this->registry( null )->renderers() );
+		sort( $slugs );
+		sort( $mapped );
+
+		$this->assertSame( $mapped, $slugs );
+	}
+
 	// ---- registration with WordPress -----------------------------------------------------------
 
 	/** @var array[] */

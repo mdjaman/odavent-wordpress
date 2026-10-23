@@ -24,6 +24,17 @@ class FormatTest extends RenderTestCase {
 		$this->assertSame( '10/11/2026 09h00', Format::datetime( '2026-11-10T08:00:00+00:00', 'Europe/Paris' ) );
 	}
 
+	public function test_date_and_time_use_the_site_formats_in_the_event_timezone(): void {
+		WpStubs::$options['date_format'] = 'd/m/Y';
+		WpStubs::$options['time_format'] = 'H\hi';
+
+		$this->assertSame( '10/11/2026', Format::date( '2026-11-10T23:30:00+00:00', 'UTC' ) );
+		$this->assertSame( '11/11/2026', Format::date( '2026-11-10T23:30:00+00:00', 'Pacific/Auckland' ) );
+		$this->assertSame( '00h30', Format::time( '2026-11-10T23:30:00+00:00', 'Europe/Paris' ) );
+		$this->assertSame( '', Format::date( 'tomorrow', 'UTC' ) );
+		$this->assertSame( '', Format::time( null, 'UTC' ) );
+	}
+
 	public function test_an_offset_in_the_input_is_honoured(): void {
 		$this->assertSame( '2026-11-10 07:00', Format::datetime( '2026-11-10T08:00:00+01:00', 'UTC', 'Y-m-d H:i' ) );
 		$this->assertSame( '2026-11-10 08:00', Format::datetime( '2026-11-10T08:00:00Z', 'UTC', 'Y-m-d H:i' ) );

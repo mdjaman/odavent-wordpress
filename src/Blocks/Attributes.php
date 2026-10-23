@@ -74,6 +74,31 @@ final class Attributes {
 	}
 
 	/**
+	 * An integer attribute (int, whole float or digit string) clamped to a range; $default when it is
+	 * absent or not a whole number.
+	 *
+	 * @param array  $atts    Attributes.
+	 * @param string $key     Attribute name.
+	 * @param int    $min     Smallest allowed value.
+	 * @param int    $max     Largest allowed value.
+	 * @param int    $default Value when absent or unreadable.
+	 */
+	public static function bounded_int( array $atts, string $key, int $min, int $max, int $default ): int {
+		$value = $atts[ $key ] ?? null;
+		if ( is_string( $value ) && preg_match( '/^\s*[0-9]{1,9}\s*\z/', $value ) ) {
+			$value = (int) $value;
+		} elseif ( is_float( $value ) && floor( $value ) === $value && abs( $value ) < 1e9 ) {
+			$value = (int) $value;
+		}
+
+		if ( ! is_int( $value ) ) {
+			return $default;
+		}
+
+		return max( $min, min( $max, $value ) );
+	}
+
+	/**
 	 * The root element's class list: the block's own class plus the editor's "Additional CSS class(es)"
 	 * (`className`, or `class` from a shortcode), each cleaned with sanitize_html_class().
 	 *

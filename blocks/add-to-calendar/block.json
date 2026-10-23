@@ -1,0 +1,47 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/add-to-calendar",
+	"title": "Add to calendar",
+	"category": "odavent-events",
+	"icon": "calendar-alt",
+	"description": "Links to add the event to Google Calendar, Outlook or a calendar file.",
+	"keywords": [
+		"odavent",
+		"event",
+		"calendar",
+		"ics",
+		"google",
+		"outlook"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"showGoogle": {
+			"type": "boolean",
+			"default": true
+		},
+		"showOutlook": {
+			"type": "boolean",
+			"default": true
+		},
+		"showIcs": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}
