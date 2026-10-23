@@ -1,8 +1,9 @@
 /*
  * Odavent Events: default styles.
  *
- * Override --odv-accent, --odv-text, --odv-muted, --odv-border, --odv-radius and --odv-gap on any
- * ancestor to match your theme. Fonts and text colour are inherited from the theme. Turn this file off
+ * Override --odv-accent, --odv-accent-contrast, --odv-text, --odv-muted, --odv-border, --odv-radius and
+ * --odv-gap on any ancestor to match your theme. Button and active-filter text is --odv-accent-contrast
+ * (default white), which assumes a dark accent: set it to a dark colour for a light accent. Fonts and text colour are inherited from the theme. Turn this file off
  * under Settings > Odavent Events ("Load default styles") to style the markup yourself.
  */
 
@@ -17,6 +18,7 @@
 .odv-calendar,
 .odv-notice {
 	--_accent: var(--odv-accent, #3730a3);
+	--_contrast: var(--odv-accent-contrast, #fff);
 	--_muted: var(--odv-muted, #5b6270);
 	--_border: var(--odv-border, #d9dce3);
 	--_radius: var(--odv-radius, 8px);
@@ -28,6 +30,13 @@
 	color: var(--odv-text, inherit);
 	font-family: inherit;
 	line-height: 1.5;
+}
+
+/* Muted text follows the theme's text colour when the browser can mix colours. */
+@supports (color: color-mix(in srgb, red, blue)) {
+	.odv-header, .odv-speakers, .odv-agenda, .odv-sponsors, .odv-tickets, .odv-register, .odv-countdown, .odv-venue, .odv-calendar, .odv-notice {
+		--_muted: var(--odv-muted, color-mix(in srgb, currentColor 70%, transparent));
+	}
 }
 
 .odv-header *,
@@ -108,7 +117,7 @@
 
 .odv-sponsors__logo { max-height: 5rem; width: auto; margin-inline: auto; object-fit: contain; }
 
-.odv-sponsors__link { color: inherit; text-decoration: none; }
+.odv-sponsors a { color: inherit; text-decoration: none; }
 
 /* Agenda */
 .odv-agenda__filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-block-end: var(--_gap); }
@@ -124,7 +133,7 @@
 }
 
 .odv-agenda__filter--active,
-.odv-agenda__filter[aria-pressed="true"] { border-color: var(--_accent); background: var(--_accent); color: #fff; }
+.odv-agenda__filter[aria-pressed="true"] { border-color: var(--_accent); background: var(--_accent); color: var(--odv-accent-contrast, #fff); }
 
 .odv-agenda__day-title { margin-block: calc(var(--_gap) * 1.5) 0.75rem; }
 
@@ -161,14 +170,14 @@
 
 .odv-tickets__price { margin: 0; font-size: 1.25em; font-weight: 700; }
 
-.odv-button,
-.odv-register__button {
+.odv-register .odv-register__button,
+.odv-tickets .odv-tickets__register {
 	display: inline-block;
 	padding: 0.65rem 1.25rem;
-	border: 1px solid var(--odv-accent, #3730a3);
-	border-radius: var(--odv-radius, 8px);
-	background: var(--odv-accent, #3730a3);
-	color: #fff;
+	border: 1px solid var(--_accent);
+	border-radius: var(--_radius);
+	background: var(--_accent);
+	color: var(--_contrast);
 	font: inherit;
 	font-weight: 600;
 	text-align: center;
@@ -176,13 +185,12 @@
 	cursor: pointer;
 }
 
-.odv-button:hover,
-.odv-register__button:hover { filter: brightness(1.1); }
+.odv-register .odv-register__button:hover,
+.odv-tickets .odv-tickets__register:hover { filter: brightness(1.1); color: var(--_contrast); text-decoration: none; }
 
-.odv-register__button--disabled,
-.odv-register__button[aria-disabled="true"] { border-color: var(--odv-border, #d9dce3); background: transparent; color: var(--odv-muted, #5b6270); cursor: not-allowed; }
+.odv-register .odv-register__button--disabled,
+.odv-register .odv-register__button[aria-disabled="true"] { border-color: var(--_border); background: transparent; color: var(--_muted); cursor: not-allowed; }
 
-/* Countdown */
 .odv-countdown,
 .odv-calendar { display: flex; flex-wrap: wrap; gap: var(--_gap); }
 
@@ -200,7 +208,7 @@
 .odv-countdown__label { color: var(--_muted); font-size: 0.8em; text-transform: uppercase; }
 
 /* Calendar links */
-.odv-calendar__link {
+.odv-calendar .odv-calendar__link {
 	padding: 0.4rem 0.9rem;
 	border: 1px solid var(--_border);
 	border-radius: var(--_radius);
@@ -208,7 +216,7 @@
 	text-decoration: none;
 }
 
-.odv-calendar__link:hover { border-color: var(--_accent); }
+.odv-calendar .odv-calendar__link:hover { border-color: var(--_accent); }
 
 /* Notices */
 .odv-notice {
@@ -229,28 +237,18 @@
 
 /* Keyboard focus, small screens, motion */
 .odv-agenda__filter:focus-visible,
-.odv-button:focus-visible,
-.odv-register__button:focus-visible,
-.odv-calendar__link:focus-visible,
-.odv-sponsors__link:focus-visible { outline: 3px solid var(--odv-accent, #3730a3); outline-offset: 2px; }
+.odv-register .odv-register__button:focus-visible,
+.odv-tickets .odv-tickets__register:focus-visible,
+.odv-calendar .odv-calendar__link:focus-visible,
+.odv-sponsors a:focus-visible { outline: 3px solid var(--odv-accent, #3730a3); outline-offset: 2px; }
 
 @media (max-width: 36rem) {
-	.odv-agenda__session {
-		grid-template-columns: 1fr;
-	}
-
-	.odv-agenda__location,
-	.odv-agenda__track,
-	.odv-agenda__speakers {
-		grid-column: 1;
-	}
+	.odv-agenda__session { grid-template-columns: 1fr; }
+	.odv-agenda__location, .odv-agenda__track, .odv-agenda__speakers { grid-column: 1; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.odv-button,
-	.odv-register__button,
-	.odv-calendar__link,
-	.odv-agenda__filter {
+	.odv-register .odv-register__button, .odv-tickets .odv-tickets__register, .odv-calendar .odv-calendar__link, .odv-agenda__filter {
 		transition: filter 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 	}
 }

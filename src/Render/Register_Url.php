@@ -15,10 +15,10 @@ final class Register_Url {
 	 * back to}, and ticket={id} when a ticket is given. An existing query string is kept.
 	 *
 	 * @param Event_View  $view      The event.
-	 * @param int|null    $ticket_id Ticket to preselect.
-	 * @param string|null $return    Where Odavent should send the visitor back to (default: the home page).
+	 * @param mixed      $ticket_id Ticket to preselect: a positive integer or digits; anything else is ignored.
+	 * @param mixed|null $return    Where Odavent should send the visitor back to (default: the home page).
 	 */
-	public static function build( Event_View $view, ?int $ticket_id = null, ?string $return = null ): string {
+	public static function build( Event_View $view, $ticket_id = null, $return = null ): string {
 		$register = $view->event()['register_url'] ?? null;
 		$base     = self::safe( is_string( $register ) ? $register : null );
 		if ( '' === $base ) {
@@ -40,11 +40,27 @@ final class Register_Url {
 			'return'       => rawurlencode( $back ),
 		);
 
-		if ( null !== $ticket_id ) {
-			$args['ticket'] = rawurlencode( (string) $ticket_id );
+		$ticket = self::ticket_id( $ticket_id );
+		if ( null !== $ticket ) {
+			$args['ticket'] = (string) $ticket;
 		}
 
 		return add_query_arg( $args, $base );
+	}
+
+	/**
+	 * A positive integer from an int, a whole float or a digit string; null for anything else.
+	 *
+	 * @param mixed $value Candidate ticket id (it comes from the payload).
+	 */
+	private static function ticket_id( $value ): ?int {
+		if ( is_float( $value ) && floor( $value ) === $value && $value > 0 && $value < PHP_INT_MAX ) {
+			$value = (int) $value;
+		} elseif ( is_string( $value ) && preg_match( '/^[0-9]{1,18}\z/', $value ) ) {
+			$value = (int) $value;
+		}
+
+		return is_int( $value ) && $value > 0 ? $value : null;
 	}
 
 	/**

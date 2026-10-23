@@ -16,7 +16,7 @@ final class Schema {
 		Event_View::LIVE      => 'https://schema.org/EventScheduled',
 		Event_View::ENDED     => 'https://schema.org/EventScheduled',
 		Event_View::ARCHIVED  => 'https://schema.org/EventScheduled',
-		Event_View::PAUSED    => 'https://schema.org/EventPostponed',
+		Event_View::PAUSED    => 'https://schema.org/EventScheduled', // Registration is paused, not the event.
 		Event_View::CANCELLED => 'https://schema.org/EventCancelled',
 	);
 
@@ -25,9 +25,9 @@ final class Schema {
 	 * valid start date).
 	 *
 	 * @param Event_View $view      The event.
-	 * @param string     $permalink URL of the WordPress page showing the event.
+	 * @param mixed      $permalink URL of the WordPress page showing the event (get_permalink() may give false).
 	 */
-	public static function event_json_ld( Event_View $view, string $permalink ): string {
+	public static function event_json_ld( Event_View $view, $permalink ): string {
 		$status = self::STATUS_URLS[ $view->state() ] ?? null;
 		if ( null === $status || ! $view->has_content() ) {
 			return '';
@@ -124,15 +124,15 @@ final class Schema {
 	}
 
 	/**
-	 * @param array[] $tickets  Ticket rows.
-	 * @param string  $currency Currency code of the event.
-	 * @param string  $url      Page URL ('' to omit).
+	 * @param array[]     $tickets  Ticket rows.
+	 * @param string|null $currency Currency code of the event (missing or malformed: offers without priceCurrency).
+	 * @param string      $url      Page URL ('' to omit).
 	 * @return array[]
 	 */
-	private static function offers( array $tickets, string $currency, string $url ): array {
-		$currency = strtoupper( trim( $currency ) );
+	private static function offers( array $tickets, ?string $currency, string $url ): array {
+		$currency = strtoupper( trim( (string) $currency ) );
 		if ( ! preg_match( '/^[A-Z]{3}$/D', $currency ) ) {
-			return array();
+			$currency = '';
 		}
 
 		$offers = array();
@@ -153,9 +153,11 @@ final class Schema {
 				'@type'         => 'Offer',
 				'name'          => Sanitizer::text( self::string_of( $ticket, 'name' ) ),
 				'price'         => $price,
-				'priceCurrency' => $currency,
 				'availability'  => true === ( $ticket['is_full'] ?? null ) ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
 			);
+			if ( '' !== $currency ) {
+				$offer['priceCurrency'] = $currency;
+			}
 			if ( '' !== $url ) {
 				$offer['url'] = $url;
 			}

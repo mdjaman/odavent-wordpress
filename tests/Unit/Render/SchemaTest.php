@@ -58,7 +58,8 @@ class SchemaTest extends RenderTestCase {
 		$map = array(
 			'published' => 'https://schema.org/EventScheduled',
 			'cancelled' => 'https://schema.org/EventCancelled',
-			'paused'    => 'https://schema.org/EventPostponed',
+			// Registration is paused, not the event: the date stays valid.
+			'paused'    => 'https://schema.org/EventScheduled',
 			'archived'  => 'https://schema.org/EventScheduled',
 		);
 
@@ -218,9 +219,47 @@ class SchemaTest extends RenderTestCase {
 		$this->assertArrayNotHasKey( 'url', $data['offers'][0] );
 	}
 
-	public function test_offers_with_an_invalid_currency_are_left_out(): void {
-		$data = $this->decode( Schema::event_json_ld( $this->view( array( 'currency' => '<b>XOF</b>' ) ), self::PERMALINK ) );
+	public function bad_currencies(): array {
+		return array(
+			'markup'   => array( '<b>XOF</b>' ),
+			'null'     => array( null ),
+			'int'      => array( 123 ),
+			'array'    => array( array( 'x' ) ),
+			'empty'    => array( '' ),
+			'too long' => array( 'EURO' ),
+		);
+	}
 
-		$this->assertArrayNotHasKey( 'offers', $data );
+	/**
+	 * @dataProvider bad_currencies
+	 */
+	public function test_a_bad_currency_does_not_throw_and_leaves_priceCurrency_out( $currency ): void {
+		$data = $this->decode( Schema::event_json_ld( $this->view( array( 'currency' => $currency ) ), self::PERMALINK ) );
+
+		$this->assertCount( 1, $data['offers'] );
+		$this->assertSame( 'Pass Standard', $data['offers'][0]['name'] );
+		$this->assertArrayNotHasKey( 'priceCurrency', $data['offers'][0] );
+	}
+
+	public function test_a_missing_currency_does_not_throw(): void {
+		$payload = $this->fixture( 'payload-v1-full' );
+		unset( $payload['event']['currency'] );
+
+		$data = $this->decode( Schema::event_json_ld( Event_View::from_payload( $payload ), self::PERMALINK ) );
+
+		$this->assertArrayNotHasKey( 'priceCurrency', $data['offers'][0] );
+	}
+
+	public function test_a_lowercase_currency_is_normalised(): void {
+		$data = $this->decode( Schema::event_json_ld( $this->view( array( 'currency' => ' eur ' ) ), self::PERMALINK ) );
+
+		$this->assertSame( 'EUR', $data['offers'][0]['priceCurrency'] );
+	}
+
+	public function test_a_permalink_that_is_not_a_string_does_not_throw(): void {
+		// get_permalink() returns false for a missing post.
+		$data = $this->decode( Schema::event_json_ld( $this->view(), false ) );
+
+		$this->assertArrayNotHasKey( 'url', $data );
 	}
 }

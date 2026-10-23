@@ -56,6 +56,21 @@ class RegisterUrlTest extends RenderTestCase {
 		$this->assertStringContainsString( '&ticket=101', Register_Url::build( $this->view(), 101 ) );
 	}
 
+	public function test_a_ticket_id_from_the_payload_is_used_only_when_it_is_a_positive_integer(): void {
+		$this->assertStringContainsString( '&ticket=12', Register_Url::build( $this->view(), '12' ) );
+		$this->assertStringContainsString( '&ticket=12', Register_Url::build( $this->view(), 12.0 ) );
+
+		foreach ( array( 'abc', '1; DROP', '', 0, -3, 1.5, array( 1 ), true, new \stdClass() ) as $bad ) {
+			$this->assertStringNotContainsString( 'ticket=', Register_Url::build( $this->view(), $bad ), var_export( $bad, true ) );
+		}
+	}
+
+	public function test_a_return_url_that_is_not_a_string_falls_back_to_home(): void {
+		$url = Register_Url::build( $this->view(), null, array( 'x' ) );
+
+		$this->assertStringContainsString( 'return=https%3A%2F%2Fblog.example.com%2F', $url );
+	}
+
 	public function test_a_hostile_return_url_falls_back_to_the_home_page(): void {
 		$url = Register_Url::build( $this->view(), null, 'javascript:alert(1)' );
 

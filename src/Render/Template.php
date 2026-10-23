@@ -22,6 +22,12 @@ final class Template {
 	}
 
 	/**
+	 * Filters: `odavent_events_template` (string $path, string $name) may swap the file and
+	 * `odavent_events_view_data` (array $vars, string $name) the variables.
+	 *
+	 * The path from `odavent_events_template` is trusted developer input: never pass a request-derived
+	 * value (a `phar://` path would be touched by is_file() and a path outside the theme would be included).
+	 *
 	 * @param string $name Template name: lowercase letters, digits and dashes.
 	 * @param array  $vars Variables made available to the template.
 	 * @return string The output, or '' when the name is invalid or no template exists.

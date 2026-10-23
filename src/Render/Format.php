@@ -29,6 +29,9 @@ final class Format {
 	/**
 	 * A date and time in the event's timezone.
 	 *
+	 * Odavent sends valid IANA timezones. A missing or unknown one falls back to UTC rather than failing
+	 * (the time then reads as UTC, which is wrong for the visitor but never an error).
+	 *
 	 * @param mixed  $iso      ISO 8601 date-time (anything but a valid string gives '').
 	 * @param mixed  $timezone IANA timezone of the event (anything invalid: UTC).
 	 * @param string $format   PHP date format; '' for the site's date and time formats.
@@ -97,27 +100,36 @@ final class Format {
 	}
 
 	/**
-	 * A ticket price: "Free", or the amount with its currency.
+	 * A ticket price: "Free", the amount with its currency, or '' when the price cannot be shown.
 	 *
-	 * Prices arrive as int or float (JSON drops ".0"), so the value is cast, never assumed a float. Zero-
-	 * decimal currencies (XOF, XAF, JPY, KRW...) show no decimals.
+	 * "Free" only for an explicit `true` flag or a numeric price of exactly 0. A missing, malformed,
+	 * negative or non-finite price gives '' (the caller hides the price) rather than a wrong "Free".
+	 * Prices arrive as int or float (JSON drops ".0"), possibly as numeric strings, so the value is cast.
+	 * Zero-decimal currencies (XOF, XAF, JPY, KRW...) show no decimals.
 	 *
-	 * @param int|float $price    Amount in the currency's main unit.
-	 * @param string    $currency ISO 4217 code.
-	 * @param bool      $is_free  Whether the ticket is flagged free.
+	 * @param mixed $price    Amount in the currency's main unit.
+	 * @param mixed $currency ISO 4217 code (anything else is dropped).
+	 * @param mixed $is_free  Whether the ticket is flagged free (only `true` counts).
 	 */
-	public static function price( $price, string $currency, bool $is_free ): string {
-		$amount = is_numeric( $price ) ? (float) $price : 0.0;
-
-		if ( $is_free || $amount <= 0 ) {
+	public static function price( $price, $currency, $is_free ): string {
+		if ( true === $is_free ) {
 			return __( 'Free', 'odavent-events' );
 		}
 
-		if ( ! is_finite( $amount ) ) {
+		if ( ! is_numeric( $price ) ) {
 			return '';
 		}
 
-		$code = strtoupper( trim( $currency ) );
+		$amount = (float) $price;
+		if ( ! is_finite( $amount ) || $amount < 0 ) {
+			return '';
+		}
+
+		if ( 0.0 === $amount ) {
+			return __( 'Free', 'odavent-events' );
+		}
+
+		$code = is_string( $currency ) ? strtoupper( trim( $currency ) ) : '';
 		if ( ! preg_match( '/^[A-Z]{3}$/D', $code ) ) {
 			$code = '';
 		}

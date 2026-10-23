@@ -153,7 +153,30 @@ class FormatTest extends RenderTestCase {
 	public function test_free_tickets_say_free(): void {
 		$this->assertSame( 'Free', Format::price( 0, 'EUR', true ) );
 		$this->assertSame( 'Free', Format::price( 0.0, 'EUR', false ) );
+		$this->assertSame( 'Free', Format::price( 0, 'EUR', false ) );
+		$this->assertSame( 'Free', Format::price( '0.00', 'EUR', false ) );
 		$this->assertSame( 'Free', Format::price( 12, 'EUR', true ) );
+		$this->assertSame( 'Free', Format::price( null, 'EUR', true ) );
+	}
+
+	public function test_a_malformed_negative_or_non_finite_price_is_not_shown_as_free(): void {
+		foreach ( array( -5, -0.01, '-3', null, 'abc', '', array( 1 ), true, INF, -INF, NAN, new \stdClass() ) as $bad ) {
+			$this->assertSame( '', Format::price( $bad, 'EUR', false ), var_export( $bad, true ) );
+		}
+	}
+
+	public function test_only_the_boolean_true_makes_a_ticket_free(): void {
+		foreach ( array( 'true', 1, '1', null, array() ) as $flag ) {
+			$this->assertSame( '', Format::price( 'abc', 'EUR', $flag ), var_export( $flag, true ) );
+		}
+	}
+
+	public function test_a_currency_that_is_not_a_string_does_not_throw(): void {
+		Format::disable_intl( true );
+
+		foreach ( array( null, 123, array( 'x' ), true ) as $currency ) {
+			$this->assertSame( '10.00', Format::price( 10, $currency, false ) );
+		}
 	}
 
 	public function test_a_price_that_is_not_finite_is_not_shown(): void {

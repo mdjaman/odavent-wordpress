@@ -41,11 +41,17 @@ final class Sanitizer {
 			return '';
 		}
 
-		$clean = wp_kses( $html, self::allowed_html(), self::PROTOCOLS );
+		$allowed = self::allowed_html();
+		$clean   = wp_kses( $html, $allowed, self::PROTOCOLS );
+
+		// Attributes an <a> may keep: what the allow-list says, whatever wp_kses did before.
+		$link_attributes = isset( $allowed['a'] ) && is_array( $allowed['a'] ) ? array_map( 'strtolower', array_keys( $allowed['a'] ) ) : array();
 
 		$hardened = preg_replace_callback(
 			'/<a\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>/i',
-			array( self::class, 'harden_anchor' ),
+			static function ( array $match ) use ( $link_attributes ): string {
+				return self::harden_anchor( $match, $link_attributes );
+			},
 			$clean
 		);
 
@@ -130,27 +136,34 @@ final class Sanitizer {
 	}
 
 	/**
-	 * Rebuilds an <a ...> tag from wp_kses output: href re-validated, target and rel dropped, rel forced.
+	 * Rebuilds an <a ...> tag from wp_kses output: only allow-listed attributes survive, href is
+	 * re-validated, target and rel are dropped, rel is forced.
 	 *
-	 * @param string[] $match preg match: [1] is the attribute string.
+	 * Attribute values may be double-quoted, single-quoted (wp_kses keeps the author's quotes) or
+	 * unquoted. With PREG_UNMATCHED_AS_NULL the groups that did not take part are null, so an empty but
+	 * quoted value (href="") stays distinguishable from a value in another group.
+	 *
+	 * @param string[] $match      preg match: [1] is the attribute string.
+	 * @param string[] $permitted  Lower-case attribute names an <a> may keep.
 	 */
-	private static function harden_anchor( array $match ): string {
+	private static function harden_anchor( array $match, array $permitted ): string {
 		$out = '<a';
 
 		preg_match_all(
 			'/([a-z_:][-a-z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'>]+)))?/i',
 			$match[1],
 			$attributes,
-			PREG_SET_ORDER
+			PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL
 		);
 
 		foreach ( $attributes as $attribute ) {
 			$name = strtolower( $attribute[1] );
-			if ( 'target' === $name || 'rel' === $name ) {
+			if ( 'target' === $name || 'rel' === $name || ! in_array( $name, $permitted, true ) ) {
 				continue;
 			}
 
-			$value = html_entity_decode( $attribute[2] ?? ( '' !== ( $attribute[3] ?? '' ) ? $attribute[3] : ( $attribute[4] ?? '' ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			$raw = $attribute[2] ?? $attribute[3] ?? $attribute[4] ?? '';
+			$value = html_entity_decode( $raw, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 			if ( 'href' === $name ) {
 				$safe = self::url( $value );

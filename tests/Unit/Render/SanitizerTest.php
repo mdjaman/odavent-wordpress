@@ -2,8 +2,10 @@
 namespace Odavent\Events\Tests\Unit\Render;
 
 use Brain\Monkey\Filters;
+use Brain\Monkey\Functions;
 use Odavent\Events\Render\Sanitizer;
 use Odavent\Events\Tests\Support\RenderTestCase;
+use Odavent\Events\Tests\Support\WpStubs;
 
 class SanitizerTest extends RenderTestCase {
 
@@ -139,6 +141,66 @@ class SanitizerTest extends RenderTestCase {
 		$this->assertSame( 1, substr_count( $out, 'rel=' ) );
 		$this->assertStringContainsString( 'rel="nofollow noopener"', $out );
 		$this->assertStringContainsString( 'href="https://example.com/x?a=1&#038;b=2"', $out );
+	}
+
+	public function anchor_quote_styles(): array {
+		return array(
+			'double quotes' => array( '<a href="https://x.com/a?b=1&amp;c=2">x</a>' ),
+			'single quotes' => array( "<a href='https://x.com/a?b=1&amp;c=2'>x</a>" ),
+			'unquoted'      => array( '<a href=https://x.com/a?b=1&amp;c=2>x</a>' ),
+			'spaced equals' => array( "<a href = 'https://x.com/a?b=1&amp;c=2'>x</a>" ),
+			'upper case'    => array( "<A HREF='https://x.com/a?b=1&amp;c=2'>x</A>" ),
+		);
+	}
+
+	/**
+	 * wp_kses is an identity function here, so the anchor rebuild sees the author's quote style untouched.
+	 *
+	 * @dataProvider anchor_quote_styles
+	 */
+	public function test_the_anchor_rebuild_keeps_the_href_whatever_the_quote_style( string $html ): void {
+		Functions\when( 'wp_kses' )->returnArg();
+
+		$out = Sanitizer::html( $html );
+
+		$this->assertMatchesRegularExpression( '#^<a href="https://x\.com/a\?b=1&\#038;c=2" rel="nofollow noopener">x</a>$#i', $out );
+	}
+
+	public function test_the_anchor_rebuild_alone_strips_unlisted_attributes_and_target(): void {
+		Functions\when( 'wp_kses' )->returnArg();
+
+		$out = Sanitizer::html( "<a href='https://x.com' onclick='steal()' style=\"x:y\" target=_blank rel=opener data-x=1>x</a>" );
+
+		$this->assertSame( '<a href="https://x.com" rel="nofollow noopener">x</a>', $out );
+	}
+
+	public function test_the_anchor_rebuild_alone_drops_a_bad_single_quoted_or_unquoted_href(): void {
+		Functions\when( 'wp_kses' )->returnArg();
+
+		$this->assertSame( '<a rel="nofollow noopener">x</a>', Sanitizer::html( "<a href='javascript:alert(1)'>x</a>" ) );
+		$this->assertSame( '<a rel="nofollow noopener">x</a>', Sanitizer::html( '<a href=javascript:alert(1)>x</a>' ) );
+		$this->assertSame( '<a rel="nofollow noopener">x</a>', Sanitizer::html( "<a href=''>x</a>" ) );
+		$this->assertSame( '<a rel="nofollow noopener">x</a>', Sanitizer::html( '<a href>x</a>' ) );
+	}
+
+	public function test_a_greater_than_inside_a_quoted_attribute_does_not_end_the_tag(): void {
+		Functions\when( 'wp_kses' )->returnArg();
+		Filters\expectApplied( 'odavent_events_allowed_html' )->andReturn( array( 'a' => array( 'href' => true, 'title' => true ) ) );
+
+		$out = Sanitizer::html( "<a title='a > b' href='https://x.com'>x</a>" );
+
+		$this->assertSame( '<a title="a &gt; b" href="https://x.com" rel="nofollow noopener">x</a>', $out );
+	}
+
+	public function test_the_kses_double_can_keep_the_authors_single_quotes(): void {
+		WpStubs::$kses_keep_quotes = true;
+
+		$this->assertSame( "<a href='https://x.com/a'>x</a>", wp_kses( "<a href='https://x.com/a'>x</a>", array( 'a' => array( 'href' => true ) ), array( 'http', 'https' ) ) );
+		$this->assertSame( '<a href="https://x.com/a">x</a>', wp_kses( '<a href="https://x.com/a">x</a>', array( 'a' => array( 'href' => true ) ), array( 'http', 'https' ) ) );
+
+		// Through the real sanitiser: single-quoted in, link kept.
+		$out = Sanitizer::html( "<p><a href='https://x.com/a' target='_blank'>x</a></p>" );
+		$this->assertSame( '<p><a href="https://x.com/a" rel="nofollow noopener">x</a></p>', $out );
 	}
 
 	public function test_links_without_a_safe_href_keep_their_text_but_lose_the_href(): void {

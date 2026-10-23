@@ -25,6 +25,9 @@ final class WpStubs {
 	/** @var string */
 	public static $template_dir = '/nonexistent/parent';
 
+	/** @var bool wp_kses() keeps the quote style the author used (single quotes) instead of always writing double quotes. */
+	public static $kses_keep_quotes = false;
+
 	/** @var string */
 	public static $home = 'https://blog.example.com';
 
@@ -39,6 +42,7 @@ final class WpStubs {
 		self::$stylesheet_dir = '/nonexistent/child';
 		self::$template_dir   = '/nonexistent/parent';
 		self::$home           = 'https://blog.example.com';
+		self::$kses_keep_quotes = false;
 
 		Functions\when( 'get_option' )->alias(
 			function ( $name, $default = false ) {
@@ -207,7 +211,8 @@ final class WpStubs {
 	 * allowed, removes comments, removes every attribute that is not allowed for its element, and
 	 * removes an href whose scheme is not in $protocols. Text is re-serialised with entities escaped.
 	 * Differences from WordPress: output formatting (attribute order, entity style, whitespace) and
-	 * that a bad href is dropped whole instead of having its scheme stripped.
+	 * that a bad href is dropped whole instead of having its scheme stripped. With $kses_keep_quotes, attribute
+	 * values are written with single quotes when the input used them (real kses keeps the author's quotes).
 	 *
 	 * @param string $html      Untrusted HTML.
 	 * @param array  $allowed   Map of tag => map of allowed attributes.
@@ -235,6 +240,22 @@ final class WpStubs {
 		$out = '';
 		foreach ( iterator_to_array( $root->childNodes ) as $child ) {
 			$out .= $doc->saveHTML( $child );
+		}
+
+		if ( self::$kses_keep_quotes && false !== strpos( $html, "='" ) ) {
+			$out = preg_replace_callback(
+				'/<[a-z][^>]*>/i',
+				static function ( $tag ) {
+					return preg_replace_callback(
+						'/(\s[a-z-]+)="([^"]*)"/i',
+						static function ( $attr ) {
+							return $attr[1] . "='" . str_replace( "'", '&#039;', $attr[2] ) . "'";
+						},
+						$tag[0]
+					);
+				},
+				$out
+			);
 		}
 
 		return $out;
