@@ -1,6 +1,8 @@
 <?php
 namespace Odavent\Events;
 
+use Odavent\Events\Settings\Options;
+
 /**
  * Plugin entry point. Later tasks register their components in boot().
  */
@@ -8,6 +10,9 @@ final class Plugin {
 
 	/** @var Plugin|null */
 	private static $instance = null;
+
+	/** @var Options|null */
+	private $options = null;
 
 	private function __construct() {
 	}
@@ -21,6 +26,14 @@ final class Plugin {
 	}
 
 	public function boot(): void {
+	}
+
+	public function options(): Options {
+		if ( null === $this->options ) {
+			$this->options = new Options();
+		}
+
+		return $this->options;
 	}
 
 	public function version(): string {
