@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<ruleset name="Odavent Events">
+    <description>PHP 7.4+ compatibility check for the Odavent Events plugin.</description>
+
+    <file>odavent-events.php</file>
+    <file>uninstall.php</file>
+    <file>src</file>
+    <file>templates</file>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <config name="testVersion" value="7.4-"/>
+    <rule ref="PHPCompatibilityWP"/>
+</ruleset>

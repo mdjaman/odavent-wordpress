@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Runs PHPUnit 9.6 inside Docker (no PHP/Composer needed on the host).
+# Usage: bin/test [phpunit arguments]
+set -e
+cd "$(dirname "$0")/.."
+exec docker run --rm -v "$PWD":/app -w /app composer:2 sh -c \
+  'composer install --no-interaction --prefer-dist --no-progress --quiet && vendor/bin/phpunit "$@"' sh "$@"
