@@ -291,6 +291,162 @@ echo class_exists( "Odavent\\\\Events\\\\Settings\\\\Options" ) ? "nested-ok" : 
 		$this->assertSame( array_keys( $this->defaults() ), array_keys( $out ) );
 	}
 
+	/* ---- ensure_exists ---- */
+
+	public function test_ensure_exists_creates_the_option_without_autoload(): void {
+		Functions\expect( 'add_option' )
+			->once()
+			->with( 'odavent_events_settings', array(), '', false );
+		Functions\expect( 'update_option' )->never();
+
+		( new Options() )->ensure_exists();
+		$this->addToAssertionCount( 1 );
+	}
+
+	public function test_ensure_exists_never_overwrites_an_existing_option(): void {
+		// add_option() is WordPress's create-if-missing; the only write ensure_exists() may use.
+		$this->stored( array( 'site_key' => self::KEY ) );
+		Functions\expect( 'add_option' )->once();
+		Functions\expect( 'update_option' )->never();
+		Functions\expect( 'delete_option' )->never();
+
+		( new Options() )->ensure_exists();
+		$this->addToAssertionCount( 1 );
+	}
+
+	/* ---- key validation ---- */
+
+	public function test_sanitize_rejects_probe_keys_and_keeps_current(): void {
+		$errors = 0;
+		Functions\when( 'add_settings_error' )->alias(
+			function () use ( &$errors ) {
+				++$errors;
+			}
+		);
+
+		$probes = array(
+			'markup'    => 'odv_wp_"><svg>',
+			'nul'       => "odv_wp_abcdefgh\0ijklmnop",
+			'too long'  => 'odv_wp_' . str_repeat( 'a', 4993 ),
+			'quote'     => "odv_wp_abcdefgh'ijkl",
+			'unicode'   => 'odv_wp_abcdefgh••••',
+			'too short' => 'odv_wp_abcdefg',
+			'too long2' => 'odv_wp_' . str_repeat( 'a', 121 ),
+		);
+
+		foreach ( $probes as $label => $probe ) {
+			$out = $this->sanitize( array( 'site_key' => $probe ), array( 'site_key' => self::KEY ) );
+			$this->assertSame( self::KEY, $out['site_key'], "Should reject {$label}" );
+		}
+
+		$this->assertSame( count( $probes ), $errors );
+	}
+
+	public function test_sanitize_accepts_a_48_char_key_and_the_length_boundaries(): void {
+		$long = 'odv_wp_' . str_repeat( 'aB3-_', 8 ) . 'abcdefgh'; // 7 + 48 = 55 characters.
+		$this->assertSame( $long, $this->sanitize( array( 'site_key' => $long ) )['site_key'] );
+
+		$min = 'odv_wp_abcdefgh';
+		$this->assertSame( $min, $this->sanitize( array( 'site_key' => $min ) )['site_key'] );
+
+		$max = 'odv_wp_' . str_repeat( 'z', 120 );
+		$this->assertSame( $max, $this->sanitize( array( 'site_key' => $max ) )['site_key'] );
+	}
+
+	public function test_is_valid_key_rejects_trailing_newline(): void {
+		$this->assertTrue( Options::is_valid_key( 'odv_wp_abcdefgh1234' ) );
+		$this->assertFalse( Options::is_valid_key( "odv_wp_abcdefgh1234\n" ) );
+	}
+
+	public function test_malformed_constant_counts_as_no_key(): void {
+		$this->stored( array( 'site_key' => self::KEY ) );
+
+		foreach ( array( 'odv_wp_"><svg>', "odv_wp_abcdefgh1234\n", 'nope' ) as $bad ) {
+			$options           = new OptionsWithConstant();
+			$options->constant = $bad;
+
+			$this->assertFalse( $options->has_key(), 'Constant: ' . $bad );
+			$this->assertSame( '', $options->site_key() );
+			$this->assertSame( '', $options->masked_key() );
+		}
+	}
+
+	public function test_malformed_stored_key_counts_as_no_key(): void {
+		foreach ( array( 'odv_wp_"><svg>', 'garbage', array( 'x' ), 123 ) as $bad ) {
+			$this->stored( array( 'site_key' => $bad ) );
+			$options = new OptionsWithConstant();
+
+			$this->assertFalse( $options->has_key() );
+			$this->assertSame( '', $options->site_key() );
+		}
+	}
+
+	/* ---- masking ---- */
+
+	public function test_mask_shows_the_tail_only_for_keys_of_at_least_12_characters(): void {
+		$this->assertSame( '', Options::mask( '' ) );
+		$this->assertSame( 'odv_wp_••••', Options::mask( 'odv_wp_ab' ) );
+		$this->assertSame( 'odv_wp_••••', Options::mask( 'odv_wp_abcd' ) ); // 11 characters.
+	}
+
+	public function test_mask_boundary_at_exactly_12_characters(): void {
+		$this->assertSame( 12, strlen( 'odv_wp_abcde' ) );
+		$this->assertSame( 'odv_wp_••••bcde', Options::mask( 'odv_wp_abcde' ) );
+	}
+
+	/* ---- base_url read-time validation ---- */
+
+	public function test_base_url_falls_back_to_default_for_unusable_stored_values(): void {
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+
+		foreach ( array( array( 'x' ), '', 'Array', 'http://example.com', 'not a url', 123 ) as $bad ) {
+			$this->stored( array( 'base_url' => $bad ) );
+			$this->assertSame( 'https://odavent.com', ( new Options() )->base_url() );
+		}
+	}
+
+	public function test_stale_http_localhost_becomes_invalid_outside_local_environment(): void {
+		$this->stored( array( 'base_url' => 'http://localhost:8000' ) );
+
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'local' );
+		$this->assertSame( 'http://localhost:8000', ( new Options() )->base_url() );
+
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+		$this->assertSame( 'https://odavent.com', ( new Options() )->base_url() );
+	}
+
+	/* ---- base URL normalisation ---- */
+
+	public function test_normalization_cases(): void {
+		Functions\when( 'add_settings_error' )->justReturn( null );
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+		$default = 'https://odavent.com';
+
+		$accepted = array(
+			'HTTPS://Odavent.com/'     => 'https://odavent.com',
+			'https://odavent.com/app/' => 'https://odavent.com/app',
+			'https://odavent.com:8443' => 'https://odavent.com:8443',
+		);
+		foreach ( $accepted as $in => $expected ) {
+			$this->assertSame( $expected, $this->sanitize( array( 'base_url' => $in ), array( 'base_url' => $default ) )['base_url'], $in );
+		}
+
+		$rejected = array(
+			'https://odavent.com/path?x',
+			'https://x#',
+			'https://x?',
+			'https://a@b',
+			'https://odavent..com',
+			'https://odavent.com/a/../b',
+			'https://odavent.com/..',
+			'https://odavent.com/a%00b',
+			'https://odavent.com:0',
+		);
+		foreach ( $rejected as $in ) {
+			$this->assertSame( 'https://keep.example.org', $this->sanitize( array( 'base_url' => $in ), array( 'base_url' => 'https://keep.example.org' ) )['base_url'], $in );
+		}
+	}
+
 	/* ---- connection disabled flag ---- */
 
 	public function test_connection_disabled_reads_the_transient(): void {

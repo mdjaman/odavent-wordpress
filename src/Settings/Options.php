@@ -48,6 +48,17 @@ class Options {
 	}
 
 	/**
+	 * Creates the option if missing, with autoload disabled.
+	 *
+	 * The Settings API creates a missing option through update_option() with no autoload argument,
+	 * which would autoload the site key on every request. Call this before it runs (admin_init).
+	 * add_option() does nothing when the option already exists.
+	 */
+	public function ensure_exists(): void {
+		add_option( self::OPTION, array(), '', false );
+	}
+
+	/**
 	 * Persists the full settings array without autoload.
 	 *
 	 * @param array $settings Sanitized settings.
@@ -58,14 +69,19 @@ class Options {
 
 	/**
 	 * The active site key: the ODAVENT_SITE_KEY constant wins over the stored key.
+	 *
+	 * A key that fails is_valid_key() counts as no key, so a malformed value can never be
+	 * sent as a header or printed.
 	 */
 	public function site_key(): string {
 		$constant = $this->constant_key();
 		if ( '' !== $constant ) {
-			return $constant;
+			return self::is_valid_key( $constant ) ? $constant : '';
 		}
 
-		return (string) $this->get()['site_key'];
+		$stored = $this->get()['site_key'];
+
+		return is_string( $stored ) && self::is_valid_key( $stored ) ? $stored : '';
 	}
 
 	public function has_key(): bool {
@@ -73,21 +89,36 @@ class Options {
 	}
 
 	/**
-	 * Display-safe form of the key: prefix, bullets and the last four characters.
+	 * Display-safe form of the active key: prefix, bullets and the last four characters.
 	 */
 	public function masked_key(): string {
-		$key = $this->site_key();
+		return self::mask( $this->site_key() );
+	}
+
+	/**
+	 * Masks a key. The tail is shown only when the key is at least 12 characters long.
+	 *
+	 * @param string $key Site key (ASCII, see is_valid_key()).
+	 */
+	public static function mask( string $key ): string {
 		if ( '' === $key ) {
 			return '';
 		}
 
-		$tail = function_exists( 'mb_substr' ) ? mb_substr( $key, -4 ) : substr( $key, -4 );
+		$tail = strlen( $key ) >= 12 ? substr( $key, -4 ) : '';
 
 		return self::KEY_PREFIX . '••••' . $tail;
 	}
 
+	/**
+	 * The validated base URL without trailing slash. Falls back to the default when the stored
+	 * value is not a string or no longer valid (re-checked at read time, e.g. a saved
+	 * http://localhost once the environment type is no longer local).
+	 */
 	public function base_url(): string {
-		return rtrim( (string) $this->get()['base_url'], '/' );
+		$normalized = $this->normalize_base_url( $this->get()['base_url'] );
+
+		return null === $normalized ? self::defaults()['base_url'] : $normalized;
 	}
 
 	public function cache_ttl(): int {
@@ -127,10 +158,10 @@ class Options {
 		if ( array_key_exists( 'site_key', $input ) ) {
 			$key = is_string( $input['site_key'] ) ? trim( $input['site_key'] ) : '';
 			if ( '' !== $key ) {
-				if ( $this->is_valid_key( $key ) ) {
+				if ( self::is_valid_key( $key ) ) {
 					$out['site_key'] = $key;
 				} else {
-					$this->add_error( 'odavent_events_site_key', __( 'That does not look like an Odavent site key. It starts with odv_wp_ and contains no spaces.', 'odavent-events' ) );
+					$this->add_error( 'odavent_events_site_key', __( 'That does not look like an Odavent site key. It starts with odv_wp_ followed by letters, digits, dashes or underscores.', 'odavent-events' ) );
 				}
 			}
 		}
@@ -175,13 +206,14 @@ class Options {
 
 		$value = constant( 'ODAVENT_SITE_KEY' );
 
-		return is_string( $value ) ? trim( $value ) : '';
+		return is_string( $value ) ? $value : '';
 	}
 
-	private function is_valid_key( string $key ): bool {
-		return 0 === strpos( $key, self::KEY_PREFIX )
-			&& strlen( $key ) > strlen( self::KEY_PREFIX )
-			&& 1 !== preg_match( '/\s/', $key );
+	/**
+	 * Site keys are odv_wp_ plus 8-120 URL-safe characters. The D modifier makes a trailing newline fail.
+	 */
+	public static function is_valid_key( string $key ): bool {
+		return 1 === preg_match( '/^odv_wp_[A-Za-z0-9_-]{8,120}$/D', $key );
 	}
 
 	/**
@@ -200,6 +232,10 @@ class Options {
 			return null;
 		}
 
+		if ( false !== strpos( $raw, '?' ) || false !== strpos( $raw, '#' ) ) {
+			return null;
+		}
+
 		$parts = parse_url( $raw );
 		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || empty( $parts['host'] ) ) {
 			return null;
@@ -212,6 +248,14 @@ class Options {
 		$scheme = strtolower( $parts['scheme'] );
 		$host   = strtolower( $parts['host'] );
 		$path   = isset( $parts['path'] ) ? rtrim( $parts['path'], '/' ) : '';
+
+		if ( false !== strpos( $host, '..' ) || ( isset( $parts['port'] ) && (int) $parts['port'] < 1 ) ) {
+			return null;
+		}
+
+		if ( false !== stripos( $path, '%00' ) || 1 === preg_match( '#(^|/)\.\.(/|$)#', $path ) ) {
+			return null;
+		}
 
 		if ( 1 !== preg_match( '/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/', $host ) || 1 !== preg_match( '/^[A-Za-z0-9\/._~%-]*$/', $path ) ) {
 			return null;
