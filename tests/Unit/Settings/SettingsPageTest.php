@@ -307,6 +307,21 @@ class SettingsPageTest extends TestCase {
 		);
 	}
 
+	public function test_render_page_does_not_print_settings_errors_itself(): void {
+		// Settings > Odavent is under options-general.php, where wp-admin/options-head.php already calls
+		// settings_errors(); a second call printed every error notice twice (bin/smoke.sh check 9).
+		$calls = 0;
+		Functions\when( 'settings_errors' )->alias(
+			function () use ( &$calls ) {
+				++$calls;
+			}
+		);
+		$this->client->shouldReceive( 'list_events' )->andReturn( $this->events_result() );
+
+		$this->render( $this->page() );
+		$this->assertSame( 0, $calls );
+	}
+
 	public function test_plugin_action_links_adds_one_settings_link(): void {
 		$links = $this->page()->action_links( array( '<a href="x">Deactivate</a>' ) );
 

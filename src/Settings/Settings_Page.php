@@ -195,8 +195,9 @@ class Settings_Page {
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Odavent Events', 'odavent-events' ) . '</h1>';
 
+		// No settings_errors() here: for pages under Settings, wp-admin/options-head.php already prints them
+		// (and "Settings saved."); a second call shows every notice twice.
 		$this->render_notices();
-		settings_errors();
 
 		echo '<form method="post" action="options.php">';
 		settings_fields( self::GROUP );
