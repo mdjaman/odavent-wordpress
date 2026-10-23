@@ -4,7 +4,7 @@ WordPress plugin for Odavent: live speakers, agenda, sponsors and tickets from y
 
 ## Development
 
-Tests run inside Docker, so no local PHP or Composer is needed (Docker is required):
+Tests run inside Docker, so no local PHP or Composer is needed (Docker is required). Tests run on PHP 7.4 by default (the plugin's floor), so PHP 8-only syntax fails locally; use `PHP_VERSION=8.3 bin/test` to run on another version:
 
 ```sh
 bin/test              # run the whole PHPUnit suite

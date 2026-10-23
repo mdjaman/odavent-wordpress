@@ -1,0 +1,16 @@
+# Test image for bin/test. PHP version is selectable: PHP_VERSION=8.3 bin/test
+ARG PHP_VERSION=7.4
+FROM php:${PHP_VERSION}-cli
+
+# Old PHP images (7.4) sit on Debian bullseye, whose repositories moved to archive.debian.org.
+RUN if grep -q bullseye /etc/os-release; then \
+        sed -i 's|deb.debian.org/debian-security|archive.debian.org/debian-security|g; s|deb.debian.org/debian|archive.debian.org/debian|g; /bullseye-updates/d' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true; \
+    fi \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git unzip libzip-dev \
+    && docker-php-ext-install zip \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
