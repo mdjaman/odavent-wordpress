@@ -32,3 +32,67 @@ if ( ! class_exists( 'WP_Error' ) ) {
 		}
 	}
 }
+
+// Minimal stand-ins for the REST request/response classes. Header names are canonicalised the
+// way WordPress does it (lowercase, dashes to underscores).
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	class WP_REST_Request {
+
+		private $method;
+		private $route;
+		private $body    = '';
+		private $headers = array();
+
+		public function __construct( $method = '', $route = '' ) {
+			$this->method = $method;
+			$this->route  = $route;
+		}
+
+		public static function canonicalize_header_name( $key ) {
+			return str_replace( '-', '_', strtolower( $key ) );
+		}
+
+		public function get_method() {
+			return $this->method;
+		}
+
+		public function set_body( $body ) {
+			$this->body = $body;
+		}
+
+		public function get_body() {
+			return $this->body;
+		}
+
+		public function set_header( $key, $value ) {
+			$this->headers[ self::canonicalize_header_name( $key ) ] = array( $value );
+		}
+
+		public function get_header( $key ) {
+			$key = self::canonicalize_header_name( $key );
+
+			return isset( $this->headers[ $key ] ) ? implode( ',', $this->headers[ $key ] ) : null;
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	class WP_REST_Response {
+
+		public $data;
+		public $status;
+
+		public function __construct( $data = null, $status = 200 ) {
+			$this->data   = $data;
+			$this->status = $status;
+		}
+
+		public function get_data() {
+			return $this->data;
+		}
+
+		public function get_status() {
+			return $this->status;
+		}
+	}
+}

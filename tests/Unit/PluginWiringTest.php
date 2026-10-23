@@ -5,6 +5,7 @@ use Brain\Monkey\Functions;
 use Odavent\Events\Api\Client;
 use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Plugin;
+use Odavent\Events\Refresh\Page_Cache_Purger;
 use Odavent\Events\Tests\TestCase;
 
 class PluginWiringTest extends TestCase {
@@ -57,5 +58,32 @@ class PluginWiringTest extends TestCase {
 		Functions\when( 'is_admin' )->justReturn( false );
 		$this->fresh_plugin()->boot();
 		$this->assertNotContains( 'admin_menu', $this->hooks );
+	}
+
+	public function test_boot_registers_the_refresh_route_on_rest_api_init(): void {
+		Functions\when( 'is_admin' )->justReturn( false );
+		$callbacks = array();
+		Functions\when( 'add_action' )->alias(
+			function ( $hook, $callback ) use ( &$callbacks ) {
+				$callbacks[ $hook ] = $callback;
+				return true;
+			}
+		);
+		$plugin = $this->fresh_plugin();
+		$plugin->boot();
+		$this->assertArrayHasKey( 'rest_api_init', $callbacks );
+
+		$routes = array();
+		Functions\when( 'register_rest_route' )->alias(
+			function ( $namespace, $route, $args ) use ( &$routes ) {
+				$routes[] = $namespace . $route . ' ' . $args['methods'];
+				return true;
+			}
+		);
+		call_user_func( $callbacks['rest_api_init'] );
+
+		$this->assertSame( array( 'odavent/v1/refresh POST' ), $routes );
+		$this->assertInstanceOf( Page_Cache_Purger::class, $plugin->purger() );
+		$this->assertSame( $plugin->purger(), $plugin->purger() );
 	}
 }
