@@ -13,6 +13,7 @@ final class Uninstaller {
 				self::clean_site();
 				restore_current_blog();
 			}
+			self::clean_network();
 			return;
 		}
 
@@ -29,12 +30,31 @@ final class Uninstaller {
 			'odavent_events_lastgood_',
 			'_transient_odavent_events_',
 			'_transient_timeout_odavent_events_',
+			// Single-site installs keep site transients (the update check) in the options table.
+			'_site_transient_odavent_events_',
+			'_site_transient_timeout_odavent_events_',
 		);
 
 		foreach ( $patterns as $prefix ) {
 			$wpdb->query(
 				$wpdb->prepare(
 					"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+					$wpdb->esc_like( $prefix ) . '%'
+				)
+			);
+		}
+	}
+
+	/**
+	 * Network-wide site transients (the update check) live in the sitemeta table on multisite.
+	 */
+	private static function clean_network(): void {
+		global $wpdb;
+
+		foreach ( array( '_site_transient_odavent_events_', '_site_transient_timeout_odavent_events_' ) as $prefix ) {
+			$wpdb->query(
+				$wpdb->prepare(
+					"DELETE FROM {$wpdb->sitemeta} WHERE meta_key LIKE %s",
 					$wpdb->esc_like( $prefix ) . '%'
 				)
 			);

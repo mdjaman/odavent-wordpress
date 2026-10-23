@@ -26,6 +26,9 @@ class UpdateCheckerTest extends TestCase {
 	/** @var Mockery\MockInterface */
 	private $client;
 
+	/** @var string Version given to the last checker; the default `checked` list reports the same. */
+	private $installed = '1.0.0';
+
 	protected function setUp(): void {
 		parent::setUp();
 		$GLOBALS['wp_version'] = '6.5';
@@ -36,12 +39,12 @@ class UpdateCheckerTest extends TestCase {
 		$this->set_calls  = array();
 		$_GET             = array();
 
-		Functions\when( 'get_transient' )->alias(
+		Functions\when( 'get_site_transient' )->alias(
 			function ( $key ) {
 				return array_key_exists( $key, $this->transients ) ? $this->transients[ $key ] : false;
 			}
 		);
-		Functions\when( 'set_transient' )->alias(
+		Functions\when( 'set_site_transient' )->alias(
 			function ( $key, $value, $ttl = 0 ) {
 				$this->transients[ $key ] = $value;
 				$this->set_calls[]        = array( $key, $value, $ttl );
@@ -59,6 +62,11 @@ class UpdateCheckerTest extends TestCase {
 	}
 
 	private function release( array $over = array() ): array {
+		// The package path carries the version (v1.2.0/...); keep them in step unless a test sets the URL.
+		if ( isset( $over['version'] ) && is_string( $over['version'] ) && ! array_key_exists( 'download_url', $over ) ) {
+			$over['download_url'] = self::PREFIX . 'v' . $over['version'] . '/odavent-events.zip';
+		}
+
 		return array_merge(
 			array(
 				'version'       => '1.2.0',
@@ -78,7 +86,8 @@ class UpdateCheckerTest extends TestCase {
 	 */
 	private function checker( ?array $data, string $installed = '1.0.0', $times = 1 ): Update_Checker {
 		$result       = null === $data ? Result::fail( Result::UNAVAILABLE, 503, 'down' ) : Result::ok( $data );
-		$this->client = Mockery::mock( Client::class );
+		$this->installed = $installed;
+		$this->client    = Mockery::mock( Client::class );
 		$this->client->shouldReceive( 'plugin_update' )->times( $times )->andReturn( $result );
 
 		return new Update_Checker( $this->client, $installed );
@@ -88,7 +97,7 @@ class UpdateCheckerTest extends TestCase {
 		$t = (object) array_merge(
 			array(
 				'last_checked' => 1,
-				'checked'      => array( self::PLUGIN => '1.0.0' ),
+				'checked'      => array( self::PLUGIN => $this->installed ),
 				'response'     => array(),
 				'no_update'    => array(),
 			),
@@ -146,9 +155,59 @@ class UpdateCheckerTest extends TestCase {
 		$data = $this->release( array( 'version' => ODAVENT_EVENTS_VERSION ) );
 		$this->client->shouldReceive( 'plugin_update' )->once()->andReturn( Result::ok( $data ) );
 
-		$out = ( new Update_Checker( $this->client ) )->inject( $this->transient() );
+		$out = ( new Update_Checker( $this->client ) )->inject( $this->transient( array( 'checked' => array() ) ) );
 
 		$this->assertArrayNotHasKey( self::PLUGIN, $out->response, 'same as the installed constant: nothing to offer' );
+	}
+
+	// ----- Installed version is read live -------------------------------------------------------
+
+	public function test_the_version_just_installed_is_not_offered_again_in_the_same_process(): void {
+		// The process still holds the OLD constant (1.0.0); core rebuilt `checked` from disk after the upgrade.
+		$t   = $this->transient( array( 'checked' => array( self::PLUGIN => '1.2.0' ) ) );
+		$out = $this->checker( $this->release() )->inject( $t );
+
+		$this->assertArrayNotHasKey( self::PLUGIN, $out->response );
+		$this->assertArrayHasKey( self::PLUGIN, $out->no_update );
+		$this->assertSame( '1.2.0', $out->no_update[ self::PLUGIN ]->new_version );
+	}
+
+	public function test_a_newer_release_is_still_offered_when_checked_is_older(): void {
+		$t   = $this->transient( array( 'checked' => array( self::PLUGIN => '1.1.0' ) ) );
+		$out = $this->checker( $this->release() )->inject( $t );
+
+		$this->assertArrayHasKey( self::PLUGIN, $out->response );
+	}
+
+	/**
+	 * @dataProvider unusable_checked_lists
+	 */
+	public function test_a_missing_or_garbage_checked_entry_falls_back_to_the_loaded_version( $checked ): void {
+		$t = $this->transient();
+		if ( '__absent__' === $checked ) {
+			unset( $t->checked );
+		} else {
+			$t->checked = $checked;
+		}
+
+		// Loaded version 1.2.0 equals the release: not offered. A garbage entry must not make it offerable.
+		$out = $this->checker( $this->release(), '1.2.0' )->inject( $t );
+
+		$this->assertArrayNotHasKey( self::PLUGIN, $out->response );
+		$this->assertSame( '1.2.0', $out->no_update[ self::PLUGIN ]->new_version );
+	}
+
+	public function unusable_checked_lists(): array {
+		return array(
+			'absent'            => array( '__absent__' ),
+			'not an array'      => array( 'x' ),
+			'no entry for us'   => array( array( 'other/other.php' => '0.0.1' ) ),
+			'garbage version'   => array( array( self::PLUGIN => 'not-a-version' ) ),
+			'markup version'    => array( array( self::PLUGIN => '0.0.1"><script>' ) ),
+			'array version'     => array( array( self::PLUGIN => array( '0.0.1' ) ) ),
+			'empty version'     => array( array( self::PLUGIN => '' ) ),
+			'trailing newline'  => array( array( self::PLUGIN => "0.0.1\n" ) ),
+		);
 	}
 
 	// ----- Pre-releases ------------------------------------------------------------------------
@@ -258,6 +317,22 @@ class UpdateCheckerTest extends TestCase {
 			'empty'                    => array( '' ),
 			'null'                     => array( null ),
 			'array'                    => array( array( $p . 'x.zip' ) ),
+			'dot only'                 => array( $p . '.' ),
+			'tag dir only'             => array( $p . 'v1.2.0/' ),
+			'double-encoded dot dot'   => array( $p . '%252e%252e/x.zip' ),
+			'port after file'          => array( $p . 'v1/x.zip:80' ),
+			'port after tag'           => array( $p . 'v1.2.0:80/x.zip' ),
+			'nested path'              => array( $p . 'v1.2.0/a/x.zip' ),
+			'not a zip'                => array( $p . 'v1.2.0/x.tar.gz' ),
+			'trailing junk'            => array( $p . 'v1.2.0/x.zip.evil' ),
+			'trailing slash'           => array( $p . 'v1.2.0/x.zip/' ),
+			'percent in file'          => array( $p . 'v1.2.0/x%20y.zip' ),
+			'older tag, higher claim'  => array( $p . 'v1.1.0/odavent-events.zip' ),
+			'prefix-sharing tag'       => array( $p . 'v1.2.01/odavent-events.zip' ),
+			'tag with suffix'          => array( $p . 'v1.2.0-beta/odavent-events.zip' ),
+			'double v'                 => array( $p . 'vv1.2.0/odavent-events.zip' ),
+			'other letter'             => array( $p . 'x1.2.0/odavent-events.zip' ),
+			'no version at all'        => array( $p . 'odavent-events.zip' ),
 			'protocol relative'        => array( '//github.com/mdjaman/odavent-wordpress/releases/download/v1.2.0/x.zip' ),
 		);
 	}
@@ -269,6 +344,35 @@ class UpdateCheckerTest extends TestCase {
 
 		$this->assertSame( array(), $out->response );
 		$this->assertFalse( $this->cached_release() );
+	}
+
+	/**
+	 * @dataProvider matching_tag_paths
+	 */
+	public function test_a_package_path_matching_the_claimed_version_is_accepted( string $tag_dir ): void {
+		$url = self::PREFIX . $tag_dir . '/odavent-events-1.2.0.zip';
+		$out = $this->checker( $this->release( array( 'download_url' => $url ) ) )->inject( $this->transient() );
+
+		$this->assertSame( $url, $out->response[ self::PLUGIN ]->package );
+	}
+
+	public function matching_tag_paths(): array {
+		return array(
+			'lowercase v' => array( 'v1.2.0' ),
+			'uppercase V' => array( 'V1.2.0' ),
+			'bare'        => array( '1.2.0' ),
+		);
+	}
+
+	public function test_a_pre_release_tag_path_must_match_the_pre_release_version(): void {
+		$url = self::PREFIX . 'v1.3.0-beta.1/odavent-events.zip';
+		$out = $this->checker( $this->release( array( 'version' => '1.3.0-beta.1', 'download_url' => $url ) ), '1.2.0-rc.1' )->inject( $this->transient() );
+		$this->assertSame( $url, $out->response[ self::PLUGIN ]->package );
+
+		// The same zip claimed under a different pre-release is refused.
+		$this->transients = array();
+		$out = $this->checker( $this->release( array( 'version' => '1.3.0-beta.2', 'download_url' => $url ) ), '1.2.0-rc.1' )->inject( $this->transient() );
+		$this->assertSame( array(), $out->response );
 	}
 
 	public function test_a_download_url_inside_the_pinned_source_is_accepted(): void {
@@ -307,7 +411,7 @@ class UpdateCheckerTest extends TestCase {
 		Filters\expectApplied( 'odavent_events_update_package_prefix' )->andReturn( $junk );
 
 		// The junk prefix would accept this URL (when it is a string); the constant must not.
-		$evil = is_string( $junk ) ? $junk . 'x.zip' : 'https://evil.example.com/x.zip';
+		$evil = is_string( $junk ) ? $junk . '1.2.0/x.zip' : 'https://evil.example.com/x.zip';
 		$out  = $this->checker( $this->release( array( 'download_url' => $evil ) ) )->inject( $this->transient() );
 
 		$this->assertSame( array(), $out->response );
@@ -337,6 +441,9 @@ class UpdateCheckerTest extends TestCase {
 			'no trailing slash' => array( 'https://github.com' ),
 			'whitespace'        => array( "https://evil.example.com/ x/" ),
 			'newline'           => array( "https://evil.example.com/\n" ),
+			'host only slash'   => array( 'https://github.com/' ),
+			'ip only'           => array( 'https://127.0.0.1/' ),
+			'ip with port only' => array( 'https://127.0.0.1:8443/' ),
 		);
 	}
 
@@ -611,6 +718,38 @@ class UpdateCheckerTest extends TestCase {
 		$out = $this->checker( $this->release( array( 'version' => '1.0.0' ) ) )->inject( $t );
 
 		$this->assertArrayNotHasKey( self::PLUGIN, $out->response );
+	}
+
+	public function test_the_release_is_cached_in_a_site_transient_not_a_per_site_one(): void {
+		Functions\expect( 'get_transient' )->never();
+		Functions\expect( 'set_transient' )->never();
+
+		$this->checker( $this->release() )->fetch();
+
+		$this->assertSame( 'odavent_events_update', $this->set_calls[0][0] );
+	}
+
+	// ----- Update URI ----------------------------------------------------------------------------
+
+	public function test_the_update_entry_id_is_the_update_uri_header_value(): void {
+		$out = $this->checker( $this->release() )->inject( $this->transient() );
+
+		$this->assertSame( $this->header_update_uri(), $out->response[ self::PLUGIN ]->id );
+	}
+
+	public function test_the_plugin_header_update_uri_is_the_repo_base_of_the_package_prefix(): void {
+		$base = substr( Update_Checker::PACKAGE_PREFIX, 0, -strlen( 'releases/download/' ) - 1 );
+
+		$this->assertSame( 'https://github.com/mdjaman/odavent-wordpress', $base );
+		$this->assertSame( $base, $this->header_update_uri() );
+		$this->assertSame( $base, Update_Checker::REPO_URL );
+	}
+
+	private function header_update_uri(): string {
+		$header = (string) file_get_contents( dirname( __DIR__, 3 ) . '/odavent-events.php', false, null, 0, 2048 );
+		$this->assertSame( 1, preg_match( '/^\s*\*\s*Update URI:\s*(\S+)\s*$/m', $header, $m ), 'Update URI header present' );
+
+		return $m[1];
 	}
 
 	// ----- Registration ------------------------------------------------------------------------

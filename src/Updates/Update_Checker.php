@@ -14,8 +14,9 @@ use Odavent\Events\Api\Client;
  * return a well-formed https:// prefix or the constant is used. A release that fails validation is
  * treated exactly like a failed fetch: cached as a failure for an hour and never offered.
  *
- * What is NOT verified: the zip's content (no checksum or signature is published yet), and the
- * endpoint can choose WHICH asset under the pinned prefix is the "latest" one.
+ * What is NOT verified: the zip's content (no checksum or signature is published yet). The package
+ * path is tied to the claimed version (.../v{version}/{file}.zip), so the endpoint cannot label an
+ * older release's zip as a newer version; it can still choose which file of that release is served.
  *
  * Version policy: only a strictly greater version is offered (never a downgrade). A pre-release
  * ("1.2.0-beta") is offered only to a site that already runs a pre-release, so a stable site never
@@ -28,10 +29,14 @@ class Update_Checker {
 	/** Where release packages must come from (overridable only through the prefix filter). */
 	const PACKAGE_PREFIX = 'https://github.com/mdjaman/odavent-wordpress/releases/download/';
 
-	const REPO_URL  = 'https://github.com/mdjaman/odavent-wordpress';
-	const SLUG      = 'odavent-events';
-	const PLUGIN    = 'odavent-events/odavent-events.php';
-	const TRANSIENT = 'odavent_events_update';
+	/** Repository page; also the plugin's `Update URI` header value and the update entry id. */
+	const REPO_URL   = 'https://github.com/mdjaman/odavent-wordpress';
+	const UPDATE_URI = self::REPO_URL;
+
+	const VERSION_PATTERN = '/^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$/D';
+	const SLUG       = 'odavent-events';
+	const PLUGIN     = 'odavent-events/odavent-events.php';
+	const TRANSIENT  = 'odavent_events_update';
 
 	const SUCCESS_TTL = 43200; // 12 hours.
 	const FAILURE_TTL = 3600;  // 1 hour.
@@ -65,14 +70,15 @@ class Update_Checker {
 	/**
 	 * The validated latest release, from cache when possible; null when there is none.
 	 *
-	 * Cached 12 h; a failure (unreachable endpoint or a release that fails validation) is cached 1 h.
+	 * Cached 12 h in a SITE transient (the release is the same for a whole multisite network, so it
+	 * is fetched once per network, not once per subsite); a failure (unreachable endpoint or a release that fails validation) is cached 1 h.
 	 * A failure is stored as array( 'failed' => true ): a literal `false` cannot be told apart from
 	 * "nothing cached" by get_transient().
 	 *
 	 * @return array{version: string, download_url: string, requires: ?string, requires_php: ?string, tested: ?string, changelog_url: ?string}|null
 	 */
 	public function fetch(): ?array {
-		$cached = get_transient( self::TRANSIENT );
+		$cached = get_site_transient( self::TRANSIENT );
 
 		if ( false !== $cached && ! $this->force_requested() ) {
 			if ( is_array( $cached ) && ! empty( $cached['failed'] ) ) {
@@ -91,12 +97,12 @@ class Update_Checker {
 		$release         = $result->ok ? $this->validate( $result->data ) : null;
 
 		if ( null === $release ) {
-			set_transient( self::TRANSIENT, array( 'failed' => true ), self::FAILURE_TTL );
+			set_site_transient( self::TRANSIENT, array( 'failed' => true ), self::FAILURE_TTL );
 
 			return null;
 		}
 
-		set_transient( self::TRANSIENT, $release, self::SUCCESS_TTL );
+		set_site_transient( self::TRANSIENT, $release, self::SUCCESS_TTL );
 
 		return $release;
 	}
@@ -123,10 +129,15 @@ class Update_Checker {
 		unset( $response[ self::PLUGIN ], $no_update[ self::PLUGIN ] );
 
 		if ( null !== $release ) {
-			if ( $this->is_offerable( $release ) ) {
+			// The version on disk right now, not the constant of this (possibly stale) process: right
+			// after an upgrade core rebuilds this transient in the same request, with a fresh `checked`
+			// list, and the just-installed version must not be offered again.
+			$installed = $this->live_version( $transient );
+
+			if ( $this->is_offerable( $release, $installed ) ) {
 				$response[ self::PLUGIN ] = $this->update_entry( $release );
 			} else {
-				$no_update[ self::PLUGIN ] = $this->no_update_entry( $release );
+				$no_update[ self::PLUGIN ] = $this->no_update_entry( $release, $installed );
 			}
 		}
 
@@ -167,7 +178,7 @@ class Update_Checker {
 		}
 
 		// No download link for a release that would not be offered as an update (older or equal).
-		if ( $this->is_offerable( $release ) ) {
+		if ( $this->is_offerable( $release, $this->installed ) ) {
 			$info->download_link = $release['download_url'];
 		}
 
@@ -189,12 +200,29 @@ class Update_Checker {
 		return ! $this->refreshed && isset( $_GET['force-check'] ) && current_user_can( 'update_plugins' ); // phpcs:ignore WordPress.Security.NonceVerification
 	}
 
-	private function is_offerable( array $release ): bool {
-		if ( ! version_compare( $release['version'], $this->installed, '>' ) ) {
+	/**
+	 * The installed version according to the transient's `checked` list (built from the plugin
+	 * header on disk), when it is a well-formed version; otherwise the version this process loaded.
+	 *
+	 * @param object $transient The update_plugins transient.
+	 */
+	private function live_version( $transient ): string {
+		$checked = isset( $transient->checked ) ? $transient->checked : null;
+		$version = is_array( $checked ) && isset( $checked[ self::PLUGIN ] ) ? $checked[ self::PLUGIN ] : null;
+
+		if ( is_string( $version ) && strlen( $version ) <= self::MAX_VERSION_LENGTH && 1 === preg_match( self::VERSION_PATTERN, $version ) ) {
+			return $version;
+		}
+
+		return $this->installed;
+	}
+
+	private function is_offerable( array $release, string $installed ): bool {
+		if ( ! version_compare( $release['version'], $installed, '>' ) ) {
 			return false;
 		}
 
-		return ! $this->is_prerelease( $release['version'] ) || $this->is_prerelease( $this->installed );
+		return ! $this->is_prerelease( $release['version'] ) || $this->is_prerelease( $installed );
 	}
 
 	private function is_prerelease( string $version ): bool {
@@ -214,9 +242,9 @@ class Update_Checker {
 		return $entry;
 	}
 
-	private function no_update_entry( array $release ): \stdClass {
+	private function no_update_entry( array $release, string $installed ): \stdClass {
 		$entry              = $this->base_entry( $release );
-		$entry->new_version = $this->installed;
+		$entry->new_version = $installed;
 		$entry->package     = '';
 
 		return $entry;
@@ -224,7 +252,7 @@ class Update_Checker {
 
 	private function base_entry( array $release ): \stdClass {
 		$entry         = new \stdClass();
-		$entry->id     = 'github.com/mdjaman/odavent-wordpress';
+		$entry->id     = self::UPDATE_URI;
 		$entry->slug   = self::SLUG;
 		$entry->plugin = self::PLUGIN;
 		$entry->url    = null !== $release['changelog_url'] ? $release['changelog_url'] : self::REPO_URL;
@@ -245,12 +273,12 @@ class Update_Checker {
 		$version = $data['version'] ?? null;
 		if ( ! is_string( $version )
 			|| strlen( $version ) > self::MAX_VERSION_LENGTH
-			|| 1 !== preg_match( '/^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$/D', $version ) ) {
+			|| 1 !== preg_match( self::VERSION_PATTERN, $version ) ) {
 			return null;
 		}
 
 		$download_url = $data['download_url'] ?? null;
-		if ( ! $this->is_trusted_package_url( $download_url ) ) {
+		if ( ! $this->is_trusted_package_url( $download_url, $version ) ) {
 			return null;
 		}
 
@@ -265,12 +293,16 @@ class Update_Checker {
 	}
 
 	/**
-	 * Under the pinned prefix, https, nothing but URL-safe characters (so no whitespace, control
-	 * character, quote, backslash, query, fragment or "@" userinfo), no dot-dot segments.
+	 * Exactly PREFIX . ('v'|'V'|'') . VERSION . '/' . FILE.zip. The server derives the version from
+	 * the release tag (leading v/V stripped), so tying the path to the claimed version stops a
+	 * compromised endpoint from labelling an older release's zip as a newer version. FILE is a plain
+	 * name (no further slashes, no ":" or "%"), so there is no whitespace, control character, quote,
+	 * backslash, query, fragment, "@" userinfo or dot-dot segment either.
 	 *
-	 * @param mixed $url Candidate package URL.
+	 * @param mixed  $url     Candidate package URL.
+	 * @param string $version The (validated) version the release claims.
 	 */
-	private function is_trusted_package_url( $url ): bool {
+	private function is_trusted_package_url( $url, string $version ): bool {
 		if ( ! is_string( $url ) || strlen( $url ) > self::MAX_URL_LENGTH ) {
 			return false;
 		}
@@ -280,14 +312,15 @@ class Update_Checker {
 			return false;
 		}
 
-		return 1 === preg_match( '#^[A-Za-z0-9._~:/%+-]+$#D', $url )
-			&& false === strpos( $url, '..' )
-			&& false === stripos( $url, '%2e' );
+		$rest = substr( $url, strlen( $prefix ) );
+
+		return 1 === preg_match( '#^[vV]?' . preg_quote( $version, '#' ) . '/[A-Za-z0-9._-]+\.zip$#D', $rest )
+			&& false === strpos( $rest, '..' );
 	}
 
 	/**
-	 * The pinned prefix: the constant unless the filter returns a well-formed https:// prefix (lower
-	 * case host, optional path, trailing slash).
+	 * The pinned prefix: the constant unless the filter returns a well-formed https:// prefix (host,
+	 * optional port, at least one path segment, trailing slash).
 	 */
 	private function package_prefix(): string {
 		$prefix = apply_filters( 'odavent_events_update_package_prefix', self::PACKAGE_PREFIX );
@@ -295,7 +328,7 @@ class Update_Checker {
 		if ( is_string( $prefix )
 			&& strlen( $prefix ) <= self::MAX_URL_LENGTH
 			&& false === strpos( $prefix, '..' )
-			&& 1 === preg_match( '#^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?/([A-Za-z0-9._~%+-]+/)*$#D', $prefix ) ) {
+			&& 1 === preg_match( '#^https://[A-Za-z0-9.-]+(:[0-9]+)?/([A-Za-z0-9._~%+-]+/)+$#D', $prefix ) ) {
 			return $prefix;
 		}
 

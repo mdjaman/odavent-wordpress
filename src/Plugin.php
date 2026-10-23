@@ -93,8 +93,9 @@ final class Plugin {
 			}
 		);
 
-		// Update checks only where WordPress runs them: wp-admin and cron, never a front-end request.
-		if ( is_admin() || wp_doing_cron() ) {
+		// Update checks only where WordPress runs them: wp-admin, cron and WP-CLI, never a front-end
+		// request. Registering is free; nothing is fetched until the update transient is built.
+		if ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
 			$this->updates()->register();
 		}
 

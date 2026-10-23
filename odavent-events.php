@@ -2,6 +2,7 @@
 /**
  * Plugin Name:       Odavent Events
  * Plugin URI:        https://github.com/mdjaman/odavent-wordpress
+ * Update URI:        https://github.com/mdjaman/odavent-wordpress
  * Description:       Show live speakers, agenda, sponsors and tickets from your Odavent events on your own WordPress site.
  * Version:           0.1.0
  * Requires at least: 6.1

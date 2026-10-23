@@ -96,6 +96,21 @@ class PluginWiringTest extends TestCase {
 		$this->assertNotContains( 'plugins_api', $front );
 	}
 
+	/**
+	 * WP_CLI is a constant, so this runs in its own process.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_updates_are_wired_under_wp_cli(): void {
+		define( 'WP_CLI', true );
+
+		$cli = $this->boot_and_collect_filters( false, false );
+
+		$this->assertContains( 'pre_set_site_transient_update_plugins', $cli );
+		$this->assertContains( 'plugins_api', $cli );
+	}
+
 	public function test_the_update_checker_is_a_lazy_singleton_inside_the_plugin(): void {
 		$plugin = $this->fresh_plugin();
 
