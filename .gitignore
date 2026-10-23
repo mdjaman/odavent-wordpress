@@ -1,0 +1,4 @@
+.superpowers/
+vendor/
+dist/
+.phpunit.result.cache
