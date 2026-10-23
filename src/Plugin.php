@@ -61,6 +61,16 @@ final class Plugin {
 			( new Settings_Page( $this->options(), $this->client(), $this->repository() ) )->register();
 		}
 
+		// Before the blocks register (priority 10): block.json titles and descriptions are translated
+		// while the block types are registered, so the text domain must be loaded by then.
+		add_action(
+			'init',
+			function () {
+				load_plugin_textdomain( 'odavent-events', false, dirname( plugin_basename( ODAVENT_EVENTS_FILE ) ) . '/languages' );
+			},
+			1
+		);
+
 		add_action(
 			'init',
 			function () {

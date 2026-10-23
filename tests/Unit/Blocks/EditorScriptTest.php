@@ -40,12 +40,22 @@ class EditorScriptTest extends TestCase {
 
 	public function test_known_statuses_are_translated(): void {
 		foreach ( array( 'draft' => 'Draft', 'published' => 'Published', 'paused' => 'Paused', 'cancelled' => 'Cancelled', 'archived' => 'Archived' ) as $status => $label ) {
-			$this->assertMatchesRegularExpression( '/' . $status . ":\\s*__\\( '" . $label . "', DOMAIN \\)/", $this->js, $status );
+			$this->assertMatchesRegularExpression( '/' . $status . ":\\s*__\\( '" . $label . "', 'odavent-events' \\)/", $this->js, $status );
 		}
 	}
 
+	public function test_every_translation_call_names_the_text_domain_as_a_literal(): void {
+		// `wp i18n make-pot` only extracts strings whose domain is a string literal: a DOMAIN variable
+		// silently drops every editor string from the .pot (and so from the .json for the browser).
+		$calls   = preg_match_all( '/\b__\(/', $this->js );
+		$literal = preg_match_all( "/', 'odavent-events' \\)/", $this->js );
+		$this->assertGreaterThan( 10, $calls );
+		$this->assertSame( $calls, $literal );
+		$this->assertDoesNotMatchRegularExpression( '/\bDOMAIN\b/', $this->js );
+	}
+
 	public function test_a_slug_only_block_is_shown_by_its_slug(): void {
-		$this->assertStringContainsString( "__( 'Event: %s', DOMAIN )", $this->js );
+		$this->assertStringContainsString( "__( 'Event: %s', 'odavent-events' )", $this->js );
 		$this->assertStringContainsString( "'slug:'", $this->js );
 	}
 

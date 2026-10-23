@@ -6,6 +6,7 @@
     <file>uninstall.php</file>
     <file>src</file>
     <file>templates</file>
+    <file>bin</file>
 
     <arg name="extensions" value="php"/>
     <arg name="colors"/>

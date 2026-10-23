@@ -58,6 +58,34 @@ class PluginWiringTest extends TestCase {
 		$this->assertContains( 'admin_post_odavent_events_test_connection', $this->hooks );
 	}
 
+	public function test_the_text_domain_is_loaded_on_init_before_the_blocks_register(): void {
+		Functions\when( 'is_admin' )->justReturn( false );
+		$actions = array();
+		Functions\when( 'add_action' )->alias(
+			function ( $hook, $callback, $priority = 10 ) use ( &$actions ) {
+				$actions[] = array( $hook, $callback, $priority );
+				return true;
+			}
+		);
+		$loaded = array();
+		Functions\when( 'load_plugin_textdomain' )->alias(
+			function ( ...$args ) use ( &$loaded ) {
+				$loaded = $args;
+				return true;
+			}
+		);
+
+		$this->fresh_plugin()->boot();
+
+		$init = array_values( array_filter( $actions, function ( $action ) { return 'init' === $action[0]; } ) );
+		usort( $init, function ( $a, $b ) { return $a[2] <=> $b[2]; } );
+		$this->assertLessThan( 10, $init[0][2], 'The text domain must be loaded before the blocks register (init, priority 10).' );
+
+		( $init[0][1] )();
+
+		$this->assertSame( array( 'odavent-events', false, 'odavent-events/languages' ), $loaded );
+	}
+
 	public function test_boot_registers_nothing_on_the_front_end(): void {
 		Functions\when( 'is_admin' )->justReturn( false );
 		$this->fresh_plugin()->boot();

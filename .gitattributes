@@ -10,3 +10,6 @@
 /phpcs.xml.dist export-ignore
 /phpunit.xml.dist export-ignore
 /patchwork.json export-ignore
+/docker export-ignore
+/docs export-ignore
+/CHANGELOG.md export-ignore

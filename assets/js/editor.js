@@ -22,16 +22,15 @@
 	var InspectorControls = wp.blockEditor.InspectorControls;
 	var useBlockProps = wp.blockEditor.useBlockProps;
 	var ServerSideRender = wp.serverSideRender;
-	var DOMAIN = 'odavent-events';
 
 	var eventsRequest = null;
 
 	var STATUS_LABELS = {
-		draft: __( 'Draft', DOMAIN ),
-		published: __( 'Published', DOMAIN ),
-		paused: __( 'Paused', DOMAIN ),
-		cancelled: __( 'Cancelled', DOMAIN ),
-		archived: __( 'Archived', DOMAIN )
+		draft: __( 'Draft', 'odavent-events' ),
+		published: __( 'Published', 'odavent-events' ),
+		paused: __( 'Paused', 'odavent-events' ),
+		cancelled: __( 'Cancelled', 'odavent-events' ),
+		archived: __( 'Archived', 'odavent-events' )
 	};
 
 	/**
@@ -83,7 +82,7 @@
 						setData( {
 							loading: false,
 							events: [],
-							error: ( error && error.message ) || __( 'The events could not be loaded.', DOMAIN )
+							error: ( error && error.message ) || __( 'The events could not be loaded.', 'odavent-events' )
 						} );
 					}
 				}
@@ -99,7 +98,7 @@
 
 		var current = parseInt( attributes.eventId, 10 ) || 0;
 		var slugHint = typeof attributes.eventSlug === 'string' ? attributes.eventSlug : '';
-		var options = [ { label: __( 'Default event (from the settings)', DOMAIN ), value: '0' } ];
+		var options = [ { label: __( 'Default event (from the settings)', 'odavent-events' ), value: '0' } ];
 		var byId = null;
 		var bySlug = null;
 		data.events.forEach( function ( event ) {
@@ -112,7 +111,7 @@
 				}
 				options.push( {
 					/* translators: 1: event name, 2: event status. */
-					label: sprintf( __( '%1$s (%2$s)', DOMAIN ), event.name || event.slug || String( event.id ), statusLabel( event.status ) ),
+					label: sprintf( __( '%1$s (%2$s)', 'odavent-events' ), event.name || event.slug || String( event.id ), statusLabel( event.status ) ),
 					value: String( event.id )
 				} );
 			}
@@ -125,7 +124,7 @@
 			if ( ! byId ) {
 				options.push( {
 					/* translators: %d: event id. */
-					label: sprintf( __( 'Event #%d', DOMAIN ), current ),
+					label: sprintf( __( 'Event #%d', 'odavent-events' ), current ),
 					value: selected
 				} );
 			}
@@ -136,7 +135,7 @@
 				selected = 'slug:' + slugHint;
 				options.push( {
 					/* translators: %s: event slug. */
-					label: sprintf( __( 'Event: %s', DOMAIN ), slugHint ),
+					label: sprintf( __( 'Event: %s', 'odavent-events' ), slugHint ),
 					value: selected
 				} );
 			}
@@ -147,8 +146,8 @@
 			controls.push( el( components.Notice, { key: 'error', status: 'warning', isDismissible: false }, data.error ) );
 			controls.push( el( components.TextControl, {
 				key: 'slug',
-				label: __( 'Event slug', DOMAIN ),
-				help: __( 'The last part of the event address on Odavent.', DOMAIN ),
+				label: __( 'Event slug', 'odavent-events' ),
+				help: __( 'The last part of the event address on Odavent.', 'odavent-events' ),
 				value: attributes.eventSlug || '',
 				onChange: function ( value ) {
 					setAttributes( { eventSlug: value, eventId: 0 } );
@@ -157,7 +156,7 @@
 		}
 		controls.push( el( components.SelectControl, {
 			key: 'event',
-			label: __( 'Event', DOMAIN ),
+			label: __( 'Event', 'odavent-events' ),
 			value: selected,
 			options: options,
 			onChange: function ( value ) {
@@ -265,8 +264,8 @@
 				el(
 					InspectorControls,
 					null,
-					el( components.PanelBody, { title: __( 'Event', DOMAIN ) }, el( EventPicker, props ) ),
-					settings.length ? el( components.PanelBody, { title: __( 'Settings', DOMAIN ) }, settings ) : null
+					el( components.PanelBody, { title: __( 'Event', 'odavent-events' ) }, el( EventPicker, props ) ),
+					settings.length ? el( components.PanelBody, { title: __( 'Settings', 'odavent-events' ) }, settings ) : null
 				),
 				el( 'div', blockProps, el( ServerSideRender, { block: meta.name, attributes: props.attributes } ) )
 			);
