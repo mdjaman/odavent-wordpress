@@ -1,0 +1,31 @@
+{
+    "contract": 1,
+    "locale": "en",
+    "event": {
+        "id": 7,
+        "slug": "small-meetup",
+        "name": "Small Meetup",
+        "description": null,
+        "status": "draft",
+        "starts_at": null,
+        "ends_at": null,
+        "timezone": "UTC",
+        "currency": "USD",
+        "logo_url": null,
+        "cover_url": null,
+        "registration_open": false,
+        "ended": false,
+        "register_url": "https://odavent.com/events/small-meetup/register",
+        "find_registration_url": "https://odavent.com/events/small-meetup/find-registration",
+        "calendar": {
+            "ics": "https://odavent.com/events/small-meetup/calendar.ics",
+            "google": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Small+Meetup",
+            "outlook": "https://outlook.live.com/calendar/0/deeplink/compose?path=%2Fcalendar%2Faction%2Fcompose&rru=addevent&subject=Small+Meetup"
+        },
+        "venue": null
+    },
+    "tickets": [],
+    "sessions": [],
+    "speakers": [],
+    "partners": []
+}
