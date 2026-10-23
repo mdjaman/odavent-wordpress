@@ -56,4 +56,41 @@ class CssTest extends TestCase {
 		$this->assertLessThan( $mix, $plain, 'The fallback must be declared first.' );
 		$this->assertMatchesRegularExpression( '/@supports\s*\(color:\s*color-mix\([^)]*\)\)\s*\{[^@]*color-mix/s', $this->css );
 	}
+
+	public function test_disabled_buttons_keep_their_look_on_hover(): void {
+		// The hover rule must not apply to a disabled button (its text would turn the contrast colour on a transparent background).
+		$this->assertMatchesRegularExpression(
+			'/\.odv-register \.odv-register__button:not\(\.odv-register__button--disabled\):not\(\[aria-disabled="true"\]\):hover/',
+			$this->css
+		);
+		$this->assertDoesNotMatchRegularExpression( '/\.odv-register \.odv-register__button:hover/', $this->css );
+	}
+
+	public function test_every_rule_has_a_selector_and_balanced_braces_in_order(): void {
+		$depth = 0;
+		$css   = (string) preg_replace( '#/\*.*?\*/#s', '', $this->css );
+		foreach ( str_split( $css ) as $char ) {
+			if ( '{' === $char ) {
+				++$depth;
+			} elseif ( '}' === $char ) {
+				--$depth;
+				$this->assertGreaterThanOrEqual( 0, $depth, 'A closing brace before its opening brace.' );
+			}
+		}
+		$this->assertSame( 0, $depth );
+		$this->assertDoesNotMatchRegularExpression( '/(^|[;}])\s*\{/', $css, 'A rule without a selector.' );
+		$this->assertStringNotContainsString( '!important', $css );
+	}
+
+	public function test_every_class_used_by_a_template_is_styled_or_rooted_in_the_stylesheet(): void {
+		$templates = glob( dirname( __DIR__, 3 ) . '/templates/*.php' );
+		$this->assertNotEmpty( $templates );
+
+		foreach ( $templates as $file ) {
+			preg_match_all( '/(?<![\w-])odv-[a-z0-9_-]*[a-z0-9](?![\w-])/', (string) file_get_contents( $file ), $m );
+			foreach ( array_unique( $m[0] ) as $class ) {
+				$this->assertMatchesRegularExpression( '/\.' . preg_quote( $class, '/' ) . '(?![a-z0-9_-])/', $this->css, basename( $file ) . ' uses .' . $class );
+			}
+		}
+	}
 }

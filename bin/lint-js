@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Syntax check of the plugin's browser scripts (no build step, so this is the only JS gate).
+# Uses a local node when there is one, otherwise node:lts-alpine in Docker.
+# Usage: bin/lint-js
+set -e
+cd "$(dirname "$0")/.."
+
+CHECK='for f in assets/js/*.js; do node --check "$f" || exit 1; done; echo "JS syntax OK"'
+
+if command -v node >/dev/null 2>&1; then
+  sh -c "$CHECK"
+else
+  docker run --rm -v "$PWD":/app -w /app node:lts-alpine sh -c "$CHECK"
+fi

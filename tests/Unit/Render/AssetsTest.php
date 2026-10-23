@@ -91,4 +91,18 @@ class AssetsTest extends RenderTestCase {
 		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/js/agenda-filter.js' );
 		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/css/odavent.css' );
 	}
+
+	public function test_register_styles_registers_the_handle_without_enqueueing(): void {
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\expect( 'wp_register_style' )->once()->with( 'odavent-events', \Mockery::type( 'string' ), array(), ODAVENT_EVENTS_VERSION );
+		Functions\expect( 'wp_enqueue_style' )->never();
+
+		( new Assets( $this->options( true ) ) )->register_styles();
+	}
+
+	public function test_register_styles_does_nothing_when_the_stylesheet_is_off(): void {
+		Functions\expect( 'wp_register_style' )->never();
+
+		( new Assets( $this->options( false ) ) )->register_styles();
+	}
 }

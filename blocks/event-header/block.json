@@ -1,0 +1,51 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/event-header",
+	"title": "Event header",
+	"category": "odavent-events",
+	"icon": "cover-image",
+	"description": "The event's name, dates, venue, cover image and description, kept up to date from Odavent.",
+	"keywords": [
+		"odavent",
+		"event"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"showCover": {
+			"type": "boolean",
+			"default": true
+		},
+		"showLogo": {
+			"type": "boolean",
+			"default": true
+		},
+		"showDescription": {
+			"type": "boolean",
+			"default": true
+		},
+		"showVenue": {
+			"type": "boolean",
+			"default": true
+		},
+		"showJsonLd": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

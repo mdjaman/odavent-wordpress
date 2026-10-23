@@ -99,6 +99,21 @@ final class WpStubs {
 			}
 		);
 		Functions\when( 'add_query_arg' )->alias( array( self::class, 'add_query_arg' ) );
+		Functions\when( 'sanitize_html_class' )->alias( array( self::class, 'sanitize_html_class' ) );
+	}
+
+	/**
+	 * Same algorithm as WordPress's sanitize_html_class(): %-encoded octets removed, then anything but A-Z a-z 0-9 _ -.
+	 */
+	public static function sanitize_html_class( $classname, $fallback = '' ) {
+		$sanitized = preg_replace( '|%[a-fA-F0-9][a-fA-F0-9]|', '', (string) $classname );
+		$sanitized = preg_replace( '/[^A-Za-z0-9_-]/', '', $sanitized );
+
+		if ( '' === $sanitized && $fallback ) {
+			return self::sanitize_html_class( $fallback );
+		}
+
+		return $sanitized;
 	}
 
 	/**

@@ -19,6 +19,25 @@ final class Assets {
 	}
 
 	/**
+	 * Registers the default stylesheet handle unless the site turned it off ("Load default styles").
+	 *
+	 * Runs on `init` before the blocks are registered: their block.json names the handle as editorStyle, so
+	 * the block editor loads it. With the setting off nothing is registered, and the editor matches the site.
+	 */
+	public function register_styles(): void {
+		if ( ! $this->options->load_css() || wp_style_is( self::STYLE_HANDLE, 'registered' ) ) {
+			return;
+		}
+
+		wp_register_style(
+			self::STYLE_HANDLE,
+			plugins_url( 'assets/css/odavent.css', ODAVENT_EVENTS_FILE ),
+			array(),
+			ODAVENT_EVENTS_VERSION
+		);
+	}
+
+	/**
 	 * Enqueues the default stylesheet unless the site turned it off ("Load default styles").
 	 */
 	public function enqueue_styles(): void {
@@ -26,15 +45,7 @@ final class Assets {
 			return;
 		}
 
-		if ( ! wp_style_is( self::STYLE_HANDLE, 'registered' ) ) {
-			wp_register_style(
-				self::STYLE_HANDLE,
-				plugins_url( 'assets/css/odavent.css', ODAVENT_EVENTS_FILE ),
-				array(),
-				ODAVENT_EVENTS_VERSION
-			);
-		}
-
+		$this->register_styles();
 		wp_enqueue_style( self::STYLE_HANDLE );
 	}
 

@@ -2,9 +2,12 @@
 namespace Odavent\Events;
 
 use Odavent\Events\Api\Client;
+use Odavent\Events\Blocks\Block_Registry;
 use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Refresh\Page_Cache_Purger;
 use Odavent\Events\Refresh\Refresh_Controller;
+use Odavent\Events\Render\Assets;
+use Odavent\Events\Rest\Editor_Controller;
 use Odavent\Events\Settings\Options;
 use Odavent\Events\Settings\Settings_Page;
 
@@ -28,6 +31,12 @@ final class Plugin {
 	/** @var Page_Cache_Purger|null */
 	private $purger = null;
 
+	/** @var Assets|null */
+	private $assets = null;
+
+	/** @var Block_Registry|null */
+	private $blocks = null;
+
 	private function __construct() {
 	}
 
@@ -45,9 +54,40 @@ final class Plugin {
 		}
 
 		add_action(
+			'init',
+			function () {
+				// The stylesheet handle first: block.json names it as editorStyle.
+				$this->assets()->register_styles();
+				$this->blocks()->register();
+			}
+		);
+
+		add_filter(
+			'block_categories_all',
+			function ( $categories ) {
+				return $this->blocks()->add_category( $categories );
+			}
+		);
+
+		add_action(
 			'rest_api_init',
 			function () {
 				( new Refresh_Controller( $this->options(), $this->repository(), $this->purger() ) )->register_routes();
+				( new Editor_Controller( $this->repository() ) )->register_routes();
+			}
+		);
+
+		add_action(
+			'template_redirect',
+			function () {
+				$this->blocks()->prevent_preview_caching();
+			}
+		);
+
+		add_action(
+			'wp_enqueue_scripts',
+			function () {
+				$this->blocks()->enqueue_early_styles();
 			}
 		);
 	}
@@ -82,6 +122,22 @@ final class Plugin {
 		}
 
 		return $this->purger;
+	}
+
+	public function assets(): Assets {
+		if ( null === $this->assets ) {
+			$this->assets = new Assets( $this->options() );
+		}
+
+		return $this->assets;
+	}
+
+	public function blocks(): Block_Registry {
+		if ( null === $this->blocks ) {
+			$this->blocks = new Block_Registry( $this->repository(), $this->options(), $this->assets() );
+		}
+
+		return $this->blocks;
 	}
 
 	public function version(): string {

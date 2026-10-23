@@ -16,6 +16,7 @@
 .odv-countdown,
 .odv-venue,
 .odv-calendar,
+.odv-find-registration,
 .odv-notice {
 	--_accent: var(--odv-accent, #3730a3);
 	--_contrast: var(--odv-accent-contrast, #fff);
@@ -34,7 +35,7 @@
 
 /* Muted text follows the theme's text colour when the browser can mix colours. */
 @supports (color: color-mix(in srgb, red, blue)) {
-	.odv-header, .odv-speakers, .odv-agenda, .odv-sponsors, .odv-tickets, .odv-register, .odv-countdown, .odv-venue, .odv-calendar, .odv-notice {
+	.odv-header, .odv-speakers, .odv-agenda, .odv-sponsors, .odv-tickets, .odv-register, .odv-countdown, .odv-venue, .odv-calendar, .odv-find-registration, .odv-notice {
 		--_muted: var(--odv-muted, color-mix(in srgb, currentColor 70%, transparent));
 	}
 }
@@ -104,6 +105,7 @@
 
 .odv-speakers__role,
 .odv-speakers__bio,
+.odv-tickets__description,
 .odv-tickets__status,
 .odv-venue__address { margin: 0; color: var(--_muted); }
 
@@ -185,11 +187,14 @@
 	cursor: pointer;
 }
 
-.odv-register .odv-register__button:hover,
+.odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"]):hover,
 .odv-tickets .odv-tickets__register:hover { filter: brightness(1.1); color: var(--_contrast); text-decoration: none; }
 
 .odv-register .odv-register__button--disabled,
 .odv-register .odv-register__button[aria-disabled="true"] { border-color: var(--_border); background: transparent; color: var(--_muted); cursor: not-allowed; }
+
+.odv-register__notice, .odv-register__status, .odv-tickets__message { margin: 0.5rem 0 0; color: var(--_muted); font-size: 0.875em; }
+.odv-find-registration__link { font-weight: 600; }
 
 .odv-countdown,
 .odv-calendar { display: flex; flex-wrap: wrap; gap: var(--_gap); }
@@ -228,7 +233,8 @@
 }
 
 .odv-notice--cancelled,
-.odv-notice--unavailable { border-inline-start-color: #b42318; }
+.odv-notice--unavailable,
+.odv-notice--error { border-inline-start-color: #b42318; }
 
 .odv-notice--paused,
 .odv-notice--draft { border-inline-start-color: #b54708; }

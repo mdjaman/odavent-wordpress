@@ -1,0 +1,43 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/tickets",
+	"title": "Tickets",
+	"category": "odavent-events",
+	"icon": "tickets",
+	"description": "The event's tickets with prices, availability and Register links.",
+	"keywords": [
+		"odavent",
+		"event"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"showDescription": {
+			"type": "boolean",
+			"default": true
+		},
+		"showAvailability": {
+			"type": "boolean",
+			"default": false
+		},
+		"buttonLabel": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

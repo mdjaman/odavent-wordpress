@@ -33,3 +33,6 @@ jobs:
 
       - name: PHPCS (PHPCompatibilityWP, PHP 7.4+)
         run: vendor/bin/phpcs
+
+      - name: JS syntax (node --check)
+        run: bin/lint-js
