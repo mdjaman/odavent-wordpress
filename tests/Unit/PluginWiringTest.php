@@ -178,8 +178,10 @@ class PluginWiringTest extends TestCase {
 		$actions = array();
 		$filters = array();
 		$late_init = null;
+		$priorities = array();
 		Functions\when( 'add_action' )->alias(
-			function ( $hook, $callback, $priority = 10 ) use ( &$actions, &$late_init ) {
+			function ( $hook, $callback, $priority = 10 ) use ( &$actions, &$late_init, &$priorities ) {
+				$priorities[ $hook ][] = $priority;
 				if ( 'init' === $hook && 11 === $priority ) {
 					$late_init = $callback;
 					return true;
@@ -197,6 +199,9 @@ class PluginWiringTest extends TestCase {
 
 		$plugin = $this->fresh_plugin();
 		$plugin->boot();
+
+		// init: text domain (1), then the blocks at exactly 10, then the shortcodes at exactly 11.
+		$this->assertSame( array( 1, 10, 11 ), $priorities['init'], 'init priorities: text domain, blocks, shortcodes' );
 
 		foreach ( array( 'init', 'rest_api_init', 'template_redirect', 'wp_enqueue_scripts', 'enqueue_block_editor_assets' ) as $hook ) {
 			$this->assertArrayHasKey( $hook, $actions, $hook );

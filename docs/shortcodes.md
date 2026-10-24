@@ -17,10 +17,11 @@ With neither `event` nor `event_id`, the default event from Settings > Odavent E
 
 ## Values
 
-- Booleans: `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off` (any case). Anything else is ignored and the default applies.
+- Booleans: `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off` (any case). An empty value (`show_bio=""`) counts as `false`. Anything else is ignored and the default applies.
 - Integers: digits only. Text such as `4px` is ignored and the default applies. A number outside the allowed range is clamped by the block.
 - Strings: plain text (HTML is removed), at most 500 characters.
-- Attributes a shortcode does not have are ignored. Attribute names are written in snake_case (`show_bio`, not `showBio`).
+- Attributes a shortcode does not have are ignored. Attribute names are written in snake_case (`show_bio`): the dashed spelling (`show-bio`) and the camelCase one (`showBio`) are not recognised and are ignored.
+- Enclosed content (`[odavent_speakers]text[/odavent_speakers]`) is ignored: shortcodes are self-closing, and the text between the tags is not shown.
 
 ## `[odavent_event_header]`
 

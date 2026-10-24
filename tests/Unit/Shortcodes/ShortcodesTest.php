@@ -179,6 +179,36 @@ class ShortcodesTest extends BlockTestCase {
 		$this->assertSame( array(), $this->shortcodes()->to_block_attributes( 'speakers', array( 'showBio' => 'true', 'eventId' => '4', 'eventSlug' => 'x' ) ) );
 	}
 
+	public function test_dashed_spellings_are_not_accepted(): void {
+		$sc = $this->shortcodes();
+		$this->assertSame( array(), $sc->to_block_attributes( 'speakers', array( 'show-bio' => 'true', 'event-id' => '4', 'event-slug' => 'x' ) ) );
+		$this->assertSame( array( 'showBio' => true ), $sc->to_block_attributes( 'speakers', array( 'show-bio' => 'false', 'show_bio' => 'true' ) ) );
+	}
+
+	public function test_enclosed_content_is_ignored_and_never_echoed(): void {
+		$registry = $this->registry( $this->payload(), Event_View::GONE, array(), 42 );
+		( new Shortcodes( $registry ) )->register();
+
+		$plain    = call_user_func( $this->registered['odavent_speakers'], array(), null, 'odavent_speakers' );
+		$enclosed = call_user_func( $this->registered['odavent_speakers'], array(), '<b>ENCLOSED-BODY</b> [odavent_venue]', 'odavent_speakers' );
+
+		$this->assertStringNotContainsString( 'ENCLOSED-BODY', $enclosed );
+		$this->assertSame( $plain, $enclosed );
+
+		$seen = $this->captured( 'speakers', array( 'columns' => '2' ) );
+		$this->assertSame( array( 'columns' => 2 ), $seen[0] );
+	}
+
+	public function test_the_docs_describe_how_odd_spellings_are_treated(): void {
+		$docs = (string) file_get_contents( dirname( __DIR__, 3 ) . '/docs/shortcodes.md' );
+
+		$this->assertStringContainsString( '`show_bio=""`', $docs );
+		$this->assertMatchesRegularExpression( '/empty value[^\n]*counts as `false`/', $docs );
+		$this->assertStringContainsString( '`show-bio`', $docs );
+		$this->assertStringContainsString( '`showBio`', $docs );
+		$this->assertMatchesRegularExpression( '/Enclosed content[^\n]*ignored/', $docs );
+	}
+
 	public function test_attribute_names_are_matched_case_insensitively_like_wordpress_does(): void {
 		$this->assertSame( array( 'showBio' => true ), $this->shortcodes()->to_block_attributes( 'speakers', array( 'SHOW_BIO' => 'true' ) ) );
 	}
@@ -353,23 +383,72 @@ class ShortcodesTest extends BlockTestCase {
 		$this->assertArrayHasKey( 'class', $speakers['attributes'] );
 	}
 
-	public function test_docs_list_every_shortcode_and_every_attribute(): void {
+	/**
+	 * The body of one "## heading" section of docs/shortcodes.md, up to the next "## " heading.
+	 */
+	private function docs_section( string $docs, string $heading ): string {
+		$this->assertSame( 1, preg_match( '/^## `?' . preg_quote( $heading, '/' ) . '[^\n]*\n(.*?)(?=^## |\z)/ms', $docs, $m ), $heading . ' has no section in docs/shortcodes.md' );
+
+		return $m[1];
+	}
+
+	/**
+	 * Asserts that the section has a table row for the attribute with the expected type and default.
+	 *
+	 * @param mixed $default The default the code reports.
+	 */
+	private function assert_documented_in( string $section, string $where, string $attribute, string $type, $default ): void {
+		$found = preg_match( '/^\|\s*`' . preg_quote( $attribute, '/' ) . '`\s*\|(.*)$/m', $section, $row );
+		$this->assertSame( 1, $found, $where . ': `' . $attribute . '` has no table row in its own section' );
+
+		// Every table is Attribute | Type | Default [| Meaning].
+		$cells = array_map( 'trim', explode( '|', rtrim( trim( $row[1] ), '|' ) ) );
+		$this->assertSame( $type, $cells[0], $where . ': `' . $attribute . '` type' );
+		$cell = $cells[1] ?? '';
+		if ( is_bool( $default ) ) {
+			$this->assertSame( $default ? '`true`' : '`false`', $cell, $where . ': `' . $attribute . '` default' );
+		} elseif ( is_int( $default ) ) {
+			$this->assertStringStartsWith( '`' . $default . '`', $cell, $where . ': `' . $attribute . '` default' );
+		} else {
+			// Text defaults are blank and described in words: "(translated default)", "(default event)", "(none)".
+			$this->assertSame( '', (string) $default, $where . ': unexpected non-blank default' );
+			$this->assertStringStartsWith( '(', $cell, $where . ': `' . $attribute . '` default' );
+		}
+	}
+
+	public function test_docs_list_every_shortcode_and_every_attribute_in_its_own_section(): void {
 		$docs = (string) file_get_contents( dirname( __DIR__, 3 ) . '/docs/shortcodes.md' );
 		$this->assertNotSame( '', $docs );
 
+		$common = $this->docs_section( $docs, 'Common attributes' );
+
 		foreach ( $this->shortcodes()->reference() as $tag => $entry ) {
-			$this->assertStringContainsString( '[' . $tag, $docs, $tag . ' is missing from docs/shortcodes.md' );
-			foreach ( array_keys( $entry['attributes'] ) as $attribute ) {
-				$this->assertMatchesRegularExpression( '/`' . preg_quote( $attribute, '/' ) . '`/', $docs, $tag . ': ' . $attribute . ' is missing from docs/shortcodes.md' );
+			$section = $this->docs_section( $docs, '[' . $tag . ']' );
+			$this->assertStringContainsString( '[' . $tag . ' ', $section, $tag . ' has no example in its section' );
+
+			foreach ( $entry['attributes'] as $attribute => $definition ) {
+				if ( in_array( $attribute, array( 'event', 'event_id', 'class' ), true ) ) {
+					// Documented once, for every shortcode, in "Common attributes", where "no value" is described in
+					// words ("(default event)", "(none)"), so the default is only checked to be such a description.
+					$this->assert_documented_in( $common, 'Common attributes', $attribute, $definition['type'], '' );
+					continue;
+				}
+
+				$this->assert_documented_in( $section, $tag, $attribute, $definition['type'], $definition['default'] );
 			}
 		}
 
-		// Every block.json attribute (not just the ones the reference reports) is in the docs in snake_case.
+		// Every block.json attribute (not just the ones the reference reports) is in its block's section in snake_case.
 		foreach ( glob( dirname( __DIR__, 3 ) . '/blocks/*/block.json' ) as $file ) {
-			$json = json_decode( (string) file_get_contents( $file ), true );
+			$json    = json_decode( (string) file_get_contents( $file ), true );
+			$slug    = substr( $json['name'], strlen( 'odavent-events/' ) );
+			$section = $this->docs_section( $docs, '[' . Shortcodes::tag( $slug ) . ']' );
 			foreach ( array_keys( $json['attributes'] ) as $attribute ) {
-				$snake = 'eventSlug' === $attribute ? 'event' : strtolower( preg_replace( '/([A-Z])/', '_$1', $attribute ) );
-				$this->assertStringContainsString( '`' . $snake . '`', $docs, $json['name'] . ': ' . $snake );
+				if ( in_array( $attribute, Block_Registry::EDITOR_MANAGED, true ) ) {
+					continue;
+				}
+				$snake = strtolower( preg_replace( '/([A-Z])/', '_$1', $attribute ) );
+				$this->assertStringContainsString( '`' . $snake . '`', $section, $json['name'] . ': ' . $snake );
 			}
 		}
 	}

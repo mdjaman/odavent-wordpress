@@ -14,6 +14,9 @@ use Odavent\Events\Tests\Support\BlockTestCase;
 
 class BlockRegistryTest extends BlockTestCase {
 
+	/** @var string[] Temporary blocks directories to remove after each test. */
+	private $temp_dirs = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 		\WP_Block_Type_Registry::$types = array();
@@ -21,6 +24,18 @@ class BlockRegistryTest extends BlockTestCase {
 
 	protected function tearDown(): void {
 		\WP_Block_Type_Registry::$types = array();
+		foreach ( $this->temp_dirs as $dir ) {
+			foreach ( glob( $dir . '/*/block.json' ) ?: array() as $file ) {
+				unlink( $file );
+			}
+			foreach ( glob( $dir . '/*', GLOB_ONLYDIR ) ?: array() as $sub ) {
+				rmdir( $sub );
+			}
+			if ( is_dir( $dir ) ) {
+				rmdir( $dir );
+			}
+		}
+		$this->temp_dirs = array();
 		parent::tearDown();
 	}
 
@@ -326,6 +341,71 @@ class BlockRegistryTest extends BlockTestCase {
 		unlink( $file );
 		rmdir( $dir . '/one' );
 		rmdir( $dir );
+	}
+
+	/**
+	 * A temporary blocks directory holding {slug}/block.json files with the given raw contents.
+	 *
+	 * @param array<string, string> $files Slug => raw block.json text.
+	 */
+	private function blocks_dir( array $files ): string {
+		$dir = sys_get_temp_dir() . '/odv-blocks-' . uniqid( '', true );
+		foreach ( $files as $slug => $raw ) {
+			mkdir( $dir . '/' . $slug, 0777, true );
+			file_put_contents( $dir . '/' . $slug . '/block.json', $raw );
+		}
+		if ( array() === $files ) {
+			mkdir( $dir, 0777, true );
+		}
+		$this->temp_dirs[] = $dir;
+
+		return $dir;
+	}
+
+	public function test_block_attributes_of_a_missing_file_are_empty(): void {
+		$dir = $this->blocks_dir( array() );
+		mkdir( $dir . '/speakers' ); // The folder exists, block.json does not.
+
+		$this->assertSame( array(), ( new Block_Registry( $this->repository( null ), $this->options(), null, $dir ) )->block_attributes( 'speakers' ) );
+		$this->assertSame( array(), ( new Block_Registry( $this->repository( null ), $this->options(), null, $dir . '/nowhere' ) )->block_attributes( 'speakers' ) );
+	}
+
+	public function test_block_attributes_of_invalid_json_are_empty(): void {
+		foreach ( array( '{not json', '', '"text"', '5', 'null', '[1,2]', '{"attributes": "nope"}', '{"attributes": 5}', '{"name": "x"}' ) as $raw ) {
+			$dir = $this->blocks_dir( array( 'speakers' => $raw ) );
+
+			$this->assertSame( array(), ( new Block_Registry( $this->repository( null ), $this->options(), null, $dir ) )->block_attributes( 'speakers' ), var_export( $raw, true ) );
+		}
+	}
+
+	public function test_block_attributes_of_an_unknown_slug_are_empty_even_when_a_file_exists(): void {
+		$dir = $this->blocks_dir( array( 'nope' => '{"attributes": {"columns": {"type": "integer", "default": 3}}}' ) );
+
+		$registry = new Block_Registry( $this->repository( null ), $this->options(), null, $dir );
+
+		$this->assertSame( array(), $registry->block_attributes( 'nope' ) );
+		$this->assertSame( array(), $registry->block_attributes( '../nope' ) );
+		$this->assertSame( array(), $registry->block_attributes( '' ) );
+	}
+
+	public function test_block_attributes_drop_non_string_names_and_non_array_definitions(): void {
+		$dir = $this->blocks_dir(
+			array(
+				// A JSON list has integer keys; "ok" is kept; scalars, null and booleans are not definitions.
+				'speakers' => '{"attributes": {"columns": {"type": "integer", "default": 3}, "text": "string", "n": 5, "nothing": null, "flag": true, "empty": [], "0": {"type": "string"}}}',
+				'venue'    => '{"attributes": [{"type": "string"}, {"type": "integer"}]}',
+			)
+		);
+
+		$registry = new Block_Registry( $this->repository( null ), $this->options(), null, $dir );
+
+		// "0" is decoded to the integer key 0: not a name. Scalars, null and booleans are not definitions.
+		$this->assertSame(
+			array( 'columns' => array( 'type' => 'integer', 'default' => 3 ), 'empty' => array() ),
+			$registry->block_attributes( 'speakers' )
+		);
+
+		$this->assertSame( array(), $registry->block_attributes( 'venue' ), 'A JSON list gives integer names: none survive.' );
 	}
 
 	public function test_the_inline_metadata_lists_every_block(): void {
