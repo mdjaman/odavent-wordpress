@@ -25,6 +25,37 @@
 
 	var eventsRequest = null;
 
+	/*
+	 * Opt-in props for the form controls: the 40px size and no bottom margin are the defaults from WordPress 7.1,
+	 * and 6.7-7.0 log a deprecation warning for every control without them. Older WordPress ignores both props.
+	 * One shared object, merged into every control's props by field().
+	 */
+	var NEXT_DEFAULTS = { __nextHasNoMarginBottom: true, __next40pxDefaultSize: true };
+	var CONTROL_DEFAULTS = {
+		SelectControl: NEXT_DEFAULTS,
+		TextControl: NEXT_DEFAULTS,
+		RangeControl: NEXT_DEFAULTS,
+		ToggleControl: { __nextHasNoMarginBottom: NEXT_DEFAULTS.__nextHasNoMarginBottom }
+	};
+
+	/** Object.assign for ES5: copies own properties of the sources into target, left to right. */
+	function assign( target ) {
+		for ( var i = 1; i < arguments.length; i++ ) {
+			var source = arguments[ i ];
+			for ( var key in source ) {
+				if ( Object.prototype.hasOwnProperty.call( source, key ) ) {
+					target[ key ] = source[ key ];
+				}
+			}
+		}
+		return target;
+	}
+
+	/** A wp.components form control with the shared defaults. */
+	function field( type, props ) {
+		return el( components[ type ], assign( {}, CONTROL_DEFAULTS[ type ] || {}, props ) );
+	}
+
 	var STATUS_LABELS = {
 		draft: __( 'Draft', 'odavent-events' ),
 		published: __( 'Published', 'odavent-events' ),
@@ -144,7 +175,7 @@
 		var controls = [];
 		if ( data.error ) {
 			controls.push( el( components.Notice, { key: 'error', status: 'warning', isDismissible: false }, data.error ) );
-			controls.push( el( components.TextControl, {
+			controls.push( field( 'TextControl', {
 				key: 'slug',
 				label: __( 'Event slug', 'odavent-events' ),
 				help: __( 'The last part of the event address on Odavent.', 'odavent-events' ),
@@ -154,7 +185,7 @@
 				}
 			} ) );
 		}
-		controls.push( el( components.SelectControl, {
+		controls.push( field( 'SelectControl', {
 			key: 'event',
 			label: __( 'Event', 'odavent-events' ),
 			value: selected,
@@ -189,12 +220,12 @@
 
 		switch ( schema.type ) {
 			case 'boolean':
-				return el( components.ToggleControl, { key: name, label: label, checked: !! value, onChange: onChange } );
+				return field( 'ToggleControl', { key: name, label: label, checked: !! value, onChange: onChange } );
 
 			case 'integer':
 			case 'number':
 				if ( typeof schema.minimum === 'number' && typeof schema.maximum === 'number' && components.RangeControl ) {
-					return el( components.RangeControl, {
+					return field( 'RangeControl', {
 						key: name,
 						label: label,
 						value: typeof value === 'number' ? value : schema[ 'default' ],
@@ -205,7 +236,7 @@
 						}
 					} );
 				}
-				return el( components.TextControl, {
+				return field( 'TextControl', {
 					key: name,
 					label: label,
 					type: 'number',
@@ -225,7 +256,7 @@
 
 			case 'string':
 				if ( Array.isArray( schema[ 'enum' ] ) ) {
-					return el( components.SelectControl, {
+					return field( 'SelectControl', {
 						key: name,
 						label: label,
 						value: value || '',
@@ -235,7 +266,7 @@
 						onChange: onChange
 					} );
 				}
-				return el( components.TextControl, { key: name, label: label, value: value || '', onChange: onChange } );
+				return field( 'TextControl', { key: name, label: label, value: value || '', onChange: onChange } );
 
 			default:
 				return null;
