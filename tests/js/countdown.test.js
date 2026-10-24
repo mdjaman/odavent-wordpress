@@ -137,3 +137,22 @@ const message = ( root ) => root.querySelector( '.odv-countdown__message' );
 }() );
 
 console.log( 'countdown.test.js ok' );
+
+// A data-state that is an Object.prototype name falls back to "upcoming" instead of poisoning the floor with NaN.
+( function () {
+	[ 'constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf', '' ].forEach( ( bogus ) => {
+		const upcoming = block( 'upcoming', { 'data-state': bogus } );
+		const clock = at( '2026-11-10T05:55:55+00:00' );
+		const { timers } = run( 'countdown.js', [ upcoming ], clock );
+		assert.equal( upcoming.getAttribute( 'data-state' ), 'upcoming', bogus + ': counts down' );
+		assert.equal( value( upcoming, 'days' ), '2', bogus + ': timer filled in' );
+
+		clock.t = Date.parse( STARTS );
+		timers[ 0 ]();
+		assert.equal( upcoming.getAttribute( 'data-state' ), 'live', bogus + ': still advances' );
+
+		const late = block( 'live', { 'data-state': bogus } );
+		run( 'countdown.js', [ late ], at( '2026-11-14T00:00:00Z' ) );
+		assert.equal( late.getAttribute( 'data-state' ), 'ended', bogus + ': ended by the clock' );
+	} );
+}() );

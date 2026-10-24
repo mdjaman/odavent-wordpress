@@ -46,7 +46,9 @@
 		var ends = Date.parse( root.getAttribute( 'data-ends-at' ) || '' );
 		var flaggedEnded = root.getAttribute( 'data-ended' ) === 'true';
 		var paused = root.getAttribute( 'data-odv-paused' ) === '1';
-		var floor = RANK[ root.getAttribute( 'data-state' ) ] || 0;
+		// Own properties only: "constructor", "toString" or "__proto__" in data-state must not become the floor.
+		var declared = root.getAttribute( 'data-state' );
+		var floor = Object.prototype.hasOwnProperty.call( RANK, declared ) ? RANK[ declared ] : 0;
 		var timer = root.querySelector( '.odv-countdown__timer' );
 		var message = root.querySelector( '.odv-countdown__message' );
 		var fields = {};
