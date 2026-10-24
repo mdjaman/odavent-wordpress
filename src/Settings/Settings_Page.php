@@ -56,8 +56,8 @@ class Settings_Page {
 
 	public function add_menu(): void {
 		add_options_page(
-			__( 'Odavent', 'odavent-events' ),
-			__( 'Odavent', 'odavent-events' ),
+			__( 'Odavent Events', 'odavent-events' ),
+			__( 'Odavent Events', 'odavent-events' ),
 			self::CAPABILITY,
 			self::SLUG,
 			array( $this, 'render_page' )

@@ -249,8 +249,9 @@ class SettingsPageTest extends TestCase {
 
 		$this->page()->add_menu();
 
-		$this->assertSame( 'Odavent', $captured[0] );
-		$this->assertSame( 'Odavent', $captured[1] );
+		// "Settings > Odavent Events", as the docs say; the slug stays odavent-events.
+		$this->assertSame( 'Odavent Events', $captured[0] );
+		$this->assertSame( 'Odavent Events', $captured[1] );
 		$this->assertSame( 'manage_options', $captured[2] );
 		$this->assertSame( 'odavent-events', $captured[3] );
 	}
