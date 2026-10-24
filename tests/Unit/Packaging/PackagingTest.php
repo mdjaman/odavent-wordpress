@@ -154,6 +154,30 @@ class PackagingTest extends TestCase {
 		}
 	}
 
+	public function test_the_zip_contains_the_event_page_widgets_and_appearance_files(): void {
+		$names = $this->entries( $this->built_zip() );
+
+		$expected = array(
+			'odavent-events/blocks/event-page/block.json',
+			'odavent-events/templates/event-page.php',
+			'odavent-events/assets/js/admin-appearance.js',
+			'odavent-events/assets/js/image-fallback.js',
+			'odavent-events/src/Widgets/Widgets.php',
+			'odavent-events/src/Widgets/Block_Widget.php',
+			'odavent-events/src/Settings/Appearance.php',
+			'odavent-events/src/Blocks/Renderers/Event_Page.php',
+		);
+		// Every file the source tree has in these places ships: nothing is added later without being packaged.
+		foreach ( array( 'assets/css', 'assets/js', 'src/Widgets' ) as $dir ) {
+			foreach ( glob( self::$root . '/' . $dir . '/*' ) ?: array() as $file ) {
+				$expected[] = 'odavent-events/' . $dir . '/' . basename( $file );
+			}
+		}
+		foreach ( array_unique( $expected ) as $file ) {
+			$this->assertContains( $file, $names );
+		}
+	}
+
 	public function test_the_zip_contains_the_javascript_translation_file(): void {
 		$names = $this->entries( $this->built_zip() );
 

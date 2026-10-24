@@ -18,8 +18,11 @@ Add blocks or shortcodes to any page and they show the current data of your Odav
 
 **Registration and payment always happen on Odavent's own secure page.** The plugin only links to it. No attendee data is ever sent to, or stored on, your WordPress site.
 
-Blocks (each one also has a shortcode with the same output):
+Start with the **Event page** block: one block that shows the whole page (header, countdown, Register button, tickets, speakers, agenda, sponsors, venue and calendar links), with toggles for the sections you want. Or insert the "Full event page" pattern to get every part as its own block. Colours, corner radius, spacing and button style are set without CSS under Settings > Odavent Events > Appearance, with a live preview.
 
+Blocks (each one also has a shortcode and a classic widget with the same output):
+
+* Event page (all of the sections below in one block)
 * Event header (title, dates, cover, logo, description, venue)
 * Register button
 * Tickets
@@ -36,6 +39,8 @@ Good to know:
 * Needs an Odavent plan that includes the WordPress plugin (Pro or Enterprise) and a site key from your Odavent organization settings.
 * Pages stay fast: event data is cached, and the last good copy keeps showing if Odavent is briefly unreachable.
 * Drafts can be previewed by editors in the block editor before the event is published.
+* Every block is also available as a widget for themes with widget areas.
+* A picture that cannot load is replaced by initials or a name instead of a broken-image icon.
 * Available in English and French.
 
 This plugin connects to the Odavent service (https://odavent.com) to read your event data. It sends your site key and the event you asked for, and nothing about your visitors.
@@ -67,17 +72,28 @@ Yes. Every block has a shortcode, so Elementor, Divi, Beaver Builder, WPBakery, 
 
 = Can I change how it looks? =
 
-Yes. The default stylesheet uses CSS variables you can override from your theme, can be turned off in the settings, and every template can be overridden from your theme. See docs/theming.md in the repository.
+Yes. Choose your colours, corner radius, spacing and button style under Settings > Odavent Events > Appearance, no code needed. For more, the default stylesheet uses CSS variables you can override from your theme, can be turned off in the settings, and every template can be overridden from your theme. See docs/theming.md in the repository.
 
 = What happens if Odavent is down? =
 
 Visitors keep seeing the last good copy of the event. A stale copy never shows a Register button, so nobody is sent to register for something that may have changed.
+
+= Can I put an Odavent block in a sidebar or footer? =
+
+Yes. Every block is also a widget ("Odavent: Speakers", "Odavent: Countdown"...), available under Appearance > Widgets on themes with widget areas, or through the Legacy Widget block. Block themes have no widget screen: use the blocks in the Site Editor instead. While an Odavent widget is active, a change on Odavent purges your whole page cache, because a widget can appear on every page.
 
 = Is any attendee data stored on my site? =
 
 No. Registration, payment and the attendee list stay on Odavent.
 
 == Changelog ==
+
+= Unreleased =
+* New: the Event page block, shortcode and widget, and the "Full event page" block pattern.
+* New: classic widgets for every block.
+* New: Appearance settings (colours, corner radius, spacing, button style) with a live preview.
+* New: a picture that cannot load no longer shows a broken-image icon.
+* Fixed: partners that are both sponsor and exhibitor were headed "Both"; the heading is now "Sponsors and exhibitors". Notices are no longer repeated on combined pages.
 
 = 0.1.0 =
 * First release: ten blocks and shortcodes (event header, register button, tickets, find my registration, speakers, agenda, sponsors, countdown, venue, add to calendar).

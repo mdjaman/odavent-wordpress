@@ -33,6 +33,40 @@ dark colour, otherwise button text becomes hard to read.
 
 Variables that start with `--_` (such as `--_accent`) are internal to the stylesheet; do not rely on them.
 
+## The Appearance settings
+
+Organizers can set the main variables without CSS under **Settings > Odavent Events > Appearance**: accent
+colour, text on accent (automatic, or a chosen colour), text colour, border colour, corner radius (0 to 24
+px), spacing (compact, comfortable, roomy) and button style (filled or outline). Each one maps to a variable:
+
+| Setting | Writes |
+|---|---|
+| Accent colour | `--odv-accent`, and `--odv-accent-contrast` too when "Text on accent" is automatic (black or white, whichever reads better) |
+| Text on accent | `--odv-accent-contrast` |
+| Text colour | `--odv-text` |
+| Border colour | `--odv-border` |
+| Corner radius | `--odv-radius` (px) |
+| Spacing | `--odv-gap`: compact `0.75rem`, comfortable `1rem`, roomy `1.5rem` |
+| Button style | Outline: transparent buttons with the accent as text and border, filled on hover; filled is the default |
+
+An empty field writes nothing, so the stylesheet's own default applies. The values are validated (hex colours,
+a clamped whole number and fixed keywords; never free text) and added after the plugin's stylesheet, so the
+screen only has an effect while **Default styles** is on. The generated CSS can be changed with the
+[`odavent_events_appearance_css`](hooks.md#odavent_events_appearance_css) filter.
+
+### Which CSS wins
+
+The settings are **defaults, declared on `:root`**, and the plugin never uses `!important` for them:
+
+* Your own CSS wins over the settings whenever it is declared closer or later: a variable set on `body`, on a
+  wrapper of the blocks, or on `:root` further down the page overrides the Appearance value.
+* The one exception is the **outline** button style. It is a rule set on the buttons themselves, with a
+  higher specificity (`.odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"])`
+  and `.odv-tickets .odv-tickets__register`). To restyle those buttons yourself while the outline style is
+  on, your selector needs at least that specificity (and to come later in the page), or set the button style
+  back to filled.
+* The plugin's stylesheet and the settings are both skipped when "Default styles" is off.
+
 ## Turning the default stylesheet off
 
 Settings > Odavent Events > "Load default styles". When unchecked the plugin loads no CSS at all (also not
@@ -72,6 +106,37 @@ What the scripts depend on, if you override these templates: `.odv-agenda__filte
 `.odv-agenda__session` (the agenda filter); the `data-*` attributes and the `.odv-countdown__*` classes
 on the countdown; and, for the broken-image fallback, `<img>` tags carrying `data-odv-img="photo|logo|cover"` (speaker
 photos also `data-odv-initials`). See the notes at the top of `templates/agenda.php` and `templates/countdown.php`.
+
+### Broken images
+
+`assets/js/image-fallback.js` (loaded with the blocks) reads the `data-odv-img` attribute of an image that
+cannot load: `photo` (a speaker's photo) becomes the initials placeholder, `logo` on a sponsor becomes the
+sponsor's name, and a header `logo` or `cover` is removed, so no broken-image icon is shown. If you override a
+template, keep `data-odv-img="photo|logo|cover"` on the `<img>` (and `data-odv-initials` on a speaker photo)
+to keep this behaviour.
+
+### The event page markup
+
+The Event page block (and `[odavent_event_page]`, and the Event page widget) is one `div.odv-event-page`
+holding one `div.odv-event-page__section` per section shown, in the fixed section order, each with a
+`.odv-event-page__section--{section}` modifier (`header`, `countdown`, `register`, `tickets`,
+`find-registration`, `speakers`, `agenda`, `sponsors`, `venue`, `calendar`). Tickets, speakers, agenda,
+sponsors and venue get an `h2.odv-event-page__heading` (the organizer can turn the headings off); the other
+sections speak for themselves. Inside each section is the markup of the matching block (`.odv-speakers`,
+`.odv-agenda`...), so your CSS for the individual blocks applies unchanged.
+
+```css
+.odv-event-page__section { margin-block: 3rem; }
+.odv-event-page__heading { font-size: 1.5rem; border-bottom: 2px solid var(--odv-accent); }
+```
+
+* **Anchors.** Every section has an `id` of the form `odv-{section}-{event id}`, for example
+  `odv-speakers-42`, so a menu can link to `#odv-speakers-42`. If the same event page is rendered twice in
+  one request (some themes run `the_content` twice, or a page shows two event pages of the same event) the
+  repeated ids get a suffix, `odv-speakers-42-2`, `odv-speakers-42-3`, so ids stay unique in the document.
+* **Notices.** The lifecycle notice of an ended, paused or cancelled event (and the draft preview notice
+  for editors) is printed once, directly above `.odv-event-page`, not inside it. The stale-data notice
+  ("this information may be out of date") is printed inside it, at the top.
 
 ## Template overrides
 

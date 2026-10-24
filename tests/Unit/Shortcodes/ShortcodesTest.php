@@ -454,6 +454,22 @@ class ShortcodesTest extends BlockTestCase {
 		}
 	}
 
+	public function test_the_event_page_section_explains_the_sections_and_their_order(): void {
+		$docs    = (string) file_get_contents( dirname( __DIR__, 3 ) . '/docs/shortcodes.md' );
+		$section = $this->docs_section( $docs, '[odavent_event_page]' );
+
+		$previous = -1;
+		foreach ( \Odavent\Events\Blocks\Renderers\Event_Page::DEFAULT_SECTIONS as $name ) {
+			$at = strpos( $section, '`' . $name . '`' );
+			$this->assertNotFalse( $at, 'the section list names ' . $name );
+			$this->assertGreaterThan( $previous, $at, $name . ' is listed in page order' );
+			$previous = $at;
+		}
+		foreach ( array( 'order', 'blank', 'show_headings', 'Full event page' ) as $fact ) {
+			$this->assertStringContainsString( $fact, $section, $fact );
+		}
+	}
+
 	public function test_early_style_detection_recognises_every_odavent_shortcode(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
 

@@ -61,7 +61,7 @@ while "Load default styles" is on). `$appearance` holds the validated values (`a
 `border`, `radius`, `spacing`, `button_style`; an empty string means the organizer did not change it).
 The filter is not applied while nothing is changed (`$css` would be empty). A return value that is not a
 string is ignored. You are responsible for anything you add: the plugin only guarantees its own output
-contains hex colours, integers with `px` or `rem`, and fixed keywords.
+contains hex colours, fixed `rem` gaps and a `px` radius (a whole number from 0 to 24), and fixed keywords.
 
 The settings write custom properties on `:root`, so CSS of your own that is declared closer (on a wrapper)
 or later still wins; the plugin never uses `!important` here.

@@ -42,6 +42,61 @@ database backups:
 define( 'ODAVENT_SITE_KEY', 'odv_wp_...' );
 ```
 
+## For organizers
+
+You do not need to write any code. Five steps take you from an empty page to a live event page.
+
+1. **Install and connect.** Install the plugin from the release zip (see Installation above), then open
+   **Settings > Odavent Events**, paste your site key and press **Test connection**. You should see
+   "Connected".
+2. **Add the event page.** Edit the page that should show your event (or create a new one). Click the **+**
+   button, search for **Event page** and add it, then pick your event in the panel on the right. This one
+   block shows everything: the title and dates, a countdown, the Register button, tickets, speakers, the
+   agenda, sponsors, the venue and the add-to-calendar links. Prefer to place and style the parts yourself?
+   Insert the **Full event page** pattern instead (open the **Patterns** tab and look under **Odavent**): it
+   puts every part on the page as its own block, and you can move, remove or restyle each one.
+3. **Choose what to show.** Select the Event page block and, in the panel on the right, switch the
+   sections you want on or off: header, countdown, register button, tickets, find my registration,
+   speakers, agenda, sponsors, venue and calendar. You can also turn the section headings off, choose the
+   number of columns for speakers and sponsors, and show speaker biographies or the places left. A section
+   with nothing to show (an event without sponsors, say) simply does not appear.
+4. **Match your brand.** Go to **Settings > Odavent Events** and scroll to **Appearance**. Pick your accent
+   colour (the button and highlight colour), and optionally the text and border colours, the roundness of
+   the corners, the spacing and a filled or outlined button. A live preview shows the result before you save,
+   and the plugin warns you when the text on your accent colour would be hard to read. Leave a field empty to
+   keep the default.
+5. **Use the widgets.** If your theme has widget areas (a sidebar or a footer), go to **Appearance >
+   Widgets**: every Odavent block is also there as an **Odavent: ...** widget, for example a countdown or a
+   list of speakers in your sidebar. On a block theme the widgets screen does not exist; use the blocks
+   (in the Site Editor too) instead.
+
+**When something looks off**
+
+* *Old information is showing.* Odavent normally updates your page within moments. If it does not, press
+  **Clear cache** in the plugin tools on the Settings page, and clear your caching plugin.
+* *Nothing appears for my event.* Check that the event is published on Odavent (an editor sees a message
+  on the page; visitors see nothing for an unpublished event), and that the connection test says
+  "Connected".
+* *The colours do not change.* The Appearance settings need **Default styles** switched on in the same
+  settings page. If your theme or a page builder sets its own colours, ask your webmaster to read
+  [docs/theming.md](docs/theming.md).
+* *A photo or logo is missing.* A picture that cannot load is replaced instead of showing a broken-image
+  icon (a speaker gets their initials, a sponsor their name); check the image on Odavent.
+* *Registration is on Odavent.* The Register buttons always lead to Odavent's own secure page; attendees
+  never register or pay on your website.
+
+## For webmasters
+
+Everything below this part, and the files in [docs](docs), are for you:
+
+* [docs/shortcodes.md](docs/shortcodes.md): every shortcode and attribute, including the all-in-one
+  `[odavent_event_page]`
+* [docs/widgets.md](docs/widgets.md): the classic widgets and the Legacy Widget block, and how they interact
+  with page caches
+* [docs/theming.md](docs/theming.md): the Appearance settings and how they combine with your CSS, CSS
+  variables, class names, template overrides
+* [docs/hooks.md](docs/hooks.md): every filter and action
+
 ## Blocks and shortcodes
 
 Add blocks from the **Odavent Events** category in the block editor. Pick an event in the block's settings
@@ -62,6 +117,10 @@ editor, widgets and page builders. Full attribute lists are in [docs/shortcodes.
 | Countdown | `[odavent_countdown]` | A live countdown to the start |
 | Venue | `[odavent_venue]` | Venue, address and a map link |
 | Add to calendar | `[odavent_add_to_calendar]` | Google Calendar, Outlook and .ics links |
+| Event page | `[odavent_event_page]` | All of the above in one block, with the sections you choose, in a fixed order |
+
+Every block is also a classic widget ([docs/widgets.md](docs/widgets.md)), and the **Full event page** block
+pattern inserts the individual blocks in page order.
 
 Example: `[odavent_speakers event="annual-summit" columns="2" show_bio="yes"]`
 
@@ -74,13 +133,15 @@ minutes by default).
 
 * This needs **pretty permalinks** (any setting except "Plain").
 * Security plugins and firewalls must let `POST /wp-json/odavent/v1/refresh` through.
-* Blocks inside synced patterns, block-theme templates or widgets are not detected for cache purging: see
-  [docs/operations.md](docs/operations.md#page-caches).
+* Blocks inside synced patterns or block-theme templates are not detected for cache purging: see
+  [docs/operations.md](docs/operations.md#page-caches). Odavent widgets, and Odavent blocks or shortcodes in
+  a widget area, are detected and purge the whole site's page cache: see [docs/widgets.md](docs/widgets.md#page-caches).
 
 ## Documentation
 
 * [docs/shortcodes.md](docs/shortcodes.md): every shortcode and attribute
-* [docs/theming.md](docs/theming.md): CSS variables, class names, template overrides
+* [docs/widgets.md](docs/widgets.md): the classic widgets and their cache behaviour
+* [docs/theming.md](docs/theming.md): Appearance settings, CSS variables, class names, template overrides
 * [docs/hooks.md](docs/hooks.md): every filter and action
 * [docs/security.md](docs/security.md): how the key, pings, previews and updates are protected
 * [docs/operations.md](docs/operations.md): live refresh, caching, what visitors see, troubleshooting
