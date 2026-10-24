@@ -138,9 +138,16 @@ A release is a Git tag. The version must be the same everywhere, and the tag mus
    `php bin/check-translations.php`, and PHPCS.
 4. Merge to `main`, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
-The `Release` workflow (`.github/workflows/release.yml`, tags `v*` only) then checks that the tag equals the
-plugin header version, runs the tests, builds `odavent-events-X.Y.Z.zip` (single top-level folder
-`odavent-events/`, runtime files only) and creates the GitHub release with that zip as its only asset.
+The `Release` workflow (`.github/workflows/release.yml`, tags `v*` only) then checks that the tagged commit is
+on `main` and that the tag equals the plugin header version, runs the tests, builds `odavent-events-X.Y.Z.zip`
+(single top-level folder `odavent-events/`, runtime files only) and creates the GitHub release with that zip as
+its only asset. It has two jobs: `build` (read-only token, not kept in the checkout) runs Composer, the tests
+and the packaging and uploads the zip and the notes as a workflow artifact; `publish` is the only job that
+can write to the repository, and it runs no project or dependency code (no checkout, no Composer): it
+downloads that artifact and calls `gh release create --verify-tag`. Every third-party action in both
+workflows is pinned to a full commit SHA with its version in a trailing comment; to update one, look up the
+commit of the new tag (`git ls-remote https://github.com/actions/checkout refs/tags/v4.4.0`, and the `^{}`
+line for an annotated tag) and replace both.
 
 The release **body** is the changelog section followed by three plain lines that Odavent reads when it serves
 update information to your sites (no bold, bullets or backticks on them):

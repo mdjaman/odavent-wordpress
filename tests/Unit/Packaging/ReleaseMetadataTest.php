@@ -129,8 +129,8 @@ class ReleaseMetadataTest extends TestCase {
 		$this->assertStringNotContainsString( 'pull_request', $yml );
 		$this->assertStringNotContainsString( 'branches', $yml );
 		$this->assertMatchesRegularExpression( '/permissions:\s*\n\s+contents: write/', $yml );
-		$this->assertStringContainsString( 'actions/checkout@v4', $yml );
-		$this->assertStringContainsString( 'shivammathur/setup-php@v2', $yml );
+		$this->assertStringContainsString( 'actions/checkout@', $yml );
+		$this->assertStringContainsString( 'shivammathur/setup-php@', $yml );
 		$this->assertStringContainsString( 'bin/release-notes.php', $yml );
 		$this->assertStringContainsString( 'bin/build-zip.php', $yml );
 		$this->assertStringContainsString( 'bin/check-translations.php', $yml );
@@ -147,7 +147,7 @@ class ReleaseMetadataTest extends TestCase {
 		$yml = $this->read( '.github/workflows/release.yml' );
 
 		// Full history, or origin/main and the ancestry check would not be there on the runner.
-		$this->assertMatchesRegularExpression( '/actions\/checkout@v4\s*\n\s+with:\s*\n(?:\s+#[^\n]*\n)*\s+fetch-depth: 0/', $yml );
+		$this->assertMatchesRegularExpression( '/actions\/checkout@[0-9a-f]{40} # v[0-9.]+\s*\n\s+with:\s*\n(?:\s+#[^\n]*\n)*\s+fetch-depth: 0/', $yml );
 		$this->assertStringContainsString( 'git merge-base --is-ancestor "$GITHUB_SHA" origin/main', $yml );
 
 		// The SHA reaches the shell as an environment variable, not pasted into the script text.
@@ -159,6 +159,61 @@ class ReleaseMetadataTest extends TestCase {
 		foreach ( array( 'composer install', 'vendor/bin/phpunit', 'bin/build-zip.php', 'gh release create' ) as $later ) {
 			$this->assertLessThan( (int) strpos( $yml, $later ), $check, "The main-branch check must come before: {$later}" );
 		}
+	}
+
+	/**
+	 * A tag such as `@v4` can be moved to other code by whoever controls the action's repository; a commit SHA
+	 * cannot. Every `uses:` in both workflows is a full SHA with the version it stands for in a comment.
+	 */
+	public function test_every_action_in_the_workflows_is_pinned_to_a_full_commit_sha(): void {
+		foreach ( array( '.github/workflows/release.yml', '.github/workflows/ci.yml' ) as $file ) {
+			$yml = $this->read( $file );
+			preg_match_all( '/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/m', $yml, $m, PREG_SET_ORDER );
+			$this->assertNotEmpty( $m, $file );
+			foreach ( $m as $use ) {
+				$this->assertMatchesRegularExpression( '/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40}$/', $use[1], "{$file}: {$use[1]}" );
+				$this->assertMatchesRegularExpression( '/^\s+# v?[0-9]+\.[0-9]+\.[0-9]+\s*$/', $use[2], "{$file}: {$use[1]} needs its version in a trailing comment" );
+			}
+		}
+	}
+
+	/**
+	 * Only the publish job holds a token that can write releases, and it runs no project or dependency code:
+	 * no checkout, no Composer. The build job's token is read-only and not left in the checkout.
+	 */
+	public function test_the_release_is_built_read_only_and_published_by_a_job_that_runs_no_project_code(): void {
+		$yml = $this->read( '.github/workflows/release.yml' );
+
+		$this->assertMatchesRegularExpression( '/^permissions:\s*\n\s+contents: read\s*$/m', $yml, 'read-only by default' );
+		$build_at   = strpos( $yml, "\n  build:\n" );
+		$publish_at = strpos( $yml, "\n  publish:\n" );
+		$this->assertNotFalse( $build_at );
+		$this->assertNotFalse( $publish_at );
+		$this->assertLessThan( $publish_at, $build_at );
+		$build   = substr( $yml, $build_at, $publish_at - $build_at );
+		$publish = substr( $yml, $publish_at );
+
+		$this->assertMatchesRegularExpression( '/\n    permissions:\s*\n\s+contents: read\s*\n/', $build );
+		$this->assertStringNotContainsString( 'contents: write', $build );
+		$this->assertMatchesRegularExpression( '/persist-credentials: false/', $build );
+		$this->assertStringNotContainsString( 'gh release', $build );
+		foreach ( array( 'composer install', 'vendor/bin/phpunit', 'bin/build-zip.php', 'bin/release-notes.php', 'actions/upload-artifact@' ) as $step ) {
+			$this->assertStringContainsString( $step, $build, $step );
+		}
+
+		$this->assertMatchesRegularExpression( '/\n    needs: build\s*\n/', $publish );
+		$this->assertMatchesRegularExpression( '/\n    permissions:\s*\n\s+contents: write\s*\n/', $publish );
+		foreach ( array( 'actions/checkout', 'composer', 'setup-php', 'vendor/bin', 'php ' ) as $forbidden ) {
+			$this->assertStringNotContainsString( $forbidden, $publish, "publish must not run: {$forbidden}" );
+		}
+		$this->assertStringContainsString( 'actions/download-artifact@', $publish );
+		foreach ( array( 'gh release create "$TAG" "$ZIP"', '--verify-tag', '--notes-file release/release-notes.md', '--prerelease' ) as $part ) {
+			$this->assertStringContainsString( $part, $publish, $part );
+		}
+		// The tag and version reach the shell as environment variables, never pasted into the script.
+		$this->assertMatchesRegularExpression( '/TAG: \$\{\{ github\.ref_name \}\}/', $publish );
+		$script = substr( $publish, (int) strpos( $publish, 'run: |' ) );
+		$this->assertStringNotContainsString( '${{', $script );
 	}
 
 	public function test_the_ancestry_check_accepts_main_history_and_rejects_a_side_branch(): void {
