@@ -64,7 +64,8 @@ test( 'insert the Speakers block from the inserter, pick event 1, toggle the bio
 	await page.getByRole( 'button', { name: /^(Toggle block inserter|Block Inserter|Add block)$/ } ).first().click();
 	const search = page.getByRole( 'searchbox' ).or( page.getByPlaceholder( /^Search/ ) ).first();
 	await search.fill( 'Speakers' );
-	const option = page.getByRole( 'option', { name: /^\s*Speakers\s*$/ } ).first();
+	// The accessible name carries the icon's text alternative, so match on the visible title.
+	const option = page.getByRole( 'option' ).filter( { hasText: /^\W*Speakers\s*$/ } ).first();
 	await expect( option ).toBeVisible();
 	await option.click();
 
