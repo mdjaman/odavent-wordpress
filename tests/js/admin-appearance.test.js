@@ -43,17 +43,19 @@ function page( values ) {
 
 	const ratio = new El( 'odv-appearance-preview__ratio' );
 	const warning = new El( 'odv-appearance-preview__warning', { hidden: '' } );
+	const outlineWarning = new El( 'odv-appearance-preview__outline-warning', { hidden: '' } );
 	const preview = new El(
 		'odv-appearance-preview odv-appearance-preview--filled',
 		{
 			'data-ratio-label': 'Text on accent: %s:1',
 			'data-decimal': '.',
 			'data-gaps': JSON.stringify( { compact: '0.75rem', comfortable: '1rem', roomy: '1.5rem' } ),
+			'data-default-accent': '#3730a3',
 		},
-		[ ratio, warning ]
+		[ ratio, warning, outlineWarning ]
 	);
 	preview.style = style();
-	return { byId, preview, ratio, warning, field: ( name ) => byId[ PREFIX + name ] };
+	return { byId, preview, ratio, warning, outlineWarning, field: ( name ) => byId[ PREFIX + name ] };
 }
 
 function run( p, jQuery ) {
@@ -111,8 +113,10 @@ const change = ( p, name, value ) => {
 
 	change( p, 'accent', 'red;}body{display:none' );
 	assert.equal( prop( p, '--odv-accent' ), 'initial', 'an invalid colour is never written' );
-	assert.ok( p.ratio.hasAttribute( 'hidden' ), 'no accent, no ratio (as on save)' );
-	assert.ok( p.warning.hasAttribute( 'hidden' ) );
+	// No accent but a manual text colour: judged against the default accent the buttons keep (as on save).
+	assert.equal( p.ratio.textContent, 'Text on accent: 2.11:1' );
+	assert.ok( !p.ratio.hasAttribute( 'hidden' ) );
+	assert.ok( !p.warning.hasAttribute( 'hidden' ), 'black on the default indigo is hard to read' );
 
 	change( p, 'text', '#111' );
 	change( p, 'border', '#cccccc' );
@@ -213,6 +217,54 @@ const change = ( p, name, value ) => {
 	assert.equal( prop( p, '--odv-accent-contrast' ), '#000000' );
 	accent.clear();
 	assert.equal( prop( p, '--odv-accent' ), 'initial' );
+}() );
+
+// test_a_manual_text_colour_without_an_accent_is_judged_against_the_default_accent
+( function () {
+	const p = page( { accent: '', contrast: '#1e1b4b', auto: false } );
+	run( p );
+
+	assert.equal( prop( p, '--odv-accent' ), 'initial', 'the stylesheet accent stays' );
+	assert.equal( prop( p, '--odv-accent-contrast' ), '#1e1b4b' );
+	assert.equal( p.ratio.textContent, 'Text on accent: 1.61:1', 'navy on the default indigo' );
+	assert.ok( !p.ratio.hasAttribute( 'hidden' ) );
+	assert.ok( !p.warning.hasAttribute( 'hidden' ) );
+
+	change( p, 'contrast', '#ffffff' );
+	assert.equal( p.ratio.textContent, 'Text on accent: 9.93:1' );
+	assert.ok( p.warning.hasAttribute( 'hidden' ), 'white on the default indigo reads well' );
+
+	// Nothing of the organizer's: the stylesheet pair, nothing to judge.
+	p.field( 'contrast_auto' ).checked = true;
+	p.field( 'contrast_auto' ).listeners.change();
+	assert.ok( p.ratio.hasAttribute( 'hidden' ) );
+	assert.ok( p.warning.hasAttribute( 'hidden' ) );
+
+	// A page without data-default-accent still judges against the stylesheet default.
+	const q = page( { accent: '', contrast: '#1e1b4b', auto: false } );
+	q.preview.removeAttribute( 'data-default-accent' );
+	run( q );
+	assert.equal( q.ratio.textContent, 'Text on accent: 1.61:1' );
+}() );
+
+// test_outline_buttons_warn_when_the_accent_is_hard_to_read_on_a_white_page
+( function () {
+	const p = page( { accent: '#ffeb3b', button_style: 'outline' } );
+	run( p );
+
+	assert.ok( p.warning.hasAttribute( 'hidden' ), 'automatic black text reads well on the hover fill' );
+	assert.ok( !p.outlineWarning.hasAttribute( 'hidden' ), 'yellow text on a white page does not' );
+
+	change( p, 'button_style', 'filled' );
+	assert.ok( p.outlineWarning.hasAttribute( 'hidden' ), 'filled buttons do not use the accent as text' );
+	change( p, 'button_style', 'outline' );
+	assert.ok( !p.outlineWarning.hasAttribute( 'hidden' ) );
+
+	change( p, 'accent', '#1e3a8a' );
+	assert.ok( p.outlineWarning.hasAttribute( 'hidden' ), 'a dark accent reads well' );
+	change( p, 'accent', '' );
+	assert.ok( p.outlineWarning.hasAttribute( 'hidden' ), 'the default accent reads well' );
+	assert.ok( p.warning.hasAttribute( 'hidden' ) );
 }() );
 
 // A preview without its fields (another plugin's page reusing the class) does nothing and never throws.

@@ -35,6 +35,9 @@ final class Appearance {
 
 	const BUTTON_STYLES = array( 'filled', 'outline' );
 
+	/** The stylesheet's own accent (assets/css/odavent.css), which buttons use while no accent is chosen. */
+	const DEFAULT_ACCENT = '#3730a3';
+
 	/** Closed button rules are left alone; hover fills the outlined button so its text stays readable. */
 	const OUTLINE_CSS = '.odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"]),.odv-tickets .odv-tickets__register{background:transparent;color:var(--_accent)}'
 		. '.odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"]):hover,.odv-tickets .odv-tickets__register:hover{background:var(--_accent);color:var(--_contrast)}';

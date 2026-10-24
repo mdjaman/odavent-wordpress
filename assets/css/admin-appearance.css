@@ -43,8 +43,10 @@
 .odv-appearance-preview--outline .odv-tickets .odv-tickets__register:hover { background: var(--_accent); color: var(--_contrast); }
 
 .odv-appearance-preview__ratio,
-.odv-appearance-preview__warning { margin: 0; }
+.odv-appearance-preview__warning,
+.odv-appearance-preview__outline-warning { margin: 0; }
 
-.odv-appearance-preview__warning { color: #b32d2e; font-weight: 600; }
+.odv-appearance-preview__warning,
+.odv-appearance-preview__outline-warning { color: #b32d2e; font-weight: 600; }
 
 .odv-appearance-preview [hidden] { display: none; }

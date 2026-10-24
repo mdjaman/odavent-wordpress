@@ -9,8 +9,10 @@
  * field's min and max, and the spacings listed in data-gaps.
  *
  * The text-on-accent ratio follows the same rules as the server (WCAG 2.x, two decimals, automatic text is black
- * or white, whichever reads better); its label comes from data-ratio-label ("%s" is the ratio), so the script has
- * no strings of its own. Colour fields get the WordPress colour picker when it is loaded.
+ * or white, whichever reads better; without an accent, the stylesheet's from data-default-accent is judged under a
+ * manual text colour); its label comes from data-ratio-label ("%s" is the ratio), so the script has no strings of
+ * its own. Outline buttons also show the outline warning when the accent, their text colour, is below 4.5:1 on
+ * white. Colour fields get the WordPress colour picker when it is loaded.
  * Safe to run twice.
  */
 ( function () {
@@ -20,6 +22,7 @@
 	var COLORS = [ 'accent', 'contrast', 'text', 'border' ];
 	var FIELDS = [ 'accent', 'contrast', 'text', 'border', 'radius', 'spacing', 'button_style', 'contrast_auto' ];
 	var MIN_RATIO = 4.5;
+	var DEFAULT_ACCENT = '#3730a3';
 	var BASE = 'odv-appearance-preview';
 
 	function hex( value ) {
@@ -106,6 +109,8 @@
 		var gaps = gapsOf( preview );
 		var ratioText = preview.querySelector( '.odv-appearance-preview__ratio' );
 		var warning = preview.querySelector( '.odv-appearance-preview__warning' );
+		var outlineWarning = preview.querySelector( '.odv-appearance-preview__outline-warning' );
+		var defaultAccent = hex( preview.getAttribute( 'data-default-accent' ) ) || DEFAULT_ACCENT;
 		var label = preview.getAttribute( 'data-ratio-label' ) || '%s';
 		var decimal = preview.getAttribute( 'data-decimal' ) || '.';
 
@@ -134,13 +139,16 @@
 				.replace( /(^|\s)odv-appearance-preview--(filled|outline)(?=\s|$)/g, '' )
 				.replace( /^\s+|\s+$/g, '' ) + ' ' + BASE + ( outline ? '--outline' : '--filled' );
 
-			// As on save: no accent of the organizer's own, no ratio to judge.
-			if ( !accent ) {
+			// As on save: without an accent of the organizer's own the buttons keep the stylesheet's, judged under
+			// a manual text colour or outline buttons; with neither colour set there is no pair to judge.
+			var judged = accent || defaultAccent;
+			setHidden( outlineWarning, !outline || ratio( judged, '#ffffff' ) >= MIN_RATIO );
+			if ( !accent && !manual ) {
 				setHidden( ratioText, true );
 				setHidden( warning, true );
 				return;
 			}
-			var current = ratio( accent, contrast );
+			var current = ratio( judged, manual || autoContrast( judged ) );
 			if ( ratioText ) {
 				ratioText.textContent = label.replace( /%(?:1\$)?s/, current.toFixed( 2 ).replace( '.', decimal ) );
 			}

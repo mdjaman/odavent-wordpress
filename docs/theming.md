@@ -49,7 +49,9 @@ px), spacing (compact, comfortable, roomy) and button style (filled or outline).
 | Spacing | `--odv-gap`: compact `0.75rem`, comfortable `1rem`, roomy `1.5rem` |
 | Button style | Outline: transparent buttons with the accent as text and border, filled on hover; filled is the default |
 
-An empty field writes nothing, so the stylesheet's own default applies. The values are validated (hex colours,
+Saving warns (and still saves) when button text falls below a 4.5:1 contrast ratio: the text on the accent
+(judged against the default `#3730a3` when only "Text on accent" is set), and, with outline buttons, the accent
+as text on a white page. An empty field writes nothing, so the stylesheet's own default applies. The values are validated (hex colours,
 a clamped whole number and fixed keywords; never free text) and added after the plugin's stylesheet, so the
 screen only has an effect while **Default styles** is on. The generated CSS can be changed with the
 [`odavent_events_appearance_css`](hooks.md#odavent_events_appearance_css) filter.

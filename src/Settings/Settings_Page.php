@@ -192,43 +192,82 @@ class Settings_Page {
 	}
 
 	/**
-	 * Adds a settings warning when the text-on-accent pair is hard to read. No accent of the organizer's own
-	 * means the stylesheet's (or the theme's) pair, which is not this screen's to judge.
+	 * Adds a settings warning when button text is hard to read: the text-on-accent pair (filled buttons, and
+	 * outline buttons on hover), and the accent as text on a white page (outline buttons). Without an accent of
+	 * the organizer's own the buttons keep the stylesheet's, which is judged too when a manual text colour or
+	 * outline buttons are set on top of it; with nothing set there is nothing to warn about.
 	 *
 	 * @param array $appearance Validated Appearance values.
 	 */
 	private function warn_low_contrast( array $appearance ): void {
-		if ( '' === $appearance['accent'] ) {
-			return;
-		}
-
 		$ratio = $this->appearance_ratio( $appearance );
-		if ( $ratio >= self::MIN_CONTRAST ) {
-			return;
+		if ( null !== $ratio && $ratio < self::MIN_CONTRAST ) {
+			add_settings_error(
+				Options::SETTINGS_ERROR_NAME,
+				self::APPEARANCE_ID . '_contrast',
+				sprintf(
+					/* translators: 1: contrast ratio such as 3.20, 2: the recommended minimum, 4.5. */
+					__( 'Your colours were saved, but the text on the accent colour has a contrast ratio of %1$s:1, below the recommended %2$s:1. Buttons may be hard to read; choose another text colour or turn on Automatic.', 'odavent-events' ),
+					number_format_i18n( $ratio, 2 ),
+					number_format_i18n( self::MIN_CONTRAST, 1 )
+				),
+				'warning'
+			);
 		}
 
-		add_settings_error(
-			Options::SETTINGS_ERROR_NAME,
-			self::APPEARANCE_ID . '_contrast',
-			sprintf(
-				/* translators: 1: contrast ratio such as 3.20, 2: the recommended minimum, 4.5. */
-				__( 'Your colours were saved, but the text on the accent colour has a contrast ratio of %1$s:1, below the recommended %2$s:1. Buttons may be hard to read; choose another text colour or turn on Automatic.', 'odavent-events' ),
-				number_format_i18n( $ratio, 2 ),
-				number_format_i18n( self::MIN_CONTRAST, 1 )
-			),
-			'warning'
-		);
+		$outline = $this->outline_ratio( $appearance );
+		if ( null !== $outline && $outline < self::MIN_CONTRAST ) {
+			add_settings_error(
+				Options::SETTINGS_ERROR_NAME,
+				self::APPEARANCE_ID . '_outline_contrast',
+				sprintf(
+					/* translators: 1: contrast ratio such as 3.20, 2: the recommended minimum, 4.5. */
+					__( 'Your colours were saved, but outline buttons use the accent colour as their text, and it has a contrast ratio of %1$s:1 on a white page, below the recommended %2$s:1. Choose a darker accent colour or the Filled button style.', 'odavent-events' ),
+					number_format_i18n( $outline, 2 ),
+					number_format_i18n( self::MIN_CONTRAST, 1 )
+				),
+				'warning'
+			);
+		}
 	}
 
 	/**
-	 * Contrast ratio of the effective accent and text-on-accent pair (automatic when no manual colour).
+	 * The accent the buttons use: the organizer's, or the stylesheet's when none is chosen.
 	 *
-	 * @param array $appearance Validated Appearance values with an accent.
+	 * @param array $appearance Validated Appearance values.
 	 */
-	private function appearance_ratio( array $appearance ): float {
-		$contrast = '' !== $appearance['contrast'] ? $appearance['contrast'] : Appearance::auto_contrast( $appearance['accent'] );
+	private function effective_accent( array $appearance ): string {
+		return '' !== $appearance['accent'] ? $appearance['accent'] : Appearance::DEFAULT_ACCENT;
+	}
 
-		return Appearance::contrast_ratio( $appearance['accent'], $contrast );
+	/**
+	 * Contrast ratio of the effective accent and text-on-accent pair (automatic when no manual colour), or null
+	 * when neither colour is the organizer's (the stylesheet's own pair).
+	 *
+	 * @param array $appearance Validated Appearance values.
+	 */
+	private function appearance_ratio( array $appearance ): ?float {
+		if ( '' === $appearance['accent'] && '' === $appearance['contrast'] ) {
+			return null;
+		}
+
+		$accent   = $this->effective_accent( $appearance );
+		$contrast = '' !== $appearance['contrast'] ? $appearance['contrast'] : Appearance::auto_contrast( $accent );
+
+		return Appearance::contrast_ratio( $accent, $contrast );
+	}
+
+	/**
+	 * Contrast ratio of outline-button text (the effective accent) on a white page, or null for filled buttons.
+	 *
+	 * @param array $appearance Validated Appearance values.
+	 */
+	private function outline_ratio( array $appearance ): ?float {
+		if ( 'outline' !== $appearance['button_style'] ) {
+			return null;
+		}
+
+		return Appearance::contrast_ratio( $this->effective_accent( $appearance ), '#ffffff' );
 	}
 
 	// ---- admin-post handlers ------------------------------------------------------------------
@@ -571,8 +610,9 @@ class Settings_Page {
 		}
 
 		$appearance = $this->options->appearance();
-		$has_ratio  = '' !== $appearance['accent'];
-		$ratio      = $has_ratio ? $this->appearance_ratio( $appearance ) : 0.0;
+		$ratio      = $this->appearance_ratio( $appearance );
+		$has_ratio  = null !== $ratio;
+		$outline    = $this->outline_ratio( $appearance );
 		/* translators: %s: contrast ratio such as 4.50. */
 		$label   = __( 'Text on accent contrast: %s:1', 'odavent-events' );
 		$decimal = isset( $GLOBALS['wp_locale'] ) && is_object( $GLOBALS['wp_locale'] ) && isset( $GLOBALS['wp_locale']->number_format['decimal_point'] )
@@ -581,11 +621,12 @@ class Settings_Page {
 		$gaps    = wp_json_encode( Appearance::GAPS );
 
 		printf(
-			'<div class="odv-appearance-preview odv-appearance-preview--%1$s" data-ratio-label="%2$s" data-decimal="%3$s" data-gaps="%4$s">',
+			'<div class="odv-appearance-preview odv-appearance-preview--%1$s" data-ratio-label="%2$s" data-decimal="%3$s" data-gaps="%4$s" data-default-accent="%5$s">',
 			'outline' === $appearance['button_style'] ? 'outline' : 'filled',
 			esc_attr( $label ),
 			esc_attr( $decimal ),
-			esc_attr( is_string( $gaps ) ? $gaps : '{}' )
+			esc_attr( is_string( $gaps ) ? $gaps : '{}' ),
+			esc_attr( Appearance::DEFAULT_ACCENT )
 		);
 
 		echo '<div class="odv-register"><span class="odv-register__button">' . esc_html__( 'Register', 'odavent-events' ) . '</span>';
@@ -617,6 +658,11 @@ class Settings_Page {
 			'<p class="odv-appearance-preview__warning"%s>%s</p>',
 			$has_ratio && $ratio < self::MIN_CONTRAST ? '' : ' hidden',
 			esc_html__( 'Below 4.5:1: button text may be hard to read.', 'odavent-events' )
+		);
+		printf(
+			'<p class="odv-appearance-preview__outline-warning"%s>%s</p>',
+			null !== $outline && $outline < self::MIN_CONTRAST ? '' : ' hidden',
+			esc_html__( 'Outline buttons use the accent colour as text: below 4.5:1 on a white page, it may be hard to read.', 'odavent-events' )
 		);
 		echo '</div>';
 	}

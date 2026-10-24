@@ -501,6 +501,12 @@ msgstr "Aperçu"
 msgid "Your colours were saved, but the text on the accent colour has a contrast ratio of %1$s:1, below the recommended %2$s:1. Buttons may be hard to read; choose another text colour or turn on Automatic."
 msgstr "Vos couleurs ont été enregistrées, mais le texte sur la couleur d’accent a un rapport de contraste de %1$s:1, inférieur au minimum recommandé de %2$s:1. Les boutons risquent d’être difficiles à lire ; choisissez une autre couleur de texte ou activez le mode automatique."
 
+#. translators: 1: contrast ratio such as 3.20, 2: the recommended minimum, 4.5.
+#: src/Settings/Settings_Page.php:225
+#, php-format
+msgid "Your colours were saved, but outline buttons use the accent colour as their text, and it has a contrast ratio of %1$s:1 on a white page, below the recommended %2$s:1. Choose a darker accent colour or the Filled button style."
+msgstr "Vos couleurs ont été enregistrées, mais les boutons à contour utilisent la couleur d’accent pour leur texte, et elle a un rapport de contraste de %1$s:1 sur une page blanche, inférieur au minimum recommandé de %2$s:1. Choisissez une couleur d’accent plus foncée ou le style de bouton Plein."
+
 #: src/Settings/Settings_Page.php:241
 msgid "Enter a site key first."
 msgstr "Saisissez d’abord une clé de site."
@@ -670,6 +676,10 @@ msgstr "Responsable produit"
 #: src/Settings/Settings_Page.php:619
 msgid "Below 4.5:1: button text may be hard to read."
 msgstr "Inférieur à 4,5:1 : le texte des boutons risque d’être difficile à lire."
+
+#: src/Settings/Settings_Page.php:665
+msgid "Outline buttons use the accent colour as text: below 4.5:1 on a white page, it may be hard to read."
+msgstr "Les boutons à contour utilisent la couleur d’accent pour leur texte : en dessous de 4,5:1 sur une page blanche, il risque d’être difficile à lire."
 
 #: src/Updates/Update_Checker.php:192
 msgid "View the changelog"

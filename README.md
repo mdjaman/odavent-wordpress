@@ -63,8 +63,8 @@ You do not need to write any code. Five steps take you from an empty page to a l
 4. **Match your brand.** Go to **Settings > Odavent Events** and scroll to **Appearance**. Pick your accent
    colour (the button and highlight colour), and optionally the text and border colours, the roundness of
    the corners, the spacing and a filled or outlined button. A live preview shows the result before you save,
-   and the plugin warns you when the text on your accent colour would be hard to read. Leave a field empty to
-   keep the default.
+   and the plugin warns you when button text would be hard to read (the text on your accent colour, or the
+   accent itself as the text of outlined buttons). Leave a field empty to keep the default.
 5. **Use the widgets.** If your theme has widget areas (a sidebar or a footer), go to **Appearance >
    Widgets**: every Odavent block is also there as an **Odavent: ...** widget, for example a countdown or a
    list of speakers in your sidebar. On a block theme the widgets screen does not exist; use the blocks

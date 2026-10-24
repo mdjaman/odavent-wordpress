@@ -1002,6 +1002,96 @@ class SettingsPageTest extends TestCase {
 		$this->assertSame( '#777777', $off['appearance']['accent'] );
 	}
 
+	public function test_a_manual_text_colour_without_an_accent_is_judged_against_the_default_accent(): void {
+		// No accent: buttons keep the stylesheet's #3730a3, so a dark manual text colour is navy on indigo.
+		$out = $this->page()->sanitize(
+			array(
+				'load_css'   => '1',
+				'appearance' => array(
+					'accent'   => '',
+					'contrast' => '#1e1b4b',
+				),
+			)
+		);
+
+		$this->assertSame( '', $out['appearance']['accent'], 'saved, not refused' );
+		$this->assertSame( '#1e1b4b', $out['appearance']['contrast'] );
+		$this->assertCount( 1, $this->errors );
+		list( , $code, $message, $type ) = $this->errors[0];
+		$this->assertSame( 'odavent_events_appearance_contrast', $code );
+		$this->assertSame( 'warning', $type );
+		$this->assertStringContainsString( '1.61:1', $message );
+	}
+
+	public function test_outline_buttons_warn_when_the_accent_is_hard_to_read_on_a_white_page(): void {
+		// Automatic text passes on the filled hover, but the outline text is the accent itself on the page.
+		$out = $this->page()->sanitize(
+			array(
+				'load_css'   => '1',
+				'appearance' => array(
+					'accent'       => '#ffeb3b',
+					'contrast'     => '',
+					'button_style' => 'outline',
+				),
+			)
+		);
+
+		$this->assertSame( '#ffeb3b', $out['appearance']['accent'], 'saved, not refused' );
+		$this->assertSame( 'outline', $out['appearance']['button_style'] );
+		$this->assertCount( 1, $this->errors );
+		list( $setting, $code, $message, $type ) = $this->errors[0];
+		$this->assertSame( Options::SETTINGS_ERROR_NAME, $setting );
+		$this->assertSame( 'odavent_events_appearance_outline_contrast', $code );
+		$this->assertSame( 'warning', $type );
+		$this->assertStringContainsString( 'outline buttons use the accent colour as their text', $message );
+		$this->assertStringContainsString( '1.22:1', $message );
+		$this->assertStringContainsString( '4.5:1', $message );
+
+		// Both problems at once: both sentences.
+		$this->errors = array();
+		$this->page()->sanitize(
+			array(
+				'load_css'   => '1',
+				'appearance' => array(
+					'accent'       => '#ffeb3b',
+					'contrast'     => '#ffffff',
+					'button_style' => 'outline',
+				),
+			)
+		);
+		$this->assertSame( array( 'odavent_events_appearance_contrast', 'odavent_events_appearance_outline_contrast' ), array_column( $this->errors, 1 ) );
+
+		foreach ( array(
+			'filled light accent'    => array( 'accent' => '#ffeb3b', 'button_style' => 'filled' ),
+			'outline dark accent'    => array( 'accent' => '#1e3a8a', 'button_style' => 'outline' ),
+			'outline default accent' => array( 'accent' => '', 'button_style' => 'outline' ),
+		) as $label => $appearance ) {
+			$this->errors = array();
+			$this->page()->sanitize( array( 'load_css' => '1', 'appearance' => $appearance ) );
+			$this->assertSame( array(), $this->errors, $label );
+		}
+	}
+
+	public function test_preview_judges_the_default_accent_and_outline_buttons(): void {
+		$this->client->shouldReceive( 'list_events' )->andReturn( $this->events_result() );
+
+		$this->options[ Options::OPTION ]['appearance'] = array( 'contrast' => '#1e1b4b' );
+		$html = $this->render( $this->page() );
+		$this->assertStringContainsString( '1.61:1', $html, 'the ratio against the default accent' );
+		$this->assertMatchesRegularExpression( '/class="odv-appearance-preview__warning"(?![^>]*hidden)/', $html );
+		$this->assertMatchesRegularExpression( '/class="odv-appearance-preview__outline-warning"[^>]*hidden/', $html );
+		$this->assertStringContainsString( 'data-default-accent="#3730a3"', $html );
+
+		$this->options[ Options::OPTION ]['appearance'] = array(
+			'accent'       => '#ffeb3b',
+			'button_style' => 'outline',
+		);
+		$html = $this->render( $this->page() );
+		$this->assertMatchesRegularExpression( '/class="odv-appearance-preview__warning"[^>]*hidden/', $html, 'automatic text reads well' );
+		$this->assertMatchesRegularExpression( '/class="odv-appearance-preview__outline-warning"(?![^>]*hidden)/', $html );
+		$this->assertStringContainsString( 'Outline buttons use the accent colour as text', $html );
+	}
+
 	public function test_a_hand_made_post_with_hostile_appearance_values_is_sanitised(): void {
 		$out = $this->page()->sanitize(
 			array(
