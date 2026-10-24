@@ -127,14 +127,15 @@ final class Schema {
 
 	/**
 	 * @param array[]     $tickets  Ticket rows.
-	 * @param string|null $currency Currency code of the event (missing or malformed: offers without priceCurrency).
+	 * @param string|null $currency Currency code of the event (missing or malformed: no offers at all, since an
+	 *                              Offer with a price but no priceCurrency is flagged by Google Rich Results).
 	 * @param string      $url      Page URL ('' to omit).
 	 * @return array[]
 	 */
 	private static function offers( array $tickets, ?string $currency, string $url ): array {
 		$currency = strtoupper( trim( (string) $currency ) );
 		if ( ! preg_match( '/^[A-Z]{3}$/D', $currency ) ) {
-			$currency = '';
+			return array();
 		}
 
 		$offers = array();
@@ -144,8 +145,17 @@ final class Schema {
 			}
 
 			$price = $ticket['price'] + 0;
+			// A negative price, NaN or INF (JSON 1e400 decodes to INF) is not an offer; INF would also make
+			// wp_json_encode fail and drop the whole block.
+			if ( $price < 0 || ( is_float( $price ) && ! is_finite( $price ) ) ) {
+				continue;
+			}
 			if ( is_float( $price ) ) {
-				$price = round( $price, 2 );
+				$rounded = round( $price, 2 );
+				if ( 0.0 === $rounded && $price > 0 ) {
+					continue; // A positive price that rounds to nothing is not a free offer.
+				}
+				$price = $rounded;
 				if ( floor( $price ) === $price && abs( $price ) < PHP_INT_MAX ) {
 					$price = (int) $price;
 				}
@@ -157,9 +167,7 @@ final class Schema {
 				'price'         => $price,
 				'availability'  => true === ( $ticket['is_full'] ?? null ) ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
 			);
-			if ( '' !== $currency ) {
-				$offer['priceCurrency'] = $currency;
-			}
+			$offer['priceCurrency'] = $currency;
 			if ( '' !== $url ) {
 				$offer['url'] = $url;
 			}

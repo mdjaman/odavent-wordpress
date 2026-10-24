@@ -156,9 +156,11 @@ final class Sanitizer {
 			PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL
 		);
 
+		$has_href = false;
 		foreach ( $attributes as $attribute ) {
 			$name = strtolower( $attribute[1] );
-			if ( 'target' === $name || 'rel' === $name || ! in_array( $name, $permitted, true ) ) {
+			// Belt and braces: event handlers and inline styles never survive, even if a filter allow-lists them.
+			if ( 'target' === $name || 'rel' === $name || 'style' === $name || 0 === strpos( $name, 'on' ) || ! in_array( $name, $permitted, true ) ) {
 				continue;
 			}
 
@@ -166,6 +168,12 @@ final class Sanitizer {
 			$value = html_entity_decode( $raw, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 			if ( 'href' === $name ) {
+				// Browsers use the first href of a tag: so does the rebuild, the others are dropped.
+				if ( $has_href ) {
+					continue;
+				}
+				$has_href = true;
+
 				$safe = self::url( $value );
 				if ( '' !== $safe ) {
 					$out .= ' href="' . esc_url( $safe, self::PROTOCOLS ) . '"';

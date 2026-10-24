@@ -154,6 +154,13 @@ final class Format {
 			$code = '';
 		}
 
+		// A positive price that rounds to zero in the display (0.001, or 0.4 in XOF) would read "0.00 EUR" or
+		// "0 XOF": neither the real price nor "Free", so it is not shown.
+		$decimals = in_array( $code, self::ZERO_DECIMAL_CURRENCIES, true ) ? 0 : 2;
+		if ( 0.0 === round( $amount, $decimals ) ) {
+			return '';
+		}
+
 		if ( '' !== $code && ! self::$intl_disabled && class_exists( 'NumberFormatter' ) ) {
 			$formatter = new \NumberFormatter( (string) get_locale(), \NumberFormatter::CURRENCY );
 			$formatted = $formatter->formatCurrency( $amount, $code );
@@ -161,8 +168,6 @@ final class Format {
 				return $formatted;
 			}
 		}
-
-		$decimals = in_array( $code, self::ZERO_DECIMAL_CURRENCIES, true ) ? 0 : 2;
 
 		return trim( number_format_i18n( $amount, $decimals ) . ' ' . $code );
 	}

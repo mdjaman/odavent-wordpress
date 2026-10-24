@@ -264,23 +264,67 @@ class SchemaTest extends RenderTestCase {
 	}
 
 	/**
+	 * An Offer with a price but no priceCurrency is flagged by Google Rich Results: no valid currency, no offers.
+	 *
 	 * @dataProvider bad_currencies
 	 */
-	public function test_a_bad_currency_does_not_throw_and_leaves_priceCurrency_out( $currency ): void {
+	public function test_a_bad_currency_does_not_throw_and_leaves_the_offers_out( $currency ): void {
 		$data = $this->decode( Schema::event_json_ld( $this->view( array( 'currency' => $currency ) ), self::PERMALINK ) );
 
-		$this->assertCount( 1, $data['offers'] );
-		$this->assertSame( 'Pass Standard', $data['offers'][0]['name'] );
-		$this->assertArrayNotHasKey( 'priceCurrency', $data['offers'][0] );
+		$this->assertArrayNotHasKey( 'offers', $data );
+		$this->assertSame( 'Event', $data['@type'] );
 	}
 
-	public function test_a_missing_currency_does_not_throw(): void {
+	public function test_a_missing_currency_leaves_the_offers_out(): void {
 		$payload = $this->fixture( 'payload-v1-full' );
 		unset( $payload['event']['currency'] );
 
 		$data = $this->decode( Schema::event_json_ld( Event_View::from_payload( $payload ), self::PERMALINK ) );
 
-		$this->assertArrayNotHasKey( 'priceCurrency', $data['offers'][0] );
+		$this->assertArrayNotHasKey( 'offers', $data );
+	}
+
+	public function test_invalid_prices_are_skipped_and_valid_rows_survive(): void {
+		$row = function ( string $name, $price ): array {
+			return array(
+				'id'      => 1,
+				'name'    => $name,
+				'price'   => $price,
+				'is_free' => false,
+				'on_sale' => true,
+				'is_full' => false,
+			);
+		};
+
+		$payload            = $this->fixture( 'payload-v1-full' );
+		$payload['tickets'] = array(
+			$row( 'Negative', -5 ),
+			$row( 'Valid', 40 ),
+			$row( 'Infinite', INF ),
+			$row( 'Not a number', NAN ),
+			$row( 'Overflow string', '1e400' ),
+			$row( 'Negative string', '-0.5' ),
+			$row( 'Rounds to nothing', 0.001 ),
+			$row( 'Free', 0 ),
+			$row( 'Valid decimal', '12.5' ),
+		);
+
+		$html = Schema::event_json_ld( $this->view( array(), $payload ), self::PERMALINK );
+		$data = $this->decode( $html );
+
+		$this->assertSame( array( 'Valid', 'Free', 'Valid decimal' ), array_column( $data['offers'], 'name' ) );
+		$this->assertSame( array( 40, 0, 12.5 ), array_column( $data['offers'], 'price' ) );
+	}
+
+	public function test_an_infinite_price_does_not_drop_the_whole_block(): void {
+		$payload                          = $this->fixture( 'payload-v1-full' );
+		$payload['tickets'][0]['price']   = json_decode( '1e400' );
+
+		$html = Schema::event_json_ld( $this->view( array(), $payload ), self::PERMALINK );
+
+		$data = $this->decode( $html );
+		$this->assertSame( 'Event', $data['@type'] );
+		$this->assertArrayNotHasKey( 'offers', $data );
 	}
 
 	public function test_a_lowercase_currency_is_normalised(): void {

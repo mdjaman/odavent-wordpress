@@ -190,6 +190,32 @@ class FormatTest extends RenderTestCase {
 		}
 	}
 
+	public function test_a_positive_price_that_rounds_to_zero_is_neither_zero_nor_free(): void {
+		Format::disable_intl( true );
+
+		$this->assertSame( '', Format::price( 0.001, 'EUR', false ) );
+		$this->assertSame( '', Format::price( '0.004', 'EUR', false ) );
+		$this->assertSame( '', Format::price( 0.4, 'XOF', false ) );
+		$this->assertSame( '', Format::price( 0.49, 'JPY', false ) );
+		$this->assertSame( '', Format::price( 0.001, null, false ) );
+
+		// Just above the rounding line the price is still shown.
+		$this->assertSame( '0.01 EUR', Format::price( 0.006, 'EUR', false ) );
+		$this->assertSame( '1 XOF', Format::price( 0.6, 'XOF', false ) );
+		// An explicit free flag and an exact zero still say Free.
+		$this->assertSame( 'Free', Format::price( 0.001, 'EUR', true ) );
+		$this->assertSame( 'Free', Format::price( 0, 'XOF', false ) );
+	}
+
+	public function test_a_positive_price_that_rounds_to_zero_is_hidden_with_intl_too(): void {
+		if ( ! class_exists( 'NumberFormatter' ) ) {
+			$this->markTestSkipped( 'The intl extension is not installed.' );
+		}
+
+		$this->assertSame( '', Format::price( 0.001, 'EUR', false ) );
+		$this->assertSame( '', Format::price( 0.4, 'XOF', false ) );
+	}
+
 	public function test_a_price_that_is_not_finite_is_not_shown(): void {
 		$this->assertSame( '', Format::price( INF, 'EUR', false ) );
 		$this->assertSame( '', Format::price( NAN, 'EUR', false ) );

@@ -183,6 +183,32 @@ class SanitizerTest extends RenderTestCase {
 		$this->assertSame( '<a rel="nofollow noopener">x</a>', Sanitizer::html( '<a href>x</a>' ) );
 	}
 
+	public function test_a_filter_cannot_bring_event_handlers_or_style_back(): void {
+		Functions\when( 'wp_kses' )->returnArg();
+		Filters\expectApplied( 'odavent_events_allowed_html' )->andReturn(
+			array( 'a' => array( 'href' => true, 'onclick' => true, 'ONMOUSEOVER' => true, 'onfocusin' => true, 'style' => true, 'title' => true ) )
+		);
+
+		$out = Sanitizer::html( "<a href='https://x.com' onclick='steal()' OnMouseOver=\"x()\" onfocusin=y style='color:red' title='t'>x</a>" );
+
+		$this->assertSame( '<a href="https://x.com" title="t" rel="nofollow noopener">x</a>', $out );
+	}
+
+	public function test_only_the_first_href_of_an_anchor_is_kept(): void {
+		Functions\when( 'wp_kses' )->returnArg();
+
+		$this->assertSame(
+			'<a href="https://first.example" rel="nofollow noopener">x</a>',
+			Sanitizer::html( '<a href="https://first.example" href="https://second.example">x</a>' )
+		);
+
+		// A bad first href is not replaced by a later good one: browsers would have used the first.
+		$this->assertSame(
+			'<a rel="nofollow noopener">x</a>',
+			Sanitizer::html( '<a href="javascript:alert(1)" href="https://second.example">x</a>' )
+		);
+	}
+
 	public function test_a_greater_than_inside_a_quoted_attribute_does_not_end_the_tag(): void {
 		Functions\when( 'wp_kses' )->returnArg();
 		Filters\expectApplied( 'odavent_events_allowed_html' )->andReturn( array( 'a' => array( 'href' => true, 'title' => true ) ) );
