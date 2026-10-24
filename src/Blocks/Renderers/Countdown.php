@@ -3,6 +3,7 @@ namespace Odavent\Events\Blocks\Renderers;
 
 use Odavent\Events\Blocks\Attributes;
 use Odavent\Events\Blocks\Renderer;
+use Odavent\Events\Data\Clock;
 use Odavent\Events\Data\Event_View;
 use Odavent\Events\Render\Format;
 use Odavent\Events\Render\Sanitizer;
@@ -85,11 +86,9 @@ final class Countdown implements Renderer {
 	}
 
 	/**
-	 * The current time. Filter `odavent_events_now` (int $timestamp) lets tests and caching setups fix it.
+	 * The current time (see Clock: the `odavent_events_now` filter, junk falls back to time()).
 	 */
 	private static function now(): int {
-		$now = apply_filters( 'odavent_events_now', time() );
-
-		return is_int( $now ) || ( is_string( $now ) && 1 === preg_match( '/^[0-9]+$/D', $now ) ) ? (int) $now : time();
+		return Clock::now();
 	}
 }

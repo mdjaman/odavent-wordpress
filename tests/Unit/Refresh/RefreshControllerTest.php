@@ -41,6 +41,9 @@ class RefreshControllerTest extends TestCase {
 	/** @var string The site key Options returns. */
 	private $key = self::KEY;
 
+	/** @var mixed What the `odavent_events_now` filter returns. */
+	private $now_filter = self::NOW;
+
 	/** @var callable[] Callbacks the controller hooked on `shutdown`, not yet run. */
 	private $shutdown = array();
 
@@ -69,7 +72,7 @@ class RefreshControllerTest extends TestCase {
 		);
 		Filters\expectApplied( 'odavent_events_now' )->zeroOrMoreTimes()->andReturnUsing(
 			function () {
-				return self::NOW;
+				return $this->now_filter;
 			}
 		);
 
@@ -190,6 +193,37 @@ class RefreshControllerTest extends TestCase {
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( array( 'ok' => true ), $response->get_data() );
+	}
+
+	public function test_a_junk_clock_filter_falls_back_to_the_real_time(): void {
+		// Not (int)'banana' = 0: that would reject every real ping. The real clock is used instead.
+		$this->now_filter = 'banana';
+		$body             = $this->valid_body( 7 );
+		$this->repository->shouldReceive( 'purge' )->once()->with( 7 );
+		$this->purger->shouldReceive( 'purge_event' )->once()->with( 7 )->andReturn( 0 );
+
+		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body, time() ) ) );
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
+	public function test_a_junk_clock_filter_still_rejects_a_stale_ping(): void {
+		$this->now_filter = array( 'x' );
+		$body             = $this->valid_body( 7 );
+		$this->expect_no_purge();
+
+		$this->assert_unauthorized( $this->controller()->handle( $this->request( $body, $this->sign( $body, self::NOW ) ) ) );
+	}
+
+	public function test_a_digit_string_clock_filter_is_used(): void {
+		$this->now_filter = (string) self::NOW;
+		$body             = $this->valid_body( 7 );
+		$this->repository->shouldReceive( 'purge' )->once()->with( 7 );
+		$this->purger->shouldReceive( 'purge_event' )->once()->with( 7 )->andReturn( 0 );
+
+		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
+
+		$this->assertSame( 200, $response->get_status() );
 	}
 
 	public function test_lowercase_header_name_is_accepted(): void {

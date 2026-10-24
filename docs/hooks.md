@@ -81,7 +81,8 @@ apply_filters( 'odavent_events_now', int $timestamp ): int
 
 The current Unix time, used by the countdown block to decide between upcoming, live and ended, and by the
 refresh endpoint to judge how fresh a signed ping is. Default: `time()`. An integer (or digit string) is
-accepted; anything else falls back to `time()`.
+accepted; anything else (a float, a word, an empty or negative string, `null`) falls back to `time()`, in the
+countdown and in the refresh endpoint alike.
 
 It exists for tests and for freezing the time in a demo. Do not use it to move the clock in production:
 the refresh endpoint rejects pings whose timestamp is more than 5 minutes away from this value.

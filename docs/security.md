@@ -100,7 +100,8 @@ on your site, the checks are strict:
   cannot take it over.
 * The package address Odavent reports must start with the pinned prefix
   `https://github.com/mdjaman/odavent-wordpress/releases/download/` and be exactly
-  `<prefix>v<version>/<file>.zip` for the version offered, with a plain file name (no query, fragment,
+  `<prefix>v<version>/<file>.zip` for the version offered (the `v` may also be a capital `V`, or left out),
+  with a plain file name (no query, fragment,
   `@`, `..` or percent-encoding). The Odavent endpoint therefore **cannot point your site at another host**,
   and cannot present an older release's file as a newer version.
 * Only a strictly newer version is offered (never a downgrade). A pre-release such as `1.2.0-beta` is

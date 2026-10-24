@@ -1,6 +1,7 @@
 <?php
 namespace Odavent\Events\Refresh;
 
+use Odavent\Events\Data\Clock;
 use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Settings\Options;
 
@@ -95,7 +96,7 @@ class Refresh_Controller {
 		}
 
 		// 4. Freshness and HMAC.
-		$now = (int) apply_filters( 'odavent_events_now', time() );
+		$now = Clock::now();
 		if ( ! Signature::verify( $header, $body, $key, $now ) ) {
 			return $this->unauthorized();
 		}

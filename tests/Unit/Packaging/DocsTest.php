@@ -80,6 +80,27 @@ class DocsTest extends TestCase {
 		}
 	}
 
+	public function test_the_update_package_path_rule_in_the_security_doc_matches_the_checker(): void {
+		$doc     = $this->doc( 'docs/security.md' );
+		$checker = (string) file_get_contents( $this->root . '/src/Updates/Update_Checker.php' );
+
+		// The code accepts [vV]? before the version; the doc must not claim a lower-case "v" is required.
+		$this->assertStringContainsString( "'#^[vV]?'", $checker );
+		$this->assertMatchesRegularExpression( '/capital `V`, or left out/', $doc );
+	}
+
+	public function test_the_clock_filter_doc_matches_the_single_helper_both_call_sites_use(): void {
+		$doc = $this->doc( 'docs/hooks.md' );
+
+		$this->assertStringContainsString( 'falls back to `time()`, in the', $doc );
+		$this->assertStringContainsString( 'refresh endpoint alike', $doc );
+		foreach ( array( 'src/Blocks/Renderers/Countdown.php', 'src/Refresh/Refresh_Controller.php' ) as $file ) {
+			$code = (string) file_get_contents( $this->root . '/' . $file );
+			$this->assertStringContainsString( 'Clock::now()', $code, $file );
+			$this->assertStringNotContainsString( "apply_filters( 'odavent_events_now'", $code, $file . ' must go through Clock' );
+		}
+	}
+
 	public function test_the_other_docs_exist_and_the_readme_links_them(): void {
 		$readme = $this->doc( 'README.md' );
 		foreach ( array( 'docs/shortcodes.md', 'docs/theming.md', 'docs/hooks.md', 'docs/security.md', 'docs/operations.md' ) as $file ) {

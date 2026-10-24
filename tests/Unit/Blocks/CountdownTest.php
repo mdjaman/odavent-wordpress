@@ -166,6 +166,15 @@ class CountdownTest extends BlockTestCase {
 		$this->assertGreaterThan( 1000, (int) $this->unit( $html, 'days' ) );
 	}
 
+	public function test_a_junk_clock_filter_counts_down_from_the_real_time_not_from_zero(): void {
+		Filters\expectApplied( 'odavent_events_now' )->andReturn( 'banana' );
+
+		$html = $this->render( $this->payload( array( 'starts_at' => gmdate( 'Y-m-d\TH:i:s\Z', time() + 3 * 86400 + 3600 ), 'ends_at' => null ) ) );
+
+		$this->assertStringContainsString( 'data-state="upcoming"', $html );
+		$this->assertSame( '3', $this->unit( $html, 'days' ) );
+	}
+
 	public function test_hostile_event_data_cannot_break_out(): void {
 		$this->freeze( '2026-11-10T09:00:00+00:00' );
 		$html = $this->render( $this->payload( array(), 'payload-v1-hostile' ), array( 'labelLive' => '"><script>alert(1)</script>', 'className' => '"><script>' ) );
