@@ -20,6 +20,9 @@ PASSES=0
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 ONLY="${ONLY:-}"
+# A full run prints exactly this many PASS lines. Fewer means a section was skipped (a failed setup step, an
+# early `if` taken): the run fails. Update it when checks are added or removed.
+EXPECTED_PASSES=132
 
 pass() { PASSES=$((PASSES + 1)); printf 'PASS %s\n' "$1"; }
 fail() { FAILS=$((FAILS + 1)); printf 'FAIL %s\n' "$1"; [ -n "${2:-}" ] && printf '     %s\n' "$2"; return 0; }
@@ -64,9 +67,10 @@ get() {
 contains() { grep -qF -- "$2" "$TMP/$1"; }
 lacks() { ! grep -qF -- "$2" "$TMP/$1"; }
 
-# Register links: <a> whose href is an Odavent /register URL, or whose text is "Register".
+# Register links: <a> elements the plugin renders as Register links (class odv-register__button or
+# odv-tickets__register), or any link to an Odavent /register URL.
 register_links() {
-	html links <"$TMP/$1" | jq '[.[] | select((.href | test("/register([?#]|$)")) or .text == "Register")] | length'
+	html links <"$TMP/$1" | jq '[.[] | select((.class | test("(^|\\s)(odv-register__button|odv-tickets__register)(\\s|$)")) or (.href | test("^https://odavent\\.com/events/[^/?#]+/register([?#]|$)")))] | length'
 }
 
 set_settings() { # set_settings [key]
@@ -201,6 +205,8 @@ if want 3; then
 	res=$(get draft-admin.html "$ODV_SITE/draft-3/" -b "$COOKIES")
 	check "3 admin sees the draft content" contains draft-admin.html "Secret Draft Workshop 3"
 	check "3 admin sees the 'Draft preview' notice" contains draft-admin.html "Draft preview: this event is not published on Odavent yet."
+	# Secondary: WordPress 6.9+ sends no-cache headers to every logged-in user itself, so this line cannot tell the
+	# plugin's layer apart there. The DONOTCACHEPAGE probe below (and its two negative controls) is the proof.
 	if grep -iE '^cache-control:.*(no-cache|no-store)' "$TMP/draft-admin.html.h" >/dev/null; then
 		pass "3 admin draft preview response has Cache-Control no-cache/no-store"
 	else
@@ -262,8 +268,8 @@ assert_refresh() { # assert_refresh <label> <site url>
 	stub_control '{"rename": {"1": "Renamed Summit 2027"}}'
 
 	s0=$(ping "$site" p-unsigned.json)
-	s1=$(ping "$site" p-wrong.json "$(bin/sign-ping odv_wp_wrongkey_000000000000000 "$PING_BODY")")
-	s2=$(ping "$site" p-stale.json "$(bin/sign-ping "$ODV_STUB_KEY" "$PING_BODY" $(( $(date +%s) - 400 )))")
+	s1=$(ping "$site" p-wrong.json "$("$ODV_ROOT/bin/sign-ping" odv_wp_wrongkey_000000000000000 "$PING_BODY")")
+	s2=$(ping "$site" p-stale.json "$("$ODV_ROOT/bin/sign-ping" "$ODV_STUB_KEY" "$PING_BODY" $(( $(date +%s) - 400 )))")
 	check "$label unsigned, wrong-key and stale (t-400s) pings are all 401 ($s0 $s1 $s2)" [ "$s0$s1$s2" = "401401401" ]
 	check "$label the three 401 bodies are identical" \
 		bash -c "cmp -s '$TMP/p-unsigned.json' '$TMP/p-wrong.json' && cmp -s '$TMP/p-unsigned.json' '$TMP/p-stale.json'"
@@ -271,7 +277,7 @@ assert_refresh() { # assert_refresh <label> <site url>
 	check "$label rejected pings leave the old name on the page" \
 		bash -c "grep -qF 'Sommet Tech d&#039;Abidjan 2026' '$TMP/after-bad.html' && ! grep -qF 'Renamed Summit 2027' '$TMP/after-bad.html'"
 
-	sig=$(bin/sign-ping "$ODV_STUB_KEY" "$PING_BODY")
+	sig=$("$ODV_ROOT/bin/sign-ping" "$ODV_STUB_KEY" "$PING_BODY")
 	s3=$(ping "$site" p-good.json "$sig")
 	check "$label a correctly signed ping answers 200 ($s3)" [ "$s3" = "200" ]
 	get after-good.html "$site/all-blocks-1/" >/dev/null
@@ -472,10 +478,11 @@ wp_pkg() { dc exec -T wpcli wp --path="$PKG_PATH" "$@"; }
 
 if want 13 || want 12; then
 	off=$(log_size "$LOG_PATH")
-	if ! (cd "$ODV_ROOT" && bin/build-zip 0.1.0 >"$TMP/build.txt" 2>&1); then
+	VERSION=$(sed -n 's/^ \* Version: *\([0-9][0-9A-Za-z.-]*\) *$/\1/p' "$ODV_ROOT/odavent-events.php")
+	if [ -z "$VERSION" ] || ! "$ODV_ROOT/bin/build-zip" "$VERSION" >"$TMP/build.txt" 2>&1; then
 		fail "13 the release zip builds" "$(tail -3 "$TMP/build.txt")"
 	else
-		pass "13 the release zip builds ($(tail -1 "$TMP/build.txt"))"
+		pass "13 the release zip $VERSION builds ($(tail -1 "$TMP/build.txt"))"
 		# A second, empty WordPress in /pkg (same database, table prefix pkg_), installed from the image's copy.
 		dc exec -T wordpress sh -c "rm -rf $PKG_PATH && cp -a /usr/src/wordpress $PKG_PATH && rm -f $PKG_PATH/wp-config-docker.php && chown -R 33:33 $PKG_PATH"
 		wp_cli eval-file "$ODV_PLUGIN_DIR/docker/smoke/drop-pkg-tables.php" >/dev/null
@@ -484,10 +491,17 @@ if want 13 || want 12; then
 		wp_pkg core install --url="$PKG_SITE" --title="Odavent package test" --admin_user=admin --admin_password=admin \
 			--admin_email=admin@example.com --skip-email >/dev/null
 		wp_pkg rewrite structure '/%postname%/' --hard >/dev/null
-		inst=$(wp_pkg plugin install "$ODV_PLUGIN_DIR/dist/odavent-events-0.1.0.zip" --force --activate 2>&1)
+		inst=$(wp_pkg plugin install "$ODV_PLUGIN_DIR/dist/odavent-events-$VERSION.zip" --force --activate 2>&1)
 		check "13 wp plugin install <zip> --force --activate succeeds" wp_pkg plugin is-active odavent-events
-		check "13 the installed copy is the zip, not the dev tree (no tests/ or composer.json)" \
-			bash -c "! docker compose -f '$ODV_ROOT/docker/docker-compose.yml' exec -T wordpress test -e $PKG_PATH/wp-content/plugins/odavent-events/tests"
+		if listing=$(dc exec -T wordpress ls -A "$PKG_PATH/wp-content/plugins/odavent-events"); then
+			listing=$(printf '%s\n' "$listing" | tr -d '\r')
+			dev=$(printf '%s\n' "$listing" | grep -xE 'tests|docker|bin|vendor|mu-plugins|composer\.json|composer\.lock|patchwork\.json|phpunit\.xml\.dist|phpcs\.xml\.dist|node_modules|\..*' | tr '\n' ' ')
+			check "13 the installed copy is the zip, not the dev tree (no dev files; found: '${dev}')" [ -z "$dev" ]
+			check "13 the installed copy has the runtime files (src, blocks, languages)" \
+				bash -c 'for f in src blocks languages odavent-events.php; do printf "%s\n" "$1" | grep -qx "$f" || exit 1; done' _ "$listing"
+		else
+			fail "13 the installed copy is the zip, not the dev tree" "could not list the installed plugin"
+		fi
 		check "13 the zip ships compiled translations (fr_FR .mo)" \
 			dc exec -T wordpress test -f "$PKG_PATH/wp-content/plugins/odavent-events/languages/odavent-events-fr_FR.mo"
 		wp_pkg option update odavent_events_settings \
@@ -538,6 +552,10 @@ if want 13 || want 12; then
 fi
 
 check "end: no PHP warnings or notices in debug.log during the whole run" log_clean_since "$LOG_PATH" "$LOG_START"
+
+if [ -z "$ONLY" ] && [ "$PASSES" -lt "$EXPECTED_PASSES" ]; then
+	fail "every section ran" "only $PASSES checks passed, $EXPECTED_PASSES expected: a section was skipped"
+fi
 
 log "Smoke test: $PASSES passed, $FAILS failed in $(( $(date +%s) - started ))s"
 [ "$FAILS" = 0 ]
