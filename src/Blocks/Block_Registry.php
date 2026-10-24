@@ -308,7 +308,7 @@ class Block_Registry {
 			self::NAMESPACE_PREFIX . 'full-event-page',
 			array(
 				'title'       => __( 'Full event page', 'odavent-events' ),
-				'description' => __( 'Every Odavent block in the order of an event page: header, countdown, registration, tickets, speakers, agenda, sponsors, venue and calendar.', 'odavent-events' ),
+				'description' => __( 'Every Odavent block in the order of an event page: header, countdown, registration, tickets, find my registration, speakers, agenda, sponsors, venue and calendar.', 'odavent-events' ),
 				'categories'  => array( self::CATEGORY ),
 				'content'     => implode( "\n", $lines ),
 			)
@@ -673,7 +673,7 @@ class Block_Registry {
 			'showGoogle'       => __( 'Google Calendar link', 'odavent-events' ),
 			'showOutlook'      => __( 'Outlook link', 'odavent-events' ),
 			'showIcs'          => __( 'Calendar file (.ics) link', 'odavent-events' ),
-			'sections'         => __( 'Sections to show (comma list, blank for all)', 'odavent-events' ),
+			'sections'         => __( 'Sections to show', 'odavent-events' ),
 			'showHeadings'     => __( 'Show section headings', 'odavent-events' ),
 			'speakersColumns'  => __( 'Speaker columns', 'odavent-events' ),
 			'sponsorsColumns'  => __( 'Sponsor columns', 'odavent-events' ),

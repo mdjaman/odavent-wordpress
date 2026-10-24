@@ -316,11 +316,13 @@
 			} );
 		} );
 
+		// One labelled group, so a screen reader announces "Sections to show, group" before the toggles.
+		var labelId = 'odavent-events-sections-label';
 		return el(
 			Fragment,
 			{ key: 'sections' },
-			el( 'p', { className: 'components-base-control__label' }, ( meta.labels && meta.labels.sections ) || 'sections' ),
-			toggles
+			el( 'p', { id: labelId, className: 'components-base-control__label' }, ( meta.labels && meta.labels.sections ) || 'sections' ),
+			el( 'div', { role: 'group', 'aria-labelledby': labelId }, toggles )
 		);
 	}
 

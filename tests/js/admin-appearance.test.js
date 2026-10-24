@@ -129,6 +129,10 @@ const change = ( p, name, value ) => {
 	assert.equal( prop( p, '--odv-radius' ), '0px' );
 	change( p, 'radius', '1e3' );
 	assert.equal( prop( p, '--odv-radius' ), 'initial' );
+	change( p, 'radius', '9999999999' );
+	assert.equal( prop( p, '--odv-radius' ), '24px', 'a very long number is clamped like on save, not rejected' );
+	change( p, 'radius', '-9999999999' );
+	assert.equal( prop( p, '--odv-radius' ), '0px' );
 	change( p, 'spacing', 'constructor' );
 	assert.equal( prop( p, '--odv-gap' ), 'initial', 'only the listed spacings' );
 
@@ -143,6 +147,16 @@ const change = ( p, name, value ) => {
 	// Run twice: still one set of listeners, and the preview is set up once.
 	run( p );
 	assert.equal( p.preview.getAttribute( 'data-odv-ready' ), '1' );
+}() );
+
+// test_ratio_label_accepts_a_positional_placeholder
+( function () {
+	[ [ 'Contraste : %s:1', 'Contraste : 10.27:1' ], [ 'Contraste : %1$s:1', 'Contraste : 10.27:1' ], [ '%s / %1$s', '10.27 / %1$s' ] ].forEach( function ( pair ) {
+		const p = page( { accent: '#1e3a8a', contrast: '#fefefe', auto: false } );
+		p.preview.setAttribute( 'data-ratio-label', pair[ 0 ] );
+		run( p );
+		assert.equal( p.ratio.textContent, pair[ 1 ], pair[ 0 ] );
+	} );
 }() );
 
 // test_automatic_text_color_tracks_the_accent

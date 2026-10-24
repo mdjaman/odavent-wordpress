@@ -160,6 +160,65 @@ assert.deepEqual( page.calls, [], 'at least one section stays on' );
 page = renderPage( 'bogus' );
 assert.ok( page.toggles.every( ( t ) => t.props.checked === true ), 'unknown names mean all on' );
 
+// For assistive technology the toggles sit in one labelled group: role="group" named by the visible heading.
+( function () {
+	const registered = {};
+	const wp = {
+		blocks: { getBlockType: () => undefined, registerBlockType: ( name, settings ) => ( registered[ name ] = settings ) },
+		element: {
+			createElement: ( type, props, ...children ) => ( { type, props: props || {}, children } ),
+			Fragment: component( 'Fragment' ),
+			useState: () => [ { loading: false, events: [], error: '' }, () => {} ],
+			useEffect: () => {},
+		},
+		components: { Spinner: component( 'Spinner' ), Notice: component( 'Notice' ), PanelBody: component( 'PanelBody' ), ToggleControl: component( 'ToggleControl' ), SelectControl: component( 'SelectControl' ), TextControl: component( 'TextControl' ), RangeControl: component( 'RangeControl' ) },
+		blockEditor: { InspectorControls: component( 'InspectorControls' ), useBlockProps: () => ( {} ) },
+		serverSideRender: component( 'ServerSideRender' ),
+		i18n: { __: ( text ) => text, sprintf: ( format ) => format },
+		apiFetch: () => new Promise( () => {} ),
+	};
+	vm.runInNewContext( source, { window: { wp, odaventEventsBlocks: pageBlocks } } );
+
+	const nodes = [];
+	const walk = ( node ) => {
+		if ( Array.isArray( node ) ) {
+			node.forEach( walk );
+			return;
+		}
+		if ( ! node || typeof node !== 'object' ) {
+			return;
+		}
+		nodes.push( node );
+		if ( typeof node.type === 'function' && ! ( node.type.displayName ) ) {
+			walk( node.type( node.props ) );
+		}
+		walk( node.props && node.props.children );
+		walk( node.children );
+	};
+	walk( registered[ 'odavent-events/event-page' ].edit( { attributes: { eventId: 0, eventSlug: '', sections: '', showHeadings: true }, setAttributes: () => {} } ) );
+
+	const groups = nodes.filter( ( n ) => n.props && n.props.role === 'group' );
+	assert.equal( groups.length, 1, 'test_section_toggles_are_one_labelled_group: exactly one group' );
+	const group = groups[ 0 ];
+	const heading = nodes.filter( ( n ) => n.props && n.props.id && n.props.id === group.props[ 'aria-labelledby' ] );
+	assert.equal( heading.length, 1, 'the group is named by the id of the visible heading' );
+	assert.equal( heading[ 0 ].props.className, 'components-base-control__label' );
+	assert.deepEqual( heading[ 0 ].children, [ 'Sections' ] );
+	const toggles = [];
+	( function collect( node ) {
+		if ( Array.isArray( node ) ) {
+			node.forEach( collect );
+		} else if ( node && typeof node === 'object' ) {
+			if ( node.type && node.type.displayName === 'ToggleControl' ) {
+				toggles.push( node );
+			}
+			collect( node.props && node.props.children );
+			collect( node.children );
+		}
+	}( group ) );
+	assert.equal( toggles.length, SECTIONS.length, 'every toggle is inside the group' );
+}() );
+
 // Without sectionChoices (any other block) `sections` would stay an ordinary text field.
 const plain = render( { loading: false, events: [], error: '' }, [ { name: 'odavent-events/x', title: 'X', attributes: { sections: { type: 'string', default: '' } }, labels: { sections: 'Sections' }, managed: [] } ] );
 assert.equal( plain.filter( ( c ) => c.name === 'TextControl' ).length, 1, 'a block without sectionChoices keeps the text field' );

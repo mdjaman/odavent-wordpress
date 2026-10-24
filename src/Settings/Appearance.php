@@ -173,7 +173,8 @@ final class Appearance {
 	}
 
 	/**
-	 * An integer clamped to 0 to 24, or '' when the value is not a plain number.
+	 * An integer clamped to 0 to 24, or '' when the value is not a plain whole number. A number of any length
+	 * is clamped (a long run of digits is just "very large"), never rejected.
 	 *
 	 * @param mixed $value Raw value.
 	 * @return int|string
@@ -181,8 +182,13 @@ final class Appearance {
 	private static function radius( $value ) {
 		if ( is_int( $value ) ) {
 			$number = $value;
-		} elseif ( is_string( $value ) && 1 === preg_match( '/^\s*-?\d{1,9}\s*$/D', $value ) ) {
-			$number = (int) $value;
+		} elseif ( is_string( $value ) && 1 === preg_match( '/^\s*(-?)(\d+)\s*$/D', $value, $m ) ) {
+			$digits = ltrim( $m[2], '0' );
+			if ( strlen( $digits ) > 9 ) {
+				// Beyond what an integer holds on every platform: clamp by sign instead of casting.
+				return '-' === $m[1] ? self::MIN_RADIUS : self::MAX_RADIUS;
+			}
+			$number = (int) ( $m[1] . ( '' === $digits ? '0' : $digits ) );
 		} else {
 			return '';
 		}

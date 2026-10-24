@@ -522,6 +522,33 @@ class BlockRegistryTest extends BlockTestCase {
 		}
 	}
 
+	public function test_the_sections_label_says_what_the_editor_shows(): void {
+		$labels = array();
+		foreach ( $this->registry( null )->editor_metadata() as $row ) {
+			$labels[ $row['name'] ] = $row['labels'];
+		}
+
+		// The editor shows one toggle per section, not a comma list.
+		$this->assertSame( 'Sections to show', $labels['odavent-events/event-page']['sections'] );
+	}
+
+	public function test_the_pattern_description_names_find_my_registration_too(): void {
+		$patterns = array();
+		Functions\when( 'register_block_pattern_category' )->justReturn( true );
+		Functions\when( 'register_block_pattern' )->alias(
+			function ( $name, $args ) use ( &$patterns ) {
+				$patterns[] = $args;
+				return true;
+			}
+		);
+
+		$this->registry( null )->register_patterns();
+
+		$this->assertCount( 1, $patterns );
+		$this->assertStringContainsString( 'find my registration', strtolower( $patterns[0]['description'] ) );
+		$this->assertStringContainsString( '<!-- wp:odavent-events/find-registration /-->', $patterns[0]['content'], 'the description matches the content' );
+	}
+
 	public function test_pattern_registers_once_and_contains_every_individual_block(): void {
 		$categories = array();
 		$patterns   = array();

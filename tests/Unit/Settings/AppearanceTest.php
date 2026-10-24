@@ -95,6 +95,20 @@ class AppearanceTest extends TestCase {
 		$this->assertSame( '', Appearance::css( array( 'accent' => 'red;}body{display:none', 'spacing' => 'x' ) ) );
 	}
 
+	public function test_a_very_long_number_is_clamped_not_rejected(): void {
+		$this->assertSame( 24, Appearance::sanitize( array( 'radius' => '9999999999' ) )['radius'] );
+		$this->assertSame( 24, Appearance::sanitize( array( 'radius' => '99999999999999999999999' ) )['radius'] );
+		$this->assertSame( 24, Appearance::sanitize( array( 'radius' => ' 0000000000012345 ' ) )['radius'] );
+		$this->assertSame( 4, Appearance::sanitize( array( 'radius' => '0000000000004' ) )['radius'], 'leading zeros are not magnitude' );
+		$this->assertSame( 0, Appearance::sanitize( array( 'radius' => '-9999999999' ) )['radius'] );
+		$this->assertSame( ':root{--odv-radius:24px;}', Appearance::css( array( 'radius' => '9999999999' ) ) );
+
+		// Everything that is not a plain whole number stays rejected.
+		foreach ( array( '12px', '1e1', '0x10', 12.5, true, '+5', '1.5', '', '1 2' ) as $hostile ) {
+			$this->assertSame( '', Appearance::sanitize( array( 'radius' => $hostile ) )['radius'], var_export( $hostile, true ) );
+		}
+	}
+
 	public function test_css_only_ever_contains_hex_colours_integers_and_fixed_keywords(): void {
 		$css = Appearance::css(
 			array(

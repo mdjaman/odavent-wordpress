@@ -85,7 +85,7 @@
 
 	function radiusOf() {
 		var raw = value( 'radius' ).replace( /^\s+|\s+$/g, '' );
-		if ( !/^-?\d{1,9}$/.test( raw ) ) {
+		if ( !/^-?\d+$/.test( raw ) ) {
 			return '';
 		}
 		var input = field( 'radius' );
@@ -142,7 +142,7 @@
 			}
 			var current = ratio( accent, contrast );
 			if ( ratioText ) {
-				ratioText.textContent = label.replace( '%s', current.toFixed( 2 ).replace( '.', decimal ) );
+				ratioText.textContent = label.replace( /%(?:1\$)?s/, current.toFixed( 2 ).replace( '.', decimal ) );
 			}
 			setHidden( ratioText, false );
 			setHidden( warning, current >= MIN_RATIO );
