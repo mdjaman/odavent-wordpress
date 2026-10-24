@@ -411,8 +411,10 @@ if want 9; then
 		reset_all
 		stub_control "{\"mode\": \"$mode\"}"
 		res=$(get settings-$mode.html "$ODV_SITE/wp-admin/options-general.php?page=odavent-events" -b "$COOKIES")
-		check "9 [$mode] settings page answers 200 (${res%% *}) within 12s (${res##* }s)" \
-			bash -c "[ '${res%% *}' = 200 ] && awk 'BEGIN { exit !(${res##* } <= 12) }'"
+		# The settings page gives the events lookup a 3 s budget (and skips it while the circuit breaker is set),
+		# so it renders in about 3 s even when Odavent hangs, not after the client's 8 s timeout.
+		check "9 [$mode] settings page answers 200 (${res%% *}) within 5s (${res##* }s)" \
+			bash -c "[ '${res%% *}' = 200 ] && awk 'BEGIN { exit !(${res##* } <= 5) }'"
 		check "9 [$mode] settings page falls back to a numeric default-event input" \
 			contains "settings-$mode.html" 'type="number" min="0" class="small-text" id="odavent_events_default_event"'
 	done
