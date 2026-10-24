@@ -137,9 +137,7 @@ class Refresh_Controller {
 	 * @param string $slug     Event slug (sanitised), or ''.
 	 */
 	private function finish_refresh( int $event_id, string $slug ): void {
-		if ( function_exists( 'fastcgi_finish_request' ) ) {
-			fastcgi_finish_request();
-		}
+		$this->close_connection();
 
 		try {
 			$this->purger->purge_event( $event_id );
@@ -155,6 +153,30 @@ class Refresh_Controller {
 		} catch ( \Throwable $e ) {
 			return;
 		}
+	}
+
+	/**
+	 * Sends the answer and closes the connection where the server can (PHP-FPM, LiteSpeed's LSAPI), so the
+	 * slow part does not hold Odavent's ping. Output buffers are flushed first: the finish call only sends
+	 * what reached the SAPI. Elsewhere (mod_php, CGI) this does nothing and the purge simply runs before the
+	 * connection ends.
+	 */
+	private function close_connection(): void {
+		$finish = '';
+		if ( function_exists( 'fastcgi_finish_request' ) ) {
+			$finish = 'fastcgi_finish_request';
+		} elseif ( function_exists( 'litespeed_finish_request' ) ) {
+			$finish = 'litespeed_finish_request';
+		}
+		if ( '' === $finish ) {
+			return;
+		}
+
+		if ( function_exists( 'wp_ob_end_flush_all' ) ) {
+			wp_ob_end_flush_all();
+		}
+		flush();
+		$finish();
 	}
 
 	private function declared_length_too_large( \WP_REST_Request $request ): bool {

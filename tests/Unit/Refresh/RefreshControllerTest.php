@@ -355,6 +355,66 @@ class RefreshControllerTest extends TestCase {
 		$this->assertSame( array( 'finished', 'purged' ), $events );
 	}
 
+	/**
+	 * LiteSpeed's LSAPI has its own finish call; output buffers are flushed before it so the answer leaves.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_on_litespeed_the_buffers_are_flushed_and_the_connection_closed_before_the_purge(): void {
+		$this->assertFalse( function_exists( 'fastcgi_finish_request' ) );
+		$this->assertFalse( function_exists( 'litespeed_finish_request' ) );
+		$events = array();
+		Functions\expect( 'wp_ob_end_flush_all' )->once()->andReturnUsing(
+			static function () use ( &$events ) {
+				$events[] = 'buffers flushed';
+			}
+		);
+		Functions\expect( 'litespeed_finish_request' )->once()->andReturnUsing(
+			static function () use ( &$events ) {
+				$events[] = 'finished';
+			}
+		);
+		$body = $this->valid_body( 7 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once();
+		$this->purger->shouldReceive( 'purge_event' )->once()->andReturnUsing(
+			static function () use ( &$events ) {
+				$events[] = 'purged';
+				return 0;
+			}
+		);
+
+		$this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
+		$this->run_shutdown();
+
+		$this->assertSame( array( 'buffers flushed', 'finished', 'purged' ), $events );
+	}
+
+	/**
+	 * With PHP-FPM, fastcgi_finish_request() is used and LiteSpeed's call is not.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_php_fpm_wins_over_litespeed_and_only_one_finish_call_is_made(): void {
+		$events = array();
+		Functions\when( 'wp_ob_end_flush_all' )->justReturn( null );
+		Functions\expect( 'fastcgi_finish_request' )->once()->andReturnUsing(
+			static function () use ( &$events ) {
+				$events[] = 'fpm';
+			}
+		);
+		Functions\expect( 'litespeed_finish_request' )->never();
+		$body = $this->valid_body( 7 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once();
+		$this->purger->shouldReceive( 'purge_event' )->once()->andReturn( 0 );
+
+		$this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
+		$this->run_shutdown();
+
+		$this->assertSame( array( 'fpm' ), $events );
+	}
+
 	public function test_slug_is_optional_and_sanitised(): void {
 		$body = $this->body( array( 'event_id' => 9 ) );
 		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 9 );
