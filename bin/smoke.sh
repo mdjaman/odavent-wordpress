@@ -22,7 +22,7 @@ trap 'rm -rf "$TMP"' EXIT
 ONLY="${ONLY:-}"
 # A full run prints exactly this many PASS lines. Fewer means a section was skipped (a failed setup step, an
 # early `if` taken): the run fails. Update it when checks are added or removed.
-EXPECTED_PASSES=132
+EXPECTED_PASSES=138
 
 pass() { PASSES=$((PASSES + 1)); printf 'PASS %s\n' "$1"; }
 fail() { FAILS=$((FAILS + 1)); printf 'FAIL %s\n' "$1"; [ -n "${2:-}" ] && printf '     %s\n' "$2"; return 0; }
@@ -262,7 +262,7 @@ fi
 # ---- 5. signed live refresh -----------------------------------------------------------------------------
 
 assert_refresh() { # assert_refresh <label> <site url>
-	local label="$1" site="$2" s0 s1 s2 s3 s4 sig
+	local label="$1" site="$2" s0 s1 s2 s3 s4 s5 s6 sig
 	reset_all
 	get before.html "$site/all-blocks-1/" >/dev/null
 	stub_control '{"rename": {"1": "Renamed Summit 2027"}}'
@@ -286,6 +286,21 @@ assert_refresh() { # assert_refresh <label> <site url>
 	s4=$(ping "$site" p-replay.json "$sig")
 	check "$label the same signed ping replayed is 401 ($s4) with the same body" \
 		bash -c "[ '$s4' = 401 ] && cmp -s '$TMP/p-unsigned.json' '$TMP/p-replay.json'"
+
+	# A ping drops the cached copy but keeps the last good one: if the very next fetch fails, the page still
+	# shows the event (stale, no Register) instead of nothing a page cache would then keep for hours.
+	s5=$(ping "$site" p-good2.json "$("$ODV_ROOT/bin/sign-ping" "$ODV_STUB_KEY" "$PING_BODY" $(( $(date +%s) - 1 )))")
+	stub_control '{"mode": "500"}'
+	get after-ping-500.html "$site/all-blocks-1/" >/dev/null
+	check "$label after a signed ping ($s5), Odavent failing (500) still shows the last good copy" \
+		contains after-ping-500.html "Renamed Summit 2027"
+	check "$label that copy is stale: the 'could not be refreshed' notice and no Register link" \
+		bash -c "grep -qF 'Registration details could not be refreshed.' '$TMP/after-ping-500.html' && [ \"\$1\" = 0 ]" _ "$(register_links after-ping-500.html)"
+	stub_control '{"mode": "ok"}'
+	s6=$(ping "$site" p-good3.json "$("$ODV_ROOT/bin/sign-ping" "$ODV_STUB_KEY" "$PING_BODY" $(( $(date +%s) - 2 )))")
+	get after-recover.html "$site/all-blocks-1/" >/dev/null
+	check "$label once Odavent answers again, the next signed ping ($s6) lifts the breaker and Register is back" \
+		bash -c "[ '$s6' = 200 ] && ! grep -qF 'Registration details could not be refreshed.' '$TMP/after-recover.html' && [ \"\$1\" -ge 1 ]" _ "$(register_links after-recover.html)"
 	stub_control '{"rename": {"1": null}}'
 }
 

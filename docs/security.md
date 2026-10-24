@@ -47,7 +47,8 @@ to the internet, so its only protection is a signature:
   logged, so an attacker cannot fill your logs.
 * Nothing is written before the signature is valid.
 
-What a valid ping can do: drop the cached copy of one event and purge the pages that show it. It carries no
+What a valid ping can do: drop the cached copy of one event (its last good copy is kept) and purge the pages
+that show it. It carries no
 content: the next visitor makes the plugin fetch fresh data with your key. So even a forged or replayed ping
 could, at worst, cause one extra request to Odavent.
 

@@ -149,7 +149,8 @@ class RefreshControllerTest extends TestCase {
 	}
 
 	private function expect_no_purge(): void {
-		$this->repository->shouldNotReceive( 'purge' );
+		$this->repository->shouldNotReceive( 'purge_for_refresh' );
+		$this->repository->shouldNotReceive( 'forget' );
 		$this->purger->shouldNotReceive( 'purge_event' );
 		Actions\expectDone( 'odavent_events_refreshed' )->never();
 	}
@@ -185,7 +186,9 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_valid_ping_purges_the_event_and_fires_the_action(): void {
 		$body = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->once()->with( 7 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 7 );
+		// A change is not a deletion: the last good copy must survive the ping.
+		$this->repository->shouldNotReceive( 'forget' );
 		$this->purger->shouldReceive( 'purge_event' )->once()->with( 7 )->andReturn( 2 );
 		Actions\expectDone( 'odavent_events_refreshed' )->once()->with( 7, 'annual-tech-summit' );
 
@@ -199,7 +202,7 @@ class RefreshControllerTest extends TestCase {
 		// Not (int)'banana' = 0: that would reject every real ping. The real clock is used instead.
 		$this->now_filter = 'banana';
 		$body             = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->once()->with( 7 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 7 );
 		$this->purger->shouldReceive( 'purge_event' )->once()->with( 7 )->andReturn( 0 );
 
 		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body, time() ) ) );
@@ -218,7 +221,7 @@ class RefreshControllerTest extends TestCase {
 	public function test_a_digit_string_clock_filter_is_used(): void {
 		$this->now_filter = (string) self::NOW;
 		$body             = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->once()->with( 7 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 7 );
 		$this->purger->shouldReceive( 'purge_event' )->once()->with( 7 )->andReturn( 0 );
 
 		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
@@ -228,7 +231,7 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_lowercase_header_name_is_accepted(): void {
 		$body = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->once()->with( 7 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 7 );
 		$this->purger->shouldReceive( 'purge_event' )->once()->andReturn( 0 );
 
 		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body ), 'x-odavent-signature' ) );
@@ -239,7 +242,7 @@ class RefreshControllerTest extends TestCase {
 	public function test_replay_marker_is_written_after_a_valid_ping(): void {
 		$body = $this->valid_body( 7 );
 		$sig  = $this->sign( $body );
-		$this->repository->shouldReceive( 'purge' )->once();
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once();
 		$this->purger->shouldReceive( 'purge_event' )->once()->andReturn( 0 );
 
 		$this->controller()->handle( $this->request( $body, $sig ) );
@@ -260,7 +263,7 @@ class RefreshControllerTest extends TestCase {
 	public function test_the_response_is_sent_before_the_page_caches_are_purged(): void {
 		$body   = $this->valid_body( 7 );
 		$events = array();
-		$this->repository->shouldReceive( 'purge' )->once()->with( 7 )->andReturnUsing(
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 7 )->andReturnUsing(
 			static function () use ( &$events ) {
 				$events[] = 'repository purged';
 			}
@@ -289,7 +292,7 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_a_purger_that_throws_does_not_change_the_answer_nor_escape_shutdown(): void {
 		$body = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->once();
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once();
 		$this->purger->shouldReceive( 'purge_event' )->once()->andThrow( new \RuntimeException( 'cache plugin exploded ' . self::KEY ) );
 		Actions\expectDone( 'odavent_events_refreshed' )->never();
 
@@ -314,7 +317,7 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_a_repository_failure_defers_nothing(): void {
 		$body = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->andThrow( new \RuntimeException( 'db down' ) );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->andThrow( new \RuntimeException( 'db down' ) );
 		$this->purger->shouldNotReceive( 'purge_event' );
 
 		$this->assertSame( 500, $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) )->get_status() );
@@ -337,7 +340,7 @@ class RefreshControllerTest extends TestCase {
 			}
 		);
 		$body = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->once();
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once();
 		$this->purger->shouldReceive( 'purge_event' )->once()->andReturnUsing(
 			static function () use ( &$events ) {
 				$events[] = 'purged';
@@ -354,7 +357,7 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_slug_is_optional_and_sanitised(): void {
 		$body = $this->body( array( 'event_id' => 9 ) );
-		$this->repository->shouldReceive( 'purge' )->once()->with( 9 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 9 );
 		$this->purger->shouldReceive( 'purge_event' )->once()->with( 9 )->andReturn( 0 );
 		Actions\expectDone( 'odavent_events_refreshed' )->once()->with( 9, '' );
 
@@ -363,7 +366,7 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_hostile_slug_is_sanitised_before_the_action(): void {
 		$body = $this->body( array( 'event_id' => 9, 'event_slug' => '<script>x</script>' ) );
-		$this->repository->shouldReceive( 'purge' )->once();
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once();
 		$this->purger->shouldReceive( 'purge_event' )->once()->andReturn( 0 );
 		Actions\expectDone( 'odavent_events_refreshed' )->once()->with( 9, '-script-x-script-' );
 
@@ -373,7 +376,7 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_unknown_event_id_still_returns_200(): void {
 		$body = $this->valid_body( 424242 );
-		$this->repository->shouldReceive( 'purge' )->once()->with( 424242 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 424242 );
 		$this->purger->shouldReceive( 'purge_event' )->once()->with( 424242 )->andReturn( 0 );
 
 		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
@@ -383,7 +386,7 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_failure_while_purging_is_a_generic_500_not_a_fatal(): void {
 		$body = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->andThrow( new \RuntimeException( 'db down ' . self::KEY ) );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->andThrow( new \RuntimeException( 'db down ' . self::KEY ) );
 		$this->purger->shouldNotReceive( 'purge_event' );
 
 		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
@@ -398,7 +401,7 @@ class RefreshControllerTest extends TestCase {
 	public function test_replay_of_the_same_signature_is_rejected(): void {
 		$body = $this->valid_body( 7 );
 		$sig  = $this->sign( $body );
-		$this->repository->shouldReceive( 'purge' )->once();
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once();
 		$this->purger->shouldReceive( 'purge_event' )->once()->andReturn( 0 );
 
 		$first  = $this->controller()->handle( $this->request( $body, $sig ) );
@@ -442,7 +445,7 @@ class RefreshControllerTest extends TestCase {
 
 	public function test_every_authentication_failure_has_the_identical_response(): void {
 		$body = $this->valid_body( 7 );
-		$this->repository->shouldReceive( 'purge' )->once();
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once();
 		$this->purger->shouldReceive( 'purge_event' )->once()->andReturn( 0 );
 
 		$responses = array();
@@ -504,7 +507,7 @@ class RefreshControllerTest extends TestCase {
 		$prefix = '{"event_id":7,"pad":"';
 		$body   = $prefix . str_repeat( 'x', 8192 - strlen( $prefix ) - 2 ) . '"}';
 		$this->assertSame( 8192, strlen( $body ) );
-		$this->repository->shouldReceive( 'purge' )->once()->with( 7 );
+		$this->repository->shouldReceive( 'purge_for_refresh' )->once()->with( 7 );
 		$this->purger->shouldReceive( 'purge_event' )->once()->andReturn( 0 );
 
 		$this->assertSame( 200, $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) )->get_status() );

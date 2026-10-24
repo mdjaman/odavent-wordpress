@@ -162,13 +162,28 @@ class Event_Repository {
 	}
 
 	/**
-	 * Forgets one event: public and preview transients (including markers) and last-good copies
-	 * in every locale, its slug mapping, the events list and this request's memo.
+	 * A signed refresh ping said the event changed: the next page view must ask Odavent again, but if that
+	 * fetch fails the last good copy is still served (as stale). So this drops the public and preview
+	 * transients (including markers) in every locale, the events list and this request's memo, and keeps the
+	 * last-good copies and the slug map. Odavent just proved it is reachable, so the breaker is lifted too.
 	 *
 	 * @param int $event_id Odavent event id.
 	 */
-	public function purge( int $event_id ): void {
-		$this->purge_event_caches( $event_id );
+	public function purge_for_refresh( int $event_id ): void {
+		$this->purge_event_caches( $event_id, false );
+		delete_transient( self::LIST_TRANSIENT );
+		delete_transient( self::BACKOFF );
+	}
+
+	/**
+	 * Forgets one event entirely: public and preview transients (including markers) and last-good copies
+	 * in every locale, its slug mapping, the events list and this request's memo. For an event Odavent says
+	 * no longer exists for this key; a plain change is purge_for_refresh().
+	 *
+	 * @param int $event_id Odavent event id.
+	 */
+	public function forget( int $event_id ): void {
+		$this->purge_event_caches( $event_id, true );
 		delete_transient( self::LIST_TRANSIENT );
 
 		$slugs = $this->slug_map();
@@ -196,7 +211,7 @@ class Event_Repository {
 	 */
 	public function purge_all(): void {
 		foreach ( $this->index() as $event_id ) {
-			$this->purge_event_caches( $event_id );
+			$this->purge_event_caches( $event_id, true );
 		}
 		$this->purge_untracked();
 
@@ -212,13 +227,18 @@ class Event_Repository {
 
 	/**
 	 * Per-event cache entries in every locale, plus this request's memos. The slug map and the index are the
-	 * caller's business (purge() edits them, purge_all() deletes them), so a bulk purge rewrites nothing per id.
+	 * caller's business (forget() edits them, purge_all() deletes them), so a bulk purge rewrites nothing per id.
+	 *
+	 * @param int  $event_id       Odavent event id.
+	 * @param bool $with_last_good Whether the last-good copies go too.
 	 */
-	private function purge_event_caches( int $event_id ): void {
+	private function purge_event_caches( int $event_id, bool $with_last_good ): void {
 		foreach ( Locale::all_key_parts() as $loc ) {
 			delete_transient( $this->public_key( $event_id, $loc ) );
 			delete_transient( $this->preview_key( $event_id, $loc ) );
-			delete_option( $this->lastgood_key( $event_id, $loc ) );
+			if ( $with_last_good ) {
+				delete_option( $this->lastgood_key( $event_id, $loc ) );
+			}
 		}
 
 		foreach ( array_keys( $this->memo ) as $memo_key ) {
@@ -336,7 +356,7 @@ class Event_Repository {
 				return $this->public_read( $id, $slug_hint, $preview_allowed, $locale, $loc );
 
 			case Result::NOT_FOUND:
-				$this->purge( $id );
+				$this->forget( $id );
 				$this->set_marker( $id, $loc, self::MARKER_GONE, min( $this->ttl(), self::GONE_MAX_TTL ) );
 				return Event_View::empty( Event_View::GONE );
 

@@ -18,7 +18,8 @@ use Odavent\Events\Settings\Options;
  *     than the 2 x 300 s window in which a timestamp is accepted, so a captured ping cannot be replayed
  *     while its timestamp still passes.
  *
- * The event's own cache is forgotten before answering (the next page view is fresh). Purging the page
+ * The event's own cache is dropped before answering (the next page view is fresh), but its last good copy is
+ * kept, so a next fetch that fails still shows the event (as stale) instead of an empty page. Purging the page
  * caches of the posts that show Odavent content can be slow on a big site, and Odavent gives a ping 10 s
  * (then retries), so that part runs on `shutdown`, after the 200 has been sent when the server allows it.
  * Every authentication failure gets the same 401 response, so a caller cannot tell a missing key
@@ -116,7 +117,7 @@ class Refresh_Controller {
 		$event_id = $data['event_id'];
 		$slug     = isset( $data['event_slug'] ) && is_string( $data['event_slug'] ) ? sanitize_title( $data['event_slug'] ) : '';
 
-		$this->repository->purge( $event_id );
+		$this->repository->purge_for_refresh( $event_id );
 
 		add_action(
 			'shutdown',

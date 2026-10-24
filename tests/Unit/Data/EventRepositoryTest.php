@@ -388,7 +388,7 @@ class EventRepositoryTest extends TestCase {
 		$repo->get( 42 );
 		$this->assertSame( 120, $this->ttl_of( $this->pub( 42 ) ) );
 
-		$repo->purge( 42 );
+		$repo->purge_for_refresh( 42 );
 		$this->assertNull( $this->transient( $this->pub( 42 ) ) );
 		$this->assertSame( Event_View::LIVE, $this->repo()->get( 42 )->state() );
 	}
@@ -872,7 +872,7 @@ class EventRepositoryTest extends TestCase {
 		$this->answer( 'site_event', Result::ok( $payload ), Result::ok( $payload ) );
 		$repo = $this->repo();
 		$repo->get( 7 );
-		$repo->purge( 7 );
+		$repo->purge_for_refresh( 7 );
 
 		$repo->get( 7, '', true );
 
@@ -1048,7 +1048,81 @@ class EventRepositoryTest extends TestCase {
 
 	// ---- purge -------------------------------------------------------------------
 
-	public function test_purge_removes_every_locale_marker_last_good_and_memo(): void {
+	public function test_purge_for_refresh_removes_every_locale_marker_and_memo_but_keeps_last_good(): void {
+		$repo = $this->repo();
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+		$repo->get( 42 );
+		$this->options[ Event_Repository::SLUGS_OPTION ] = array( 'sommet-tech-abidjan-2026' => 42 );
+
+		foreach ( array( 'en', 'fr', 'default' ) as $loc ) {
+			$this->transients[ $this->pub( 42, $loc ) ] = array( array( '__state' => 'draft' ), 0 );
+			$this->transients[ $this->pvw( 42, $loc ) ] = array( $this->payload( 'draft' ), 0 );
+			$this->seed_last_good( 42, $this->payload(), $loc );
+		}
+		$this->transients[ $this->pub( 43, 'en' ) ]          = array( $this->payload(), 0 );
+		$this->transients[ Event_Repository::LIST_TRANSIENT ] = array( $this->fixture( 'events-list' ), 0 );
+
+		$repo->purge_for_refresh( 42 );
+
+		foreach ( array( 'en', 'fr', 'default' ) as $loc ) {
+			$this->assertNull( $this->transient( $this->pub( 42, $loc ) ), "public {$loc}" );
+			$this->assertNull( $this->transient( $this->pvw( 42, $loc ) ), "preview {$loc}" );
+			$this->assertSame( $this->payload(), $this->options[ $this->lastgood( 42, $loc ) ], "last-good {$loc} is kept" );
+		}
+		$this->assertNotNull( $this->transient( $this->pub( 43, 'en' ) ), 'other events are untouched' );
+		$this->assertNull( $this->transient( Event_Repository::LIST_TRANSIENT ) );
+		$this->assertSame( array( 'sommet-tech-abidjan-2026' => 42 ), $this->options[ Event_Repository::SLUGS_OPTION ], 'the slug map is kept' );
+
+		// Memo cleared: the same repository fetches again.
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+		$repo->get( 42 );
+		$this->assertCount( 2, $this->calls );
+	}
+
+	public function test_after_a_refresh_a_failing_fetch_still_serves_the_last_good_copy_as_stale(): void {
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+		$this->repo()->get( 42 );
+
+		$this->repo()->purge_for_refresh( 42 );
+
+		foreach ( array( 0, 429, 500, 503 ) as $code ) {
+			$this->transients = array_diff_key( $this->transients, array( Event_Repository::BACKOFF => 1 ) );
+			$this->answer( 'site_event', $this->fail_result( Result::UNAVAILABLE, $code ) );
+			$view = $this->repo()->get( 42 );
+
+			$this->assertTrue( $view->is_stale(), (string) $code );
+			$this->assertTrue( $view->has_content(), (string) $code );
+			$this->assertSame( $this->payload()['event'], $view->event(), (string) $code );
+		}
+	}
+
+	public function test_after_a_refresh_an_active_breaker_still_serves_the_last_good_copy(): void {
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+		$this->repo()->get( 42 );
+		$repo = $this->repo();
+		$repo->purge_for_refresh( 42 );
+		// Another request trips the breaker after the ping.
+		$this->transients[ Event_Repository::BACKOFF ] = array( 1, $this->now + 60 );
+
+		$view = $this->repo()->get( 42 );
+
+		$this->assertTrue( $view->is_stale() );
+		$this->assertTrue( $view->has_content() );
+		$this->assertCount( 1, $this->calls );
+	}
+
+	public function test_purge_for_refresh_lifts_the_breaker(): void {
+		$this->transients[ Event_Repository::BACKOFF ] = array( 1, $this->now + 60 );
+
+		$this->repo()->purge_for_refresh( 42 );
+
+		$this->assertNull( $this->transient( Event_Repository::BACKOFF ) );
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+		$this->assertSame( Event_View::LIVE, $this->repo()->get( 42 )->state() );
+		$this->assertCount( 1, $this->calls, 'the next page view asks Odavent at once' );
+	}
+
+	public function test_forget_removes_every_locale_marker_last_good_and_memo(): void {
 		$repo = $this->repo();
 		$this->answer( 'site_event', Result::ok( $this->payload() ) );
 		$repo->get( 42 );
@@ -1060,7 +1134,7 @@ class EventRepositoryTest extends TestCase {
 		}
 		$this->transients[ $this->pub( 43, 'en' ) ] = array( $this->payload(), 0 );
 
-		$repo->purge( 42 );
+		$repo->forget( 42 );
 
 		foreach ( array( 'en', 'fr', 'default' ) as $loc ) {
 			$this->assertNull( $this->transient( $this->pub( 42, $loc ) ), "public {$loc}" );
@@ -1080,7 +1154,7 @@ class EventRepositoryTest extends TestCase {
 		$this->repo()->get( 42 );
 
 		$repo = $this->repo();
-		$repo->purge( 42 );
+		$repo->purge_for_refresh( 42 );
 
 		$this->assertSame( Event_View::LIVE, $repo->get( 42 )->state() );
 	}
