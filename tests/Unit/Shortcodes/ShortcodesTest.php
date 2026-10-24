@@ -104,7 +104,8 @@ class ShortcodesTest extends BlockTestCase {
 			$this->assertIsString( $out );
 			$this->assertStringContainsString( 'odv-speakers', $out );
 		}
-		$this->assertSame( array(), array_filter( $this->enqueued_scripts ) );
+		// The speakers carry photos, so only the image script (never the agenda or countdown ones) is asked for.
+		$this->assertSame( array( 'odavent-events-image-fallback' ), array_values( array_unique( $this->enqueued_scripts ) ) );
 	}
 
 	public function test_each_shortcode_renders_the_same_html_as_its_block(): void {

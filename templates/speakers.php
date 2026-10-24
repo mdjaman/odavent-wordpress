@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 <?php foreach ( $speakers as $speaker ) : ?>
 		<li class="odv-speakers__item<?php echo $speaker['featured'] ? ' odv-speakers__item--featured' : ''; ?>">
 <?php if ( '' !== $speaker['photo_url'] ) : ?>
-			<img class="odv-speakers__photo" src="<?php echo esc_url( $speaker['photo_url'] ); ?>" alt="<?php echo esc_attr( $speaker['name'] ); ?>" loading="lazy" decoding="async" width="96" height="96">
+			<img class="odv-speakers__photo" src="<?php echo esc_url( $speaker['photo_url'] ); ?>" alt="<?php echo esc_attr( $speaker['name'] ); ?>" loading="lazy" decoding="async" width="96" height="96" data-odv-img="photo" data-odv-initials="<?php echo esc_attr( $speaker['initials'] ); ?>">
 <?php else : ?>
 			<span class="odv-speakers__photo odv-speakers__photo--placeholder" aria-hidden="true"><?php echo esc_html( $speaker['initials'] ); ?></span>
 <?php endif; ?>

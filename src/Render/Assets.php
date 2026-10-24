@@ -10,7 +10,7 @@ use Odavent\Events\Settings\Options;
 final class Assets {
 
 	const STYLE_HANDLE = 'odavent-events';
-	const SCRIPTS      = array( 'countdown', 'agenda-filter' );
+	const SCRIPTS      = array( 'countdown', 'agenda-filter', 'image-fallback' );
 
 	/** @var Options */
 	private $options;
@@ -87,7 +87,7 @@ final class Assets {
 	 *
 	 * Before WordPress 6.3 the array form of the last argument is read as "in footer" (true), which is the same placement.
 	 *
-	 * @param string $handle `countdown` or `agenda-filter`; anything else is ignored.
+	 * @param string $handle `countdown`, `agenda-filter` or `image-fallback`; anything else is ignored.
 	 */
 	public function enqueue_script( string $handle ): void {
 		if ( ! in_array( $handle, self::SCRIPTS, true ) ) {

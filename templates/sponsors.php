@@ -26,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
 		<ul class="<?php echo esc_attr( $list_class ); ?>">
 <?php foreach ( $group['items'] as $item ) : ?>
 			<li class="odv-sponsors__item<?php echo $item['featured'] ? ' odv-sponsors__item--featured' : ''; ?>">
-				<?php if ( '' !== $item['link_url'] ) : ?><a class="odv-sponsors__link" href="<?php echo esc_url( $item['link_url'] ); ?>" rel="sponsored noopener"><?php endif; ?><?php if ( '' !== $item['logo_url'] ) : ?><img class="odv-sponsors__logo" src="<?php echo esc_url( $item['logo_url'] ); ?>" alt="<?php echo esc_attr( $item['name'] ); ?>" loading="lazy" decoding="async"><?php else : ?><span class="odv-sponsors__name"><?php echo esc_html( $item['name'] ); ?></span><?php endif; ?><?php if ( '' !== $item['link_url'] ) : ?></a><?php endif; ?>
+				<?php if ( '' !== $item['link_url'] ) : ?><a class="odv-sponsors__link" href="<?php echo esc_url( $item['link_url'] ); ?>" rel="sponsored noopener"><?php endif; ?><?php if ( '' !== $item['logo_url'] ) : ?><img class="odv-sponsors__logo" src="<?php echo esc_url( $item['logo_url'] ); ?>" alt="<?php echo esc_attr( $item['name'] ); ?>" loading="lazy" decoding="async" data-odv-img="logo"><?php else : ?><span class="odv-sponsors__name"><?php echo esc_html( $item['name'] ); ?></span><?php endif; ?><?php if ( '' !== $item['link_url'] ) : ?></a><?php endif; ?>
 
 <?php if ( '' !== trim( $item['description'] ) ) : ?>
 				<div class="odv-sponsors__description"><?php echo $item['description']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitizer::html() allow-list. ?></div>

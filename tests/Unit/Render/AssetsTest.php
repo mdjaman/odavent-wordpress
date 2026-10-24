@@ -56,6 +56,7 @@ class AssetsTest extends RenderTestCase {
 		return array(
 			'countdown'     => array( 'countdown' ),
 			'agenda filter' => array( 'agenda-filter' ),
+			'image fallback' => array( 'image-fallback' ),
 		);
 	}
 
@@ -97,6 +98,7 @@ class AssetsTest extends RenderTestCase {
 	public function test_the_script_files_exist(): void {
 		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/js/countdown.js' );
 		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/js/agenda-filter.js' );
+		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/js/image-fallback.js' );
 		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/css/odavent.css' );
 	}
 

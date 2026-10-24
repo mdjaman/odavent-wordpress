@@ -70,7 +70,8 @@ Every block renders one `section` with a root class, and its parts use BEM names
 What the scripts depend on, if you override these templates: `.odv-agenda__filter` buttons with a
 `data-track` attribute, sessions with a matching `data-track`, and `.odv-agenda__day` /
 `.odv-agenda__session` (the agenda filter); the `data-*` attributes and the `.odv-countdown__*` classes
-on the countdown. See the notes at the top of `templates/agenda.php` and `templates/countdown.php`.
+on the countdown; and, for the broken-image fallback, `<img>` tags carrying `data-odv-img="photo|logo|cover"` (speaker
+photos also `data-odv-initials`). See the notes at the top of `templates/agenda.php` and `templates/countdown.php`.
 
 ## Template overrides
 

@@ -155,21 +155,26 @@ class BlockRegistryTest extends BlockTestCase {
 		Filters\expectApplied( 'odavent_events_now' )->zeroOrMoreTimes()->andReturn( strtotime( '2026-11-01T00:00:00Z' ) );
 
 		$this->registry( $this->payload() )->render_block( 'odavent-events/event-page', array( 'eventId' => 42 ) );
-		$this->assertEqualsCanonicalizing( array( 'odavent-events-countdown', 'odavent-events-agenda-filter' ), $this->enqueued_scripts );
+		$this->assertEqualsCanonicalizing( array( 'odavent-events-countdown', 'odavent-events-agenda-filter', 'odavent-events-image-fallback' ), $this->enqueued_scripts );
 
 		// Only the scripts whose markup is on the page.
 		$this->enqueued_scripts = array();
 		$this->registry( $this->payload() )->render_block( 'odavent-events/event-page', array( 'eventId' => 42, 'sections' => 'speakers,agenda' ) );
-		$this->assertSame( array( 'odavent-events-agenda-filter' ), $this->enqueued_scripts );
+		$this->assertEqualsCanonicalizing( array( 'odavent-events-agenda-filter', 'odavent-events-image-fallback' ), $this->enqueued_scripts );
 
 		$this->enqueued_scripts = array();
 		$this->registry( $this->payload() )->render_block( 'odavent-events/event-page', array( 'eventId' => 42, 'sections' => 'speakers,venue' ) );
+		$this->assertSame( array( 'odavent-events-image-fallback' ), $this->enqueued_scripts );
+
+		// No image on the page (the venue has none): no image script either.
+		$this->enqueued_scripts = array();
+		$this->registry( $this->payload() )->render_block( 'odavent-events/event-page', array( 'eventId' => 42, 'sections' => 'venue' ) );
 		$this->assertSame( array(), $this->enqueued_scripts );
 
 		// An ended event: no countdown on the page, so no countdown script.
 		$this->enqueued_scripts = array();
 		$this->registry( $this->payload( self::state_overrides()['ended closed'] ) )->render_block( 'odavent-events/event-page', array( 'eventId' => 42 ) );
-		$this->assertSame( array( 'odavent-events-agenda-filter' ), $this->enqueued_scripts );
+		$this->assertEqualsCanonicalizing( array( 'odavent-events-agenda-filter', 'odavent-events-image-fallback' ), $this->enqueued_scripts );
 	}
 
 	public function test_the_event_page_carries_the_lifecycle_notice(): void {

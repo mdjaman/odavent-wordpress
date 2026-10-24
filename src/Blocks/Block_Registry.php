@@ -69,6 +69,7 @@ class Block_Registry {
 	private const SCRIPTS = array(
 		'countdown' => array( 'countdown', 'odv-countdown' ),
 		'agenda'    => array( 'agenda-filter', 'odv-agenda__filters' ),
+		'images'    => array( 'image-fallback', 'data-odv-img' ),
 	);
 
 	/** @var Event_Repository */

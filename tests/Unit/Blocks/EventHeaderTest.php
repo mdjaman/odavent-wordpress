@@ -35,6 +35,22 @@ class EventHeaderTest extends BlockTestCase {
 		$this->assertStringContainsString( '"url":"https://blog.example.com/event-page/"', $html );
 	}
 
+	public function test_cover_and_logo_carry_the_fallback_markers(): void {
+		$html = $this->render( $this->payload() );
+
+		$this->assertMatchesRegularExpression( '#<img class="odv-header__cover"[^>]* data-odv-img="cover">#', $html );
+		$this->assertMatchesRegularExpression( '#<img class="odv-header__logo"[^>]* data-odv-img="logo">#', $html );
+	}
+
+	public function test_the_image_fallback_script_is_enqueued_only_when_an_image_is_rendered(): void {
+		$this->registry( $this->payload() )->render_block( 'odavent-events/event-header', array( 'eventId' => 42 ) );
+		$this->assertSame( array( 'odavent-events-image-fallback' ), $this->enqueued_scripts );
+
+		$this->enqueued_scripts = array();
+		$this->registry( $this->payload() )->render_block( 'odavent-events/event-header', array( 'eventId' => 42, 'showCover' => false, 'showLogo' => false ) );
+		$this->assertSame( array(), $this->enqueued_scripts );
+	}
+
 	public function test_each_part_can_be_turned_off(): void {
 		$html = $this->render(
 			$this->payload(),
