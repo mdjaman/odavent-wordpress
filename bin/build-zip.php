@@ -47,28 +47,40 @@ if ( array() !== $problems ) {
 	odv_fail( "Translations are not release-ready:\n" . implode( "\n", $problems ) );
 }
 
-// What ships. Files at the top level, then whole directories (dot files are always skipped).
+// What ships. Files at the top level, then whole directories, but only the file types that run on a
+// site (an allow-list of extensions per directory, so a stray src/Foo.php.orig, an editor backup or a
+// screenshot never leaks into a release). Symlinks and any path component starting with a dot are
+// skipped. languages/ is handled separately below; its .mo and .json files are generated.
 $top_files = array( 'odavent-events.php', 'uninstall.php', 'readme.txt', 'LICENSE' );
-$top_dirs  = array( 'src', 'templates', 'blocks', 'assets' );
+$top_dirs  = array(
+	'src'       => array( 'php' ),
+	'templates' => array( 'php' ),
+	'blocks'    => array( 'json' ),
+	'assets'    => array( 'css', 'js', 'svg', 'png', 'jpg', 'gif', 'webp' ),
+);
 
 $entries = array(); // Zip path => absolute file.
 foreach ( $top_files as $file ) {
-	if ( ! is_file( "{$source}/{$file}" ) ) {
-		odv_fail( "Missing runtime file {$file}." );
+	if ( ! is_file( "{$source}/{$file}" ) || is_link( "{$source}/{$file}" ) ) {
+		odv_fail( "Missing runtime file {$file} (a symlink does not count)." );
 	}
 	$entries[ $file ] = "{$source}/{$file}";
 }
-foreach ( $top_dirs as $dir ) {
+foreach ( $top_dirs as $dir => $extensions ) {
 	if ( ! is_dir( "{$source}/{$dir}" ) ) {
 		odv_fail( "Missing runtime directory {$dir}/." );
 	}
 	$iterator = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( "{$source}/{$dir}", FilesystemIterator::SKIP_DOTS ) );
 	foreach ( $iterator as $file ) {
 		/** @var SplFileInfo $file */
-		if ( ! $file->isFile() || 0 === strpos( $file->getFilename(), '.' ) ) {
+		if ( ! $file->isFile() || $file->isLink() ) {
 			continue;
 		}
-		$entries[ $dir . '/' . str_replace( '\\', '/', $iterator->getSubPathname() ) ] = $file->getPathname();
+		$sub = str_replace( '\\', '/', $iterator->getSubPathname() );
+		if ( 1 === preg_match( '#(^|/)\.#', $sub ) || ! in_array( strtolower( $file->getExtension() ), $extensions, true ) ) {
+			continue;
+		}
+		$entries[ $dir . '/' . $sub ] = $file->getPathname();
 	}
 }
 // languages/: the template; the .mo and .json files are generated below, the .po sources stay out.
@@ -94,25 +106,58 @@ if ( is_file( $tmp_path ) ) {
 }
 
 $zip = new ZipArchive();
+
+/**
+ * Fails the build and leaves no half-written archive behind.
+ */
+$abort = static function ( string $message ) use ( $zip, $tmp_path ): void {
+	@$zip->unchangeAll(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+	@$zip->close(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+	if ( is_file( $tmp_path ) ) {
+		unlink( $tmp_path );
+	}
+	odv_fail( $message );
+};
+
 if ( true !== $zip->open( $tmp_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
 	odv_fail( "Cannot write {$tmp_path}." );
 }
+
+// Entries carry Unix modes whoever builds the zip: files 0644, folders 0755 (the extracting host's umask
+// would otherwise decide, and a build on a restrictive umask or on Windows ships unreadable files).
+$file_mode = ( 0100000 | 0644 ) << 16;
+$dir_mode  = ( 040000 | 0755 ) << 16;
+
+$names = array( ODV_SLUG . '/' => true );
+foreach ( array_merge( array_keys( $entries ), array_keys( $generated ) ) as $path ) {
+	for ( $dir = dirname( $path ); '.' !== $dir && '/' !== $dir; $dir = dirname( $dir ) ) {
+		$names[ ODV_SLUG . '/' . $dir . '/' ] = true;
+	}
+}
+ksort( $names );
+foreach ( array_keys( $names ) as $name ) {
+	if ( ! $zip->addEmptyDir( rtrim( $name, '/' ) ) || ! $zip->setExternalAttributesName( $name, ZipArchive::OPSYS_UNIX, $dir_mode ) ) {
+		$abort( "Cannot add the folder {$name}." );
+	}
+}
 foreach ( $entries as $path => $absolute ) {
-	if ( ! $zip->addFile( $absolute, ODV_SLUG . '/' . $path ) ) {
-		odv_fail( "Cannot add {$path}." );
+	$name = ODV_SLUG . '/' . $path;
+	if ( ! $zip->addFile( $absolute, $name ) || ! $zip->setExternalAttributesName( $name, ZipArchive::OPSYS_UNIX, $file_mode ) ) {
+		$abort( "Cannot add {$path}." );
 	}
 }
 foreach ( $generated as $path => $bytes ) {
-	if ( ! $zip->addFromString( ODV_SLUG . '/' . $path, $bytes ) ) {
-		odv_fail( "Cannot add {$path}." );
+	$name = ODV_SLUG . '/' . $path;
+	if ( ! $zip->addFromString( $name, $bytes ) || ! $zip->setExternalAttributesName( $name, ZipArchive::OPSYS_UNIX, $file_mode ) ) {
+		$abort( "Cannot add {$path}." );
 	}
 }
 $count = $zip->numFiles;
 if ( ! $zip->close() ) {
-	odv_fail( "Cannot finish {$tmp_path}." );
+	$abort( "Cannot finish {$tmp_path}." );
 }
 if ( ! rename( $tmp_path, $zip_path ) ) {
-	odv_fail( "Cannot move the archive to {$zip_path}." );
+	$abort( "Cannot move the archive to {$zip_path}." );
 }
 
 echo "Built {$zip_path} ({$count} files).\n";

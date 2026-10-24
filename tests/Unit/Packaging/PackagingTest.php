@@ -77,10 +77,12 @@ class PackagingTest extends TestCase {
 	 *
 	 * @return array{0: int, 1: string, 2: string} Exit code, output, output directory.
 	 */
-	private function build( string $version, ?string $source = null ): array {
-		$out = sys_get_temp_dir() . '/odv-out-' . bin2hex( random_bytes( 4 ) );
-		mkdir( $out, 0777, true );
-		self::$cleanup[] = $out;
+	private function build( string $version, ?string $source = null, ?string $out = null ): array {
+		if ( null === $out ) {
+			$out = sys_get_temp_dir() . '/odv-out-' . bin2hex( random_bytes( 4 ) );
+			mkdir( $out, 0777, true );
+			self::$cleanup[] = $out;
+		}
 
 		$cmd = escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( self::$root . '/bin/build-zip.php' )
 			. ' ' . escapeshellarg( $version )
@@ -187,6 +189,79 @@ class PackagingTest extends TestCase {
 			$this->assertNotSame( '.po', substr( $relative, -3 ), "Translation source shipped: {$name}" );
 			$this->assertSame( 0, preg_match( '#(^|/)\.[^/]#', $relative ), "Dotfile shipped: {$name}" );
 		}
+	}
+
+	public function test_only_allow_listed_file_types_are_shipped_and_symlinks_and_hidden_paths_are_not(): void {
+		$copy = self::copy_tree();
+		mkdir( $copy . '/src/.hidden', 0777, true );
+		mkdir( $copy . '/assets/images', 0777, true );
+		file_put_contents( $copy . '/src/Plugin.php.orig', '<?php // backup' );
+		file_put_contents( $copy . '/src/Plugin.php~', '<?php // editor backup' );
+		file_put_contents( $copy . '/src/.hidden/x.php', '<?php // hidden folder' );
+		file_put_contents( $copy . '/src/notes.txt', 'notes' );
+		file_put_contents( $copy . '/assets/images/logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>' );
+		file_put_contents( $copy . '/assets/images/design.psd', 'psd' );
+		file_put_contents( $copy . '/blocks/speakers/README.md', 'x' );
+		file_put_contents( $copy . '/templates/venue.php.bak', 'x' );
+		file_put_contents( $copy . '/secret.php', '<?php // outside the allow-list' );
+		$this->assertTrue( symlink( $copy . '/src/Plugin.php', $copy . '/src/Linked.php' ) );
+		$this->assertTrue( symlink( $copy . '/secret.php', $copy . '/assets/js/linked.js' ) );
+
+		list( $code, $output, $out ) = $this->build( '0.1.0', $copy );
+		$this->assertSame( 0, $code, $output );
+		$names = $this->entries( $out . '/odavent-events-0.1.0.zip' );
+
+		$this->assertContains( 'odavent-events/src/Plugin.php', $names );
+		$this->assertContains( 'odavent-events/assets/images/logo.svg', $names, 'An allow-listed type in a new folder ships.' );
+		foreach ( array( 'src/Plugin.php.orig', 'src/Plugin.php~', 'src/.hidden/x.php', 'src/notes.txt', 'src/Linked.php', 'assets/js/linked.js', 'assets/images/design.psd', 'blocks/speakers/README.md', 'templates/venue.php.bak', 'secret.php' ) as $leak ) {
+			$this->assertNotContains( 'odavent-events/' . $leak, $names, "{$leak} must not ship." );
+		}
+		$this->assertSame( array(), array_filter( $names, function ( $name ) { return false !== strpos( $name, '.hidden' ); } ) );
+	}
+
+	public function test_entries_carry_unix_modes_0644_for_files_and_0755_for_folders(): void {
+		$zip = new \ZipArchive();
+		$zip->open( $this->built_zip() );
+
+		$files = 0;
+		$dirs  = 0;
+		$seen  = array();
+		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+			$name = (string) $zip->getNameIndex( $i );
+			$this->assertTrue( $zip->getExternalAttributesIndex( $i, $opsys, $attributes ), $name );
+			$this->assertSame( \ZipArchive::OPSYS_UNIX, $opsys, $name );
+			$mode = ( $attributes >> 16 ) & 0777;
+			if ( '/' === substr( $name, -1 ) ) {
+				$this->assertSame( 0755, $mode, "Folder mode of {$name}" );
+				++$dirs;
+			} else {
+				$this->assertSame( 0644, $mode, "File mode of {$name}" );
+				++$files;
+			}
+			$seen[] = $name;
+		}
+		$zip->close();
+
+		$this->assertGreaterThan( 20, $files );
+		$this->assertGreaterThan( 3, $dirs );
+		// Generated files get the same modes as copied ones.
+		$this->assertContains( 'odavent-events/languages/odavent-events-fr_FR.mo', $seen );
+		$this->assertContains( 'odavent-events/languages/odavent-events-fr_FR-' . md5( 'assets/js/editor.js' ) . '.json', $seen );
+		$this->assertContains( 'odavent-events/src/', $seen );
+	}
+
+	public function test_a_failure_after_the_archive_was_opened_leaves_no_partial_file(): void {
+		$out = sys_get_temp_dir() . '/odv-out-' . bin2hex( random_bytes( 4 ) );
+		mkdir( $out . '/odavent-events-0.1.0.zip', 0777, true ); // The final name is taken by a folder: the last step fails.
+		file_put_contents( $out . '/odavent-events-0.1.0.zip/keep', 'x' );
+		self::$cleanup[] = $out;
+
+		list( $code, $output ) = $this->build( '0.1.0', null, $out );
+
+		$this->assertNotSame( 0, $code, $output );
+		$this->assertStringContainsString( 'Cannot move the archive', $output );
+		$this->assertFileDoesNotExist( $out . '/odavent-events-0.1.0.zip.partial' );
+		$this->assertSame( array(), glob( $out . '/*.partial' ) ?: array() );
 	}
 
 	public function test_the_plugin_header_inside_the_zip_has_the_requested_version(): void {
