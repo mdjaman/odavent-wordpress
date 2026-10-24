@@ -107,8 +107,8 @@ example a call to the CDN's API with `get_permalink( $post_id )`).
 | Published, open (`LIVE`) | Everything; Register button and ticket links when registration is open and a ticket is on sale | The same |
 | Published and finished (`ENDED`) | Everything, with "This event has ended." above the header and register blocks. The countdown shows "Event ended". Register is shown only if Odavent still reports registration open | The same |
 | `PAUSED` | Everything, with "Registration is temporarily closed." and no Register or ticket links. A countdown whose start has passed hides itself | The same |
-| `CANCELLED` | Everything, with "This event has been cancelled." and no Register or ticket links | The same |
-| `ARCHIVED` | Treated like ended: "This event has ended.", no Register | The same |
+| `CANCELLED` | Everything, with "This event has been cancelled." and no Register or ticket links; no countdown and no "Add to calendar" links | The same |
+| `ARCHIVED` | Treated like ended: "This event has ended.", no Register; no countdown and no "Add to calendar" links | The same |
 | `DRAFT` (not published) | Nothing | The draft content with "Draft preview: this event is not published on Odavent yet. Visitors do not see it." Register links appear once published. Never page-cached |
 | `GONE` (deleted, unpublished or not in your organization) | Nothing | A notice: "This Odavent event was not found or is no longer published. Choose another event in the block settings." |
 | `UNAVAILABLE`, no copy (Odavent unreachable, never cached) | Nothing | A notice: "Odavent could not be reached and there is no saved copy of this event yet." |

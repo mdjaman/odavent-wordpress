@@ -136,7 +136,8 @@ Example: `[odavent_venue event="annual-summit" show_map_link="no"]`
 
 ## `[odavent_add_to_calendar]`
 
-Links to add the event to Google Calendar, Outlook or a calendar file.
+Links to add the event to Google Calendar, Outlook or a calendar file. Nothing is shown for a cancelled or
+archived event.
 
 | Attribute | Type | Default |
 |---|---|---|

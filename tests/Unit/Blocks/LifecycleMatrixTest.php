@@ -222,9 +222,9 @@ class LifecycleMatrixTest extends BlockTestCase {
 	// ---- content blocks ------------------------------------------------------------------------
 
 	/**
-	 * Speakers, agenda, sponsors, venue and calendar keep showing their content when the event is paused,
-	 * cancelled, archived, ended, a draft preview or a stale copy, and never offer registration. The
-	 * countdown goes away when its promise (a start to wait for) is false.
+	 * Speakers, agenda, sponsors and venue keep showing their content when the event is paused, cancelled,
+	 * archived, ended, a draft preview or a stale copy, and never offer registration. The countdown and the
+	 * calendar links go away when their promise (a date to keep) is false: cancelled or archived.
 	 */
 	public function test_content_blocks_keep_their_content_and_never_offer_registration(): void {
 		Filters\expectApplied( 'odavent_events_now' )->zeroOrMoreTimes()->andReturn( strtotime( '2026-11-01T00:00:00Z' ) );
@@ -239,7 +239,7 @@ class LifecycleMatrixTest extends BlockTestCase {
 			foreach ( self::CONTENT_BLOCKS as $block ) {
 				$html = $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42 ) );
 
-				if ( 'countdown' === $block && ! $expect_countdown[ $state ] ) {
+				if ( in_array( $block, array( 'countdown', 'add-to-calendar' ), true ) && ! $expect_countdown[ $state ] ) {
 					$this->assertSame( '', $html, $state . ' ' . $block );
 					continue;
 				}
@@ -261,6 +261,10 @@ class LifecycleMatrixTest extends BlockTestCase {
 
 			foreach ( array( 'speakers', 'agenda', 'sponsors', 'venue', 'add-to-calendar' ) as $block ) {
 				$html = $registry->render_block( 'odavent-events/' . $block, array( 'eventId' => 42 ) );
+				if ( 'add-to-calendar' === $block && 'cancelled' === $state ) {
+					$this->assertSame( '', $html, 'no calendar links for a cancelled event, stale or not' );
+					continue;
+				}
 				$this->assertNotSame( '', $html, $state . ' ' . $block );
 				$this->assertStringNotContainsString( 'odv-notice', $html, $state . ' ' . $block );
 				$this->assertStringNotContainsString( 'register', $html, $state . ' ' . $block );

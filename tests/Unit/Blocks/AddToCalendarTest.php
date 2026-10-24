@@ -74,11 +74,26 @@ class AddToCalendarTest extends BlockTestCase {
 		$this->assertSame( '', $this->render( $this->payload( array(), 'payload-v1-hostile' ) ) );
 	}
 
-	public function test_it_renders_for_cancelled_ended_and_stale_events_too(): void {
-		foreach ( array( 'live', 'ended open', 'paused', 'cancelled', 'archived' ) as $state ) {
+	public function test_it_renders_for_live_ended_and_paused_events(): void {
+		foreach ( array( 'live', 'ended open', 'paused' ) as $state ) {
 			$html = $this->registry( $this->payload( self::state_overrides()[ $state ] ) )->render_block( 'odavent-events/add-to-calendar', array( 'eventId' => 42 ) );
 			$this->assertStringContainsString( 'odv-calendar__link', $html, $state );
 			$this->assertStringNotContainsString( 'odv-notice', $html, $state );
 		}
+	}
+
+	public function test_it_renders_nothing_for_a_cancelled_or_archived_event(): void {
+		foreach ( array( 'cancelled', 'archived' ) as $state ) {
+			$this->assertSame( '', $this->registry( $this->payload( self::state_overrides()[ $state ] ) )->render_block( 'odavent-events/add-to-calendar', array( 'eventId' => 42 ) ), $state );
+			$this->assertSame( '', $this->render( $this->payload( self::state_overrides()[ $state ] ) ), $state );
+		}
+	}
+
+	public function test_a_stale_copy_of_a_live_event_still_offers_the_links_but_not_of_a_cancelled_one(): void {
+		$live = Event_View::from_payload( $this->payload( self::state_overrides()['live'] ), false, true );
+		$this->assertStringContainsString( 'odv-calendar__link', ( new Add_To_Calendar() )->render( $live, array() ) );
+
+		$cancelled = Event_View::from_payload( $this->payload( self::state_overrides()['cancelled'] ), false, true );
+		$this->assertSame( '', ( new Add_To_Calendar() )->render( $cancelled, array() ) );
 	}
 }

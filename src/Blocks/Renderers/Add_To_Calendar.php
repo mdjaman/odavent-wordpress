@@ -10,10 +10,16 @@ use Odavent\Events\Render\Template;
 /**
  * "Add to calendar" links (Google, Outlook, .ics file) built by Odavent. A link is shown only when its
  * URL is a valid http(s) URL; with none, nothing is shown.
+ *
+ * Like the countdown, it invites people to keep a date, so it is hidden for a cancelled or archived event.
  */
 final class Add_To_Calendar implements Renderer {
 
 	public function render( Event_View $view, array $atts ): string {
+		if ( in_array( $view->state(), array( Event_View::CANCELLED, Event_View::ARCHIVED ), true ) ) {
+			return '';
+		}
+
 		$event    = $view->event();
 		$calendar = isset( $event['calendar'] ) && is_array( $event['calendar'] ) ? $event['calendar'] : array();
 
