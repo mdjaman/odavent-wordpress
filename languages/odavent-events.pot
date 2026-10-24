@@ -9,16 +9,16 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-24T20:43:31+00:00\n"
+"POT-Creation-Date: 2026-10-24T22:07:37+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: odavent-events\n"
 
 #. Plugin Name of the plugin
 #: odavent-events.php
-#: src/Settings/Settings_Page.php:59
-#: src/Settings/Settings_Page.php:60
-#: src/Settings/Settings_Page.php:226
+#: src/Settings/Settings_Page.php:68
+#: src/Settings/Settings_Page.php:69
+#: src/Settings/Settings_Page.php:319
 msgid "Odavent Events"
 msgstr ""
 
@@ -35,7 +35,8 @@ msgstr ""
 
 #. Author of the plugin
 #: odavent-events.php
-#: src/Blocks/Block_Registry.php:229
+#: src/Blocks/Block_Registry.php:274
+#: src/Blocks/Block_Registry.php:292
 msgid "Odavent"
 msgstr ""
 
@@ -55,132 +56,161 @@ msgstr ""
 msgid "Odavent is temporarily unavailable."
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:293
+#: src/Blocks/Block_Registry.php:310
+msgid "Full event page"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:311
+msgid "Every Odavent block in the order of an event page: header, countdown, registration, tickets, find my registration, speakers, agenda, sponsors, venue and calendar."
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:389
 msgid "This Odavent block is not available in this version of the plugin."
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:298
+#: src/Blocks/Block_Registry.php:394
 msgid "Choose an event for this Odavent block in the block settings, or set a default event under Settings > Odavent Events."
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:323
+#: src/Blocks/Block_Registry.php:426
+#: src/Blocks/Renderers/Event_Page.php:251
 msgid "This Odavent block could not be displayed. Turn on WP_DEBUG to log the error."
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:398
+#: src/Blocks/Block_Registry.php:501
 msgid "This Odavent event was not found or is no longer published. Choose another event in the block settings. Visitors see nothing here."
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:400
+#: src/Blocks/Block_Registry.php:503
 msgid "This event is a draft on Odavent. Visitors see nothing here until it is published."
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:402
+#: src/Blocks/Block_Registry.php:505
 msgid "Odavent could not be reached and there is no saved copy of this event yet. Visitors see nothing here until it is back."
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:514
+#: src/Blocks/Block_Registry.php:650
 msgid "Link text"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:515
+#: src/Blocks/Block_Registry.php:651
 #: assets/js/editor.js:190
-#: assets/js/editor.js:298
+#: assets/js/editor.js:355
 msgid "Event"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:516
+#: src/Blocks/Block_Registry.php:652
 #: assets/js/editor.js:180
 msgid "Event slug"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:517
+#: src/Blocks/Block_Registry.php:653
 msgid "Show cover image"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:518
+#: src/Blocks/Block_Registry.php:654
 msgid "Show logo"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:519
+#: src/Blocks/Block_Registry.php:655
 msgid "Show description"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:520
+#: src/Blocks/Block_Registry.php:656
 msgid "Show venue"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:521
+#: src/Blocks/Block_Registry.php:657
 msgid "Add structured data for search engines"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:522
-#: src/Blocks/Block_Registry.php:525
+#: src/Blocks/Block_Registry.php:658
+#: src/Blocks/Block_Registry.php:661
 msgid "Button text"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:523
+#: src/Blocks/Block_Registry.php:659
 msgid "Preselect ticket (ID, 0 for none)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:524
+#: src/Blocks/Block_Registry.php:660
 msgid "Show remaining places"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:526
+#: src/Blocks/Block_Registry.php:662
 msgid "Columns"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:527
+#: src/Blocks/Block_Registry.php:663
 msgid "Show biography"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:528
+#: src/Blocks/Block_Registry.php:664
 msgid "Show company"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:529
+#: src/Blocks/Block_Registry.php:665
 msgid "Maximum number to show (0 for all)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:530
+#: src/Blocks/Block_Registry.php:666
 msgid "Show only one speaker (ID, 0 for all)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:531
+#: src/Blocks/Block_Registry.php:667
 msgid "Show speakers"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:532
+#: src/Blocks/Block_Registry.php:668
 msgid "Show track filter buttons"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:533
+#: src/Blocks/Block_Registry.php:669
 msgid "Group by type (sponsors, exhibitors...)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:534
+#: src/Blocks/Block_Registry.php:670
 msgid "Text while the event is live (blank for the default)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:535
+#: src/Blocks/Block_Registry.php:671
 msgid "Text once the event has ended (blank for the default)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:536
+#: src/Blocks/Block_Registry.php:672
 msgid "Show map link"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:537
+#: src/Blocks/Block_Registry.php:673
 msgid "Google Calendar link"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:538
+#: src/Blocks/Block_Registry.php:674
 msgid "Outlook link"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:539
+#: src/Blocks/Block_Registry.php:675
 msgid "Calendar file (.ics) link"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:676
+msgid "Sections to show"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:677
+msgid "Show section headings"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:678
+msgid "Speaker columns"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:679
+msgid "Sponsor columns"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:680
+msgid "Show speaker biographies"
 msgstr ""
 
 #: src/Blocks/Lifecycle.php:22
@@ -234,35 +264,78 @@ msgstr ""
 msgid "%1$s – %2$s"
 msgstr ""
 
-#: src/Blocks/Renderers/Countdown.php:64
+#: src/Blocks/Renderers/Countdown.php:72
 msgid "Live now"
 msgstr ""
 
-#: src/Blocks/Renderers/Countdown.php:65
+#: src/Blocks/Renderers/Countdown.php:73
 msgid "Event ended"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:160
+msgid "Event header"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:161
+msgid "Countdown"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:162
+msgid "Register button"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:163
+msgid "Tickets"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:164
+msgid "Find my registration"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:165
+msgid "Speakers"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:166
+msgid "Agenda"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:167
+msgid "Sponsors and partners"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:168
+msgid "Venue"
+msgstr ""
+
+#: src/Blocks/Renderers/Event_Page.php:169
+msgid "Add to calendar"
 msgstr ""
 
 #: src/Blocks/Renderers/Find_Registration.php:28
 msgid "Already registered? Get my ticket"
 msgstr ""
 
-#: src/Blocks/Renderers/Register_Button.php:38
 #: src/Blocks/Renderers/Register_Button.php:42
-#: src/Blocks/Renderers/Tickets.php:41
+#: src/Blocks/Renderers/Register_Button.php:46
+#: src/Blocks/Renderers/Tickets.php:50
 msgid "Sold out"
 msgstr ""
 
-#: src/Blocks/Renderers/Register_Button.php:40
+#: src/Blocks/Renderers/Register_Button.php:44
 msgid "This ticket is not on sale."
 msgstr ""
 
-#: src/Blocks/Renderers/Register_Button.php:58
-#: src/Blocks/Renderers/Tickets.php:25
+#: src/Blocks/Renderers/Register_Button.php:62
+#: src/Blocks/Renderers/Tickets.php:31
+#: src/Settings/Settings_Page.php:591
+#: src/Settings/Settings_Page.php:600
 msgid "Register"
 msgstr ""
 
-#: src/Blocks/Renderers/Register_Button.php:61
-#: src/Blocks/Renderers/Tickets.php:83
+#: src/Blocks/Renderers/Register_Button.php:65
+#: src/Blocks/Renderers/Tickets.php:92
+#: src/Settings/Settings_Page.php:592
 msgid "Registration and payment are handled securely by Odavent."
 msgstr ""
 
@@ -287,12 +360,13 @@ msgstr ""
 msgid "Partners"
 msgstr ""
 
-#: src/Blocks/Renderers/Tickets.php:43
+#: src/Blocks/Renderers/Tickets.php:52
 msgid "Not on sale"
 msgstr ""
 
 #. translators: %s: number of places left for a ticket.
-#: src/Blocks/Renderers/Tickets.php:50
+#: src/Blocks/Renderers/Tickets.php:59
+#: src/Settings/Settings_Page.php:599
 #, php-format
 msgid "%s spot left"
 msgid_plural "%s spots left"
@@ -342,149 +416,285 @@ msgstr ""
 msgid "Odavent could not be reached. Try again in a moment."
 msgstr ""
 
-#: src/Settings/Options.php:182
+#: src/Settings/Options.php:194
 msgid "The Odavent address must start with https:// (http://localhost is accepted on local development sites only)."
 msgstr ""
 
-#: src/Settings/Options.php:194
+#: src/Settings/Options.php:206
 msgid "That does not look like an Odavent site key. It starts with odv_wp_ followed by letters, digits, dashes or underscores."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:75
-#: assets/js/editor.js:299
+#: src/Settings/Settings_Page.php:84
+#: assets/js/editor.js:356
 msgid "Settings"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:94
+#: src/Settings/Settings_Page.php:103
 msgid "Connection"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:95
+#: src/Settings/Settings_Page.php:104
 msgid "Odavent URL"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:96
+#: src/Settings/Settings_Page.php:105
 msgid "Site key"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:97
+#: src/Settings/Settings_Page.php:106
 msgid "Default event"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:99
+#: src/Settings/Settings_Page.php:108
 msgid "Display and cache"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:100
+#: src/Settings/Settings_Page.php:109
 msgid "Cache lifetime"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:101
+#: src/Settings/Settings_Page.php:110
 msgid "Default styles"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:148
+#: src/Settings/Settings_Page.php:113
+msgid "Appearance"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:114
+msgid "Accent colour"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:115
+msgid "Text on accent"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:116
+msgid "Text colour"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:117
+msgid "Border colour"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:118
+msgid "Corner radius"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:119
+msgid "Spacing"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:120
+msgid "Button style"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:121
+msgid "Preview"
+msgstr ""
+
+#. translators: 1: contrast ratio such as 3.20, 2: the recommended minimum, 4.5.
+#: src/Settings/Settings_Page.php:215
+#, php-format
+msgid "Your colours were saved, but the text on the accent colour has a contrast ratio of %1$s:1, below the recommended %2$s:1. Buttons may be hard to read; choose another text colour or turn on Automatic."
+msgstr ""
+
+#: src/Settings/Settings_Page.php:241
 msgid "Enter a site key first."
 msgstr ""
 
 #. translators: %d: number of events.
-#: src/Settings/Settings_Page.php:164
+#: src/Settings/Settings_Page.php:257
 #, php-format
 msgid "Connected: %d event found."
 msgid_plural "Connected: %d events found."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Settings/Settings_Page.php:169
+#: src/Settings/Settings_Page.php:262
 msgid "The site key was rejected."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:174
+#: src/Settings/Settings_Page.php:267
 msgid "Could not reach Odavent. Check the URL and try again."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:184
+#: src/Settings/Settings_Page.php:277
 msgid "Cache cleared."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:194
+#: src/Settings/Settings_Page.php:287
 msgid "You do not have permission to do this."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:238
+#: src/Settings/Settings_Page.php:331
 msgid "Tools"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:239
+#: src/Settings/Settings_Page.php:332
 msgid "Test the connection with the saved settings, or clear everything this plugin has cached."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:240
+#: src/Settings/Settings_Page.php:333
 msgid "Test connection"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:241
+#: src/Settings/Settings_Page.php:334
 msgid "Clear cache"
 msgstr ""
 
 #. translators: %d: number of minutes.
-#: src/Settings/Settings_Page.php:270
+#: src/Settings/Settings_Page.php:363
 #, php-format
 msgid "Live updates need pretty permalinks; pages refresh every %d minute instead."
 msgid_plural "Live updates need pretty permalinks; pages refresh every %d minutes instead."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Settings/Settings_Page.php:289
+#: src/Settings/Settings_Page.php:382
 msgid "Your Odavent site key was rejected; check it below."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:293
+#: src/Settings/Settings_Page.php:386
 msgid "Odavent has a newer data format than this plugin supports; update the Odavent plugin."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:302
+#: src/Settings/Settings_Page.php:395
 msgid "ODAVENT_SITE_KEY in wp-config.php is not a valid site key (it starts with odv_wp_), so it is ignored."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:306
+#: src/Settings/Settings_Page.php:399
 msgid "Your Odavent plan no longer includes the WordPress plugin; published events keep showing."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:329
+#: src/Settings/Settings_Page.php:422
 msgid "Defined in wp-config.php"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:329
+#: src/Settings/Settings_Page.php:422
 msgid "A key is stored"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:336
+#: src/Settings/Settings_Page.php:429
 msgid "Leave blank to keep the stored key. Find your site key in your Odavent organization settings."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:351
+#: src/Settings/Settings_Page.php:444
 msgid "Could not load your events from Odavent, so enter the event ID. 0 means none."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:356
+#: src/Settings/Settings_Page.php:449
 msgid "None"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:369
+#: src/Settings/Settings_Page.php:462
 msgid "Used by blocks and shortcodes that do not name an event."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:380
+#: src/Settings/Settings_Page.php:473
 msgid "seconds (60 to 86400)"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:388
+#: src/Settings/Settings_Page.php:481
 msgid "Load the default styles for Odavent blocks"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:489
+msgid "Turn on Default styles to use these settings."
+msgstr ""
+
+#: src/Settings/Settings_Page.php:493
+msgid "Colours and shapes of the Odavent blocks on your site. Empty fields keep the default styles; your theme's own CSS still wins."
+msgstr ""
+
+#: src/Settings/Settings_Page.php:498
+msgid "Buttons, links and highlights. Empty keeps the default indigo."
+msgstr ""
+
+#: src/Settings/Settings_Page.php:510
+msgid "Automatic (black or white, whichever reads better on the accent colour)"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:519
+msgid "Empty uses your theme's text colour."
+msgstr ""
+
+#: src/Settings/Settings_Page.php:524
+msgid "Card and divider lines. Empty keeps the default light grey."
+msgstr ""
+
+#: src/Settings/Settings_Page.php:539
+msgid "pixels (0 to 24; empty keeps the default)"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:546
+msgid "Unchanged"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:547
+msgid "Compact"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:548
+msgid "Comfortable"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:549
+msgid "Roomy"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:558
+msgid "Filled"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:559
+msgid "Outline"
+msgstr ""
+
+#. translators: %s: contrast ratio such as 4.50.
+#: src/Settings/Settings_Page.php:577
+#, php-format
+msgid "Text on accent contrast: %s:1"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:596
+msgid "Standard ticket"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:607
+msgid "Head of Product"
+msgstr ""
+
+#: src/Settings/Settings_Page.php:619
+msgid "Below 4.5:1: button text may be hard to read."
 msgstr ""
 
 #: src/Updates/Update_Checker.php:192
 msgid "View the changelog"
+msgstr ""
+
+#. translators: %s: block title, such as "Speakers".
+#: src/Widgets/Block_Widget.php:40
+#, php-format
+msgid "Odavent: %s"
+msgstr ""
+
+#: src/Widgets/Block_Widget.php:104
+msgid "Title (optional)"
+msgstr ""
+
+#: src/Widgets/Block_Widget.php:150
+msgid "Enter the Odavent event ID, or leave empty to use the default event from Settings > Odavent Events."
+msgstr ""
+
+#: src/Widgets/Block_Widget.php:155
+msgid "Default event (Settings > Odavent Events)"
+msgstr ""
+
+#. translators: %d: Odavent event ID.
+#: src/Widgets/Block_Widget.php:162
+#, php-format
+msgid "Event %d (not found in your Odavent events)"
 msgstr ""
 
 #: templates/agenda.php:57
@@ -585,6 +795,7 @@ msgstr ""
 #: blocks/agenda/block.json
 #: blocks/countdown/block.json
 #: blocks/event-header/block.json
+#: blocks/event-page/block.json
 #: blocks/find-registration/block.json
 #: blocks/register-button/block.json
 #: blocks/speakers/block.json
@@ -599,6 +810,7 @@ msgstr ""
 #: blocks/agenda/block.json
 #: blocks/countdown/block.json
 #: blocks/event-header/block.json
+#: blocks/event-page/block.json
 #: blocks/find-registration/block.json
 #: blocks/register-button/block.json
 #: blocks/speakers/block.json
@@ -682,6 +894,26 @@ msgstr ""
 #: blocks/event-header/block.json
 msgctxt "block description"
 msgid "The event's name, dates, venue, cover image and description, kept up to date from Odavent."
+msgstr ""
+
+#: blocks/event-page/block.json
+msgctxt "block title"
+msgid "Event page"
+msgstr ""
+
+#: blocks/event-page/block.json
+msgctxt "block description"
+msgid "The whole event page in one block: header, countdown, registration, tickets, speakers, agenda, sponsors, venue and calendar links, kept up to date from Odavent."
+msgstr ""
+
+#: blocks/event-page/block.json
+msgctxt "block keyword"
+msgid "page"
+msgstr ""
+
+#: blocks/event-page/block.json
+msgctxt "block keyword"
+msgid "all-in-one"
 msgstr ""
 
 #: blocks/find-registration/block.json
