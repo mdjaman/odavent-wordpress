@@ -160,12 +160,51 @@ Tested up to: 7.1
 
 They come from `readme.txt`. The update checker also requires the asset URL to be exactly
 `https://github.com/mdjaman/odavent-wordpress/releases/download/vX.Y.Z/odavent-events-X.Y.Z.zip`, which is why
-the tag must be `vX.Y.Z` with the same version as the plugin header. Odavent caches the latest release for up
-to an hour. A tag with a pre-release suffix (`v1.0.0-beta.1`) creates a GitHub pre-release, which Odavent
-ignores.
+the tag must be `vX.Y.Z` with the same version as the plugin header.
 
 To check the packaging without publishing: `bin/build-zip X.Y.Z` and
 `php bin/release-notes.php X.Y.Z`.
+
+#### How Odavent serves the update (read before publishing)
+
+Sites do not read GitHub: they ask `https://odavent.com/api/v1/wordpress/plugin-update`, which reads GitHub's
+`releases/latest` for this repository. That has consequences:
+
+* **Pre-releases are invisible to it.** GitHub's "latest" release is never a pre-release, so a tag with a
+  suffix (`v1.0.0-beta.1`, a GitHub pre-release) is never offered to any site. A throwaway `v0.1.0-rc.1`
+  proves the workflow, the asset name and the zip, but **not** the update path.
+* **It caches.** The latest release is cached for an hour, a failed GitHub lookup for five minutes, and the
+  last good release is kept **forever** (served whenever GitHub fails). Sites cache what they got for up to
+  12 hours (an hour after a failure); *Check again* in Dashboard > Updates refreshes a site at once.
+* **It takes the first `.zip` asset** of the release. Attach nothing else that ends in `.zip`.
+* **Never delete a published release** without also clearing Odavent's cache, or sites keep being offered
+  the deleted file (a 404 at update time) for as long as the last good copy lives. On the Odavent server:
+  `php artisan cache:forget wordpress_plugin_release`, `php artisan cache:forget wordpress_plugin_release_failed`
+  and `php artisan cache:forget wordpress_plugin_release_last_good`. To withdraw a bad release, publish a fixed
+  higher version instead whenever you can.
+
+#### First release checklist
+
+1. Fix and verify: every gate above green, plus `bin/smoke.sh` and `bin/e2e` on the newest WordPress and on
+   `wordpress:6.1-php7.4-apache`.
+2. `bin/make-pot.sh`, finish `languages/odavent-events-fr_FR.po`, `php bin/check-translations.php`.
+3. The versions agree: the `Version:` header, `ODAVENT_EVENTS_VERSION`, `Stable tag` in `readme.txt`, and the
+   `CHANGELOG.md` section with today's date.
+4. Merge to `main` (CI green), then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+5. Watch the `Release` workflow until both jobs are green, and check the release has exactly one asset,
+   `odavent-events-X.Y.Z.zip`, and the three `Requires`/`Tested` lines at the end of its body.
+6. `curl -s https://odavent.com/api/v1/wordpress/plugin-update` (allow up to an hour for the cache) and check
+   that `version` is `X.Y.Z` and `download_url` is the asset above.
+7. Do a real update on a scratch site: install the plugin there with its `Version:` header lowered to `0.0.9`
+   (or publish a no-op `0.1.1` and update a site running `0.1.0`), press *Check again* in Dashboard >
+   Updates, update, and check the plugin still works and reports the new version.
+
+#### Who can ship code to every site
+
+Anyone who can push a tag that reaches the `Release` workflow, or publish a release in this repository, ships
+code to every site that updates the plugin, automatically on sites with auto-updates on. Protect the
+repository accordingly: require 2FA for everyone with write access, protect `v*` tags (tag rulesets) and
+`main`, and restrict who can create releases to the maintainers who publish them.
 
 ## License
 

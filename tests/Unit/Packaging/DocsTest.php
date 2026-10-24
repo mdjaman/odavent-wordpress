@@ -109,4 +109,37 @@ class DocsTest extends TestCase {
 		}
 		$this->assertStringContainsString( 'Download ZIP', $readme );
 	}
+
+	/**
+	 * The release facts a maintainer must know before publishing: what Odavent's update endpoint reads, what it
+	 * caches and how to clear it, and that a pre-release reaches no site.
+	 */
+	public function test_the_release_docs_say_how_odavent_serves_updates(): void {
+		$readme = $this->doc( 'README.md' );
+		foreach ( array(
+			'releases/latest',
+			'Pre-releases are invisible',
+			'first `.zip` asset',
+			'wordpress_plugin_release`',
+			'wordpress_plugin_release_failed',
+			'wordpress_plugin_release_last_good',
+			'php artisan cache:forget',
+			'bin/make-pot.sh',
+			'https://odavent.com/api/v1/wordpress/plugin-update',
+			'0.0.9',
+			'2FA',
+		) as $fact ) {
+			$this->assertStringContainsString( $fact, $readme, "README.md, Releasing: {$fact}" );
+		}
+
+		$operations = $this->doc( 'docs/operations.md' );
+		foreach ( array( 'pre-releases are never offered', 'wordpress_plugin_release_last_good', 'ships code to every site' ) as $fact ) {
+			$this->assertStringContainsString( $fact, $operations, "docs/operations.md: {$fact}" );
+		}
+
+		$security = $this->doc( 'docs/security.md' );
+		$this->assertStringContainsString( 'Pre-releases reach no site.', $security );
+		$this->assertStringContainsString( '2FA', $security );
+		$this->assertStringNotContainsString( 'offered only to sites already running a pre-release.', $security, 'the pre-release branch is dead: Odavent never serves one' );
+	}
 }

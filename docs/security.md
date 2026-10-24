@@ -105,8 +105,9 @@ on your site, the checks are strict:
   with a plain file name (no query, fragment,
   `@`, `..` or percent-encoding). The Odavent endpoint therefore **cannot point your site at another host**,
   and cannot present an older release's file as a newer version.
-* Only a strictly newer version is offered (never a downgrade). A pre-release such as `1.2.0-beta` is
-  offered only to sites already running a pre-release.
+* Only a strictly newer version is offered (never a downgrade). The checker would offer a pre-release such
+  as `1.2.0-beta` only to sites already running a pre-release, but in practice Odavent never serves one: it
+  reads GitHub's latest release, which is never a pre-release. Pre-releases reach no site.
 * Any release that fails validation is treated like a failed check: nothing is offered and the result is
   cached for an hour. The latest valid release is cached for 12 hours.
 * The check runs only in wp-admin, WP-Cron and WP-CLI, never on a front-end request.
@@ -119,6 +120,13 @@ its releases. Someone who can publish a release in that repository can ship code
 updates. Odavent can only choose which of the repository's release files is offered (not where it comes
 from). If that matters to you, update manually after reviewing the release, or disable auto-updates for this
 plugin in Plugins.
+
+The maintainers therefore treat publishing rights as production access: 2FA for everyone with write access to
+the repository, protected `v*` tags and `main`, and only the maintainers who publish releases may create them.
+Releases are built by a workflow job with a read-only token; the job that creates the release runs no project
+or dependency code (see the README, "Releasing"). Odavent serves only the latest non-pre-release GitHub
+release, caches it for an hour and keeps the last good one, so a release is never deleted without clearing
+Odavent's cache (README, "How Odavent serves the update").
 
 ## Data the plugin handles
 

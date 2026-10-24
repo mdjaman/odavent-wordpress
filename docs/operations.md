@@ -169,6 +169,24 @@ locale for your organization's default language. Multilingual plugins can decide
 [`odavent_events_locale`](hooks.md#odavent_events_locale). The plugin's own words (buttons, notices) follow
 the site language, English and French are included.
 
+## Plugin updates
+
+Updates appear in Dashboard > Updates like any other plugin, from this plugin's GitHub releases, through
+Odavent (`https://odavent.com/api/v1/wordpress/plugin-update`):
+
+* Odavent reads GitHub's latest release, so **pre-releases are never offered**, and it takes the release's
+  first `.zip` file.
+* Odavent caches the release for an hour and keeps the last good one when GitHub fails; your site keeps
+  what it got for up to 12 hours (an hour after a failure). *Check again* in Dashboard > Updates asks again
+  at once.
+* A release that was published and then deleted can still be offered until Odavent's cache is cleared
+  (`php artisan cache:forget` of `wordpress_plugin_release`, `wordpress_plugin_release_failed` and
+  `wordpress_plugin_release_last_good` on the Odavent server); the update then fails with a download error and
+  nothing changes on your site.
+* Whoever can publish a release in the repository ships code to every site that auto-updates; see
+  [security.md](security.md#updates) for what is checked and the README "Releasing" section for the release
+  steps and the repository protections.
+
 ## Multisite
 
 * Settings, the site key, caches and page-cache purging are **per site**. Each site connects with its own
