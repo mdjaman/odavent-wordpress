@@ -111,8 +111,14 @@ $zip = new ZipArchive();
  * Fails the build and leaves no half-written archive behind.
  */
 $abort = static function ( string $message ) use ( $zip, $tmp_path ): void {
-	@$zip->unchangeAll(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-	@$zip->close(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+	try {
+		// Drop what was queued, then close. On PHP 8 either call throws when the archive is already closed
+		// (the failure came after close()), which is fine: the file is removed below either way.
+		$zip->unchangeAll();
+		$zip->close();
+	} catch ( Throwable $e ) {
+		unset( $e );
+	}
 	if ( is_file( $tmp_path ) ) {
 		unlink( $tmp_path );
 	}
