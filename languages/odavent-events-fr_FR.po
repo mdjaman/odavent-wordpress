@@ -273,6 +273,10 @@ msgid "Sponsors"
 msgstr "Sponsors"
 
 #: src/Blocks/Renderers/Sponsors.php:126
+msgid "Sponsors and exhibitors"
+msgstr "Sponsors et exposants"
+
+#: src/Blocks/Renderers/Sponsors.php:127
 msgid "Exhibitors"
 msgstr "Exposants"
 

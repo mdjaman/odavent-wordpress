@@ -41,6 +41,27 @@ class SponsorsTest extends BlockTestCase {
 		$this->assertSame( 5, substr_count( $html, '<li class="odv-sponsors__item' ) );
 	}
 
+	public function test_type_both_gets_a_translated_heading_between_sponsors_and_exhibitors(): void {
+		$payload = $this->with_partners(
+			array(
+				$this->partner( array( 'id' => 1, 'name' => 'Ex Co', 'type' => 'exhibitor' ) ),
+				$this->partner( array( 'id' => 2, 'name' => 'Both Co', 'type' => 'both' ) ),
+				$this->partner( array( 'id' => 3, 'name' => 'Spons Co', 'type' => 'sponsor' ) ),
+			)
+		);
+		$html    = $this->render( $payload );
+
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $html, $m );
+		$this->assertSame( array( 'Sponsors', 'Sponsors and exhibitors', 'Exhibitors' ), $m[1] );
+	}
+
+	public function test_an_unknown_type_still_gets_the_humanised_fallback(): void {
+		$html = $this->render( $this->with_partners( array( $this->partner( array( 'type' => 'vip-guest' ) ) ) ) );
+
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $html, $m );
+		$this->assertSame( array( 'Vip guest' ), $m[1] );
+	}
+
 	public function test_payload_order_is_kept_inside_a_group_with_featured_first(): void {
 		$payload = $this->with_partners(
 			array(

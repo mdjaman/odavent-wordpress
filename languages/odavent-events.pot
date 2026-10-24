@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-24T10:11:08+00:00\n"
+"POT-Creation-Date: 2026-10-24T20:43:31+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: odavent-events\n"
@@ -271,15 +271,19 @@ msgid "Sponsors"
 msgstr ""
 
 #: src/Blocks/Renderers/Sponsors.php:141
-msgid "Exhibitors"
+msgid "Sponsors and exhibitors"
 msgstr ""
 
 #: src/Blocks/Renderers/Sponsors.php:143
-msgid "Media partners"
+msgid "Exhibitors"
 msgstr ""
 
 #: src/Blocks/Renderers/Sponsors.php:145
-#: src/Blocks/Renderers/Sponsors.php:150
+msgid "Media partners"
+msgstr ""
+
+#: src/Blocks/Renderers/Sponsors.php:147
+#: src/Blocks/Renderers/Sponsors.php:152
 msgid "Partners"
 msgstr ""
 

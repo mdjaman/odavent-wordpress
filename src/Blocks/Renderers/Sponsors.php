@@ -21,7 +21,7 @@ final class Sponsors implements Renderer {
 	const MAX_COLUMNS = 6;
 
 	/** Group order for the known types; any other type follows, in order of appearance. */
-	const KNOWN_TYPES = array( 'sponsor', 'exhibitor', 'media', 'partner' );
+	const KNOWN_TYPES = array( 'sponsor', 'both', 'exhibitor', 'media', 'partner' );
 
 	public function render( Event_View $view, array $atts ): string {
 		$event            = $view->event();
@@ -137,6 +137,8 @@ final class Sponsors implements Renderer {
 		switch ( $type ) {
 			case 'sponsor':
 				return __( 'Sponsors', 'odavent-events' );
+			case 'both':
+				return __( 'Sponsors and exhibitors', 'odavent-events' );
 			case 'exhibitor':
 				return __( 'Exhibitors', 'odavent-events' );
 			case 'media':
