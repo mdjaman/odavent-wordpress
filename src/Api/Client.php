@@ -51,6 +51,12 @@ class Client {
 	 * @param string|null $locale Content locale such as fr or fr_FR; dropped when malformed.
 	 */
 	public function public_event( string $slug, ?string $locale = null ): Result {
+		// An empty slug or one made only of dots would turn into `/events/` or `/events/..`: no event, and no request.
+		$trimmed = trim( $slug );
+		if ( '' === $trimmed || '' === trim( $trimmed, '.' ) ) {
+			return Result::fail( Result::NOT_FOUND, 0, $this->message( Result::NOT_FOUND ) );
+		}
+
 		return $this->request( '/events/' . rawurlencode( $slug ) . $this->locale_query( $locale ), '' );
 	}
 

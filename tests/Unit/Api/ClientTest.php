@@ -330,6 +330,62 @@ class ClientTest extends TestCase {
 		$this->assertSame( 'unavailable', $this->client()->public_event( 'x' )->code );
 	}
 
+	public function test_a_3xx_with_a_valid_success_body_is_never_ok(): void {
+		$body = $this->envelope( array( 'event' => array( 'id' => 1 ) ) );
+
+		foreach ( array( 301, 302, 303, 307, 308 ) as $status ) {
+			$this->respond( $this->http( $status, $body ) );
+
+			$result = $this->client()->public_event( 'x' );
+			$this->assertFalse( $result->ok, "status {$status}" );
+			$this->assertSame( 'unavailable', $result->code, "status {$status}" );
+			$this->assertSame( $status, $result->status );
+
+			$this->assertFalse( $this->client()->list_events()->ok, "status {$status}" );
+		}
+	}
+
+	public function test_errors_that_are_a_string_or_a_list_never_map_to_an_error_code(): void {
+		foreach ( array(
+			401 => 'invalid_key',
+			403 => 'plan_required',
+			404 => 'not_found',
+		) as $status => $code ) {
+			foreach ( array(
+				'string' => array(
+					'success' => false,
+					'errors'  => $code,
+				),
+				'list'   => array(
+					'success' => false,
+					'errors'  => array( $code ),
+				),
+				'nested list' => array(
+					'success' => false,
+					'errors'  => array( array( 'code' => $code ) ),
+				),
+				'non-string code' => array(
+					'success' => false,
+					'errors'  => array( 'code' => array( $code ) ),
+				),
+			) as $label => $body ) {
+				$this->respond( $this->http( $status, $body ) );
+
+				$result = $this->client()->list_events();
+				$this->assertSame( 'unavailable', $result->code, "{$status} / {$label}" );
+				$this->assertSame( $status, $result->status );
+			}
+		}
+	}
+
+	public function test_a_body_with_a_byte_order_mark_is_unavailable(): void {
+		$this->respond( $this->http( 200, "\xEF\xBB\xBF" . json_encode( $this->envelope( array( 'event' => array( 'id' => 1 ) ) ) ) ) );
+		$this->assertSame( 'unavailable', $this->client()->public_event( 'x' )->code );
+
+		$this->respond( $this->http( 404, "\xEF\xBB\xBF" . json_encode( $this->error_body( 'not_found' ) ) ) );
+		$this->assertSame( 'unavailable', $this->client()->public_event( 'x' )->code );
+	}
+
 	public function test_body_over_two_megabytes_is_unavailable(): void {
 		$huge = $this->envelope( array( 'blob' => str_repeat( 'a', 2 * 1024 * 1024 ) ) );
 		$this->respond( $this->http( 200, $huge ) );
@@ -375,6 +431,7 @@ class ClientTest extends TestCase {
 		$this->assertSame( 8, $args['timeout'] );
 		$this->assertSame( 0, $args['redirection'] );
 		$this->assertTrue( $args['sslverify'] );
+		$this->assertSame( Client::MAX_BODY_BYTES + 1, $args['limit_response_size'] );
 	}
 
 	public function test_every_method_uses_the_safe_args(): void {
@@ -399,6 +456,7 @@ class ClientTest extends TestCase {
 			$this->assertSame( 8, $this->args()['timeout'] );
 			$this->assertSame( 0, $this->args()['redirection'] );
 			$this->assertTrue( $this->args()['sslverify'] );
+			$this->assertSame( Client::MAX_BODY_BYTES + 1, $this->args()['limit_response_size'] );
 			$this->assertSame( 'application/json', $this->args()['headers']['Accept'] );
 		}
 	}
@@ -504,6 +562,22 @@ class ClientTest extends TestCase {
 
 		$this->client()->public_event( '../site/events' );
 		$this->assertSame( 'https://odavent.com/api/v1/wordpress/events/..%2Fsite%2Fevents', $this->url() );
+	}
+
+	public function test_a_slug_that_is_empty_or_only_dots_is_not_found_without_any_request(): void {
+		$this->respond( $this->http( 200, $this->envelope( array() ) ) );
+
+		foreach ( array( '', '.', '..', '...', ' ', "\t", ' . ', ' .. ', "\n" ) as $slug ) {
+			$result = $this->client()->public_event( $slug, 'fr' );
+
+			$this->assertFalse( $result->ok, 'slug: ' . json_encode( $slug ) );
+			$this->assertSame( 'not_found', $result->code, 'slug: ' . json_encode( $slug ) );
+		}
+		$this->assertSame( 0, $this->calls );
+
+		// A real slug that merely contains a dot still goes out.
+		$this->client()->public_event( 'v1.2-summit' );
+		$this->assertSame( 1, $this->calls );
 	}
 
 	public function test_site_event_id_is_cast_to_int(): void {
