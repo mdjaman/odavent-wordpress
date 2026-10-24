@@ -12,6 +12,7 @@ use Odavent\Events\Settings\Options;
 use Odavent\Events\Settings\Settings_Page;
 use Odavent\Events\Shortcodes\Shortcodes;
 use Odavent\Events\Updates\Update_Checker;
+use Odavent\Events\Widgets\Widgets;
 
 /**
  * Plugin entry point. Later tasks register their components in boot().
@@ -45,6 +46,12 @@ final class Plugin {
 	/** @var Update_Checker|null */
 	private $updates = null;
 
+	/** @var Widgets|null */
+	private $widgets = null;
+
+	/** @var bool */
+	private $textdomain_loaded = false;
+
 	private function __construct() {
 	}
 
@@ -66,9 +73,19 @@ final class Plugin {
 		add_action(
 			'init',
 			function () {
-				load_plugin_textdomain( 'odavent-events', false, dirname( plugin_basename( ODAVENT_EVENTS_FILE ) ) . '/languages' );
+				$this->load_textdomain();
 			},
 			1
+		);
+
+		// widgets_init runs inside init at priority 1, before the callback above, so the widget names
+		// ("Odavent: Speakers") would not be translated: load the text domain here first.
+		add_action(
+			'widgets_init',
+			function () {
+				$this->load_textdomain();
+				$this->widgets()->register();
+			}
 		);
 
 		add_action(
@@ -189,12 +206,32 @@ final class Plugin {
 		return $this->shortcodes;
 	}
 
+	public function widgets(): Widgets {
+		if ( null === $this->widgets ) {
+			$this->widgets = new Widgets( $this->blocks(), $this->shortcodes(), $this->repository() );
+		}
+
+		return $this->widgets;
+	}
+
 	public function updates(): Update_Checker {
 		if ( null === $this->updates ) {
 			$this->updates = new Update_Checker( $this->client() );
 		}
 
 		return $this->updates;
+	}
+
+	/**
+	 * Loads the plugin's translations once (on init, or earlier on widgets_init).
+	 */
+	private function load_textdomain(): void {
+		if ( $this->textdomain_loaded ) {
+			return;
+		}
+		$this->textdomain_loaded = true;
+
+		load_plugin_textdomain( 'odavent-events', false, dirname( plugin_basename( ODAVENT_EVENTS_FILE ) ) . '/languages' );
 	}
 
 	public function version(): string {

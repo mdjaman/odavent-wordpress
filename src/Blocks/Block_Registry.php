@@ -120,6 +120,15 @@ class Block_Registry {
 	}
 
 	/**
+	 * The block slugs, without an instance (widget id bases are derived from them).
+	 *
+	 * @return string[]
+	 */
+	public static function slugs(): array {
+		return array_keys( self::RENDERERS );
+	}
+
+	/**
 	 * The attribute schema of a block (name => definition with `type` and `default`) from its block.json,
 	 * so shortcodes and docs derive from the same file the editor uses. Empty for an unknown slug.
 	 *
@@ -142,6 +151,35 @@ class Block_Registry {
 		}
 
 		return $clean;
+	}
+
+	/**
+	 * The block's title for people: the registered block type's (WordPress translated it from block.json),
+	 * else the block.json title translated the way WordPress does it (`block title` context), else the slug.
+	 *
+	 * @param string $slug Block slug.
+	 */
+	public function block_title( string $slug ): string {
+		return $this->block_text( $slug, 'title', 'block title', $slug );
+	}
+
+	/**
+	 * The block's description, found the same way as block_title(); '' when it has none.
+	 *
+	 * @param string $slug Block slug.
+	 */
+	public function block_description( string $slug ): string {
+		return $this->block_text( $slug, 'description', 'block description', '' );
+	}
+
+	/**
+	 * The translated label the editor shows for one attribute of a block (widgets reuse it).
+	 *
+	 * @param string $slug      Block slug.
+	 * @param string $attribute Attribute name.
+	 */
+	public function attribute_label( string $slug, string $attribute ): string {
+		return self::label( $attribute, $slug );
 	}
 
 	/**
@@ -296,9 +334,9 @@ class Block_Registry {
 			}
 
 			// Title and description from the registered block type: WordPress translated them from block.json.
-			$registered  = class_exists( 'WP_Block_Type_Registry' ) ? \WP_Block_Type_Registry::get_instance()->get_registered( $json['name'] ) : null;
-			$title       = is_object( $registered ) && isset( $registered->title ) && is_string( $registered->title ) && '' !== $registered->title ? $registered->title : ( isset( $json['title'] ) && is_string( $json['title'] ) ? $json['title'] : $json['name'] );
-			$description = is_object( $registered ) && isset( $registered->description ) && is_string( $registered->description ) ? $registered->description : ( isset( $json['description'] ) && is_string( $json['description'] ) ? $json['description'] : '' );
+			$slug        = substr( $json['name'], strlen( self::NAMESPACE_PREFIX ) );
+			$title       = $this->block_text( $slug, 'title', 'block title', $json['name'], $file );
+			$description = $this->block_text( $slug, 'description', 'block description', '', $file );
 
 			$row = array(
 				'name'        => $json['name'],
@@ -553,6 +591,34 @@ class Block_Registry {
 		$name = is_array( $json ) ? ( $json['name'] ?? null ) : null;
 
 		return is_string( $name ) && 0 === strpos( $name, self::NAMESPACE_PREFIX ) ? $name : '';
+	}
+
+	/**
+	 * A text field of a block (title, description) for people: the registered block type's value, else the
+	 * block.json value translated with its i18n context (before the blocks register, e.g. on widgets_init),
+	 * else $fallback.
+	 *
+	 * @param string      $slug     Block slug.
+	 * @param string      $field    `title` or `description`.
+	 * @param string      $context  Gettext context WordPress uses for that block.json field.
+	 * @param string      $fallback Value when neither has one.
+	 * @param string|null $file     block.json path (default: the slug's).
+	 */
+	private function block_text( string $slug, string $field, string $context, string $fallback, ?string $file = null ): string {
+		$registered = class_exists( 'WP_Block_Type_Registry' ) ? \WP_Block_Type_Registry::get_instance()->get_registered( self::NAMESPACE_PREFIX . $slug ) : null;
+		if ( is_object( $registered ) && isset( $registered->{$field} ) && is_string( $registered->{$field} ) && ( '' !== $registered->{$field} || 'description' === $field ) ) {
+			return $registered->{$field};
+		}
+
+		$json = $this->read_json( null !== $file ? $file : $this->blocks_dir . '/' . $slug . '/block.json' );
+		$text = is_array( $json ) && isset( $json[ $field ] ) && is_string( $json[ $field ] ) ? $json[ $field ] : '';
+		if ( '' === $text ) {
+			return $fallback;
+		}
+
+		$translated = function_exists( 'translate_with_gettext_context' ) ? translate_with_gettext_context( $text, $context, 'odavent-events' ) : $text;
+
+		return is_string( $translated ) && '' !== $translated ? $translated : $text;
 	}
 
 	private function read_json( string $file ): ?array {
