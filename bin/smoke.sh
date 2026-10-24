@@ -43,6 +43,14 @@ if ! dc ps --status running --services 2>/dev/null | grep -qx wordpress \
 	exit 1
 fi
 
+# Signatures are timed (300 s tolerance) and so are the resilience checks: a Docker VM clock that drifted
+# (it happens after the host sleeps) makes them fail for reasons that have nothing to do with the plugin.
+drift=$(( $(date -u +%s) - $(dc exec -T wordpress date -u +%s | tr -d '\r') ))
+if [ "${drift#-}" -gt 30 ]; then
+	fail "prerequisites" "the Docker clock is ${drift}s off the host clock: restart Docker (see docs/development.md)"
+	exit 1
+fi
+
 # ---- helpers ------------------------------------------------------------------------------------------
 
 html() { dc exec -T wpcli php "$ODV_PLUGIN_DIR/docker/smoke/html.php" "$@"; }
