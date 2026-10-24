@@ -177,8 +177,11 @@ class Update_Checker {
 			}
 		}
 
-		// No download link for a release that would not be offered as an update (older or equal).
-		if ( $this->is_offerable( $release, $this->installed ) ) {
+		// No download link for a release that would not be offered as an update (older or equal). The version on
+		// disk comes from core's update_plugins transient when it lists one, as in inject(): right after an
+		// upgrade this process still holds the old constant, and the just-installed version must not be offered.
+		$installed = $this->live_version( get_site_transient( 'update_plugins' ) );
+		if ( $this->is_offerable( $release, $installed ) ) {
 			$info->download_link = $release['download_url'];
 		}
 
@@ -204,10 +207,10 @@ class Update_Checker {
 	 * The installed version according to the transient's `checked` list (built from the plugin
 	 * header on disk), when it is a well-formed version; otherwise the version this process loaded.
 	 *
-	 * @param object $transient The update_plugins transient.
+	 * @param mixed $transient The update_plugins transient (anything that is not an object is ignored).
 	 */
 	private function live_version( $transient ): string {
-		$checked = isset( $transient->checked ) ? $transient->checked : null;
+		$checked = is_object( $transient ) && isset( $transient->checked ) ? $transient->checked : null;
 		$version = is_array( $checked ) && isset( $checked[ self::PLUGIN ] ) ? $checked[ self::PLUGIN ] : null;
 
 		if ( is_string( $version ) && strlen( $version ) <= self::MAX_VERSION_LENGTH && 1 === preg_match( self::VERSION_PATTERN, $version ) ) {

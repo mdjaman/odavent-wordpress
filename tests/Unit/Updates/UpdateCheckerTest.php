@@ -832,6 +832,26 @@ class UpdateCheckerTest extends TestCase {
 		$this->assertFalse( property_exists( $info, 'download_link' ) );
 	}
 
+	public function test_plugin_info_uses_the_version_on_disk_from_the_update_transient(): void {
+		// Just upgraded to 1.2.0 in this request: the process constant still says 1.0.0, core's list says 1.2.0.
+		$checker = $this->checker( $this->release() );
+		$this->transients['update_plugins'] = (object) array( 'checked' => array( self::PLUGIN => '1.2.0' ) );
+
+		$info = $checker->plugin_info( false, 'plugin_information', $this->info_args() );
+
+		$this->assertSame( '1.2.0', $info->version );
+		$this->assertFalse( property_exists( $info, 'download_link' ), 'the installed version is not offered again' );
+	}
+
+	public function test_plugin_info_falls_back_to_the_loaded_version_without_a_usable_update_transient(): void {
+		foreach ( array( false, 'junk', (object) array(), (object) array( 'checked' => array( self::PLUGIN => 'not a version' ) ) ) as $transient ) {
+			$this->transients = array( 'update_plugins' => $transient );
+			$info             = $this->checker( $this->release() )->plugin_info( false, 'plugin_information', $this->info_args() );
+
+			$this->assertSame( self::PREFIX . 'v1.2.0/odavent-events.zip', $info->download_link, var_export( $transient, true ) );
+		}
+	}
+
 	public function test_plugin_info_passes_other_slugs_through_untouched_without_http(): void {
 		$this->client->shouldReceive( 'plugin_update' )->never();
 		$checker  = new Update_Checker( $this->client, '1.0.0' );
