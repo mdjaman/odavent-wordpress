@@ -619,7 +619,7 @@ class EventRepositoryTest extends TestCase {
 		$this->assertNull( $this->transient( Event_Repository::BACKOFF ), 'plan_required is not a breaker failure' );
 	}
 
-	public function test_invalid_key_is_unavailable_and_raises_the_notice_flag(): void {
+	public function test_invalid_key_without_slug_is_unavailable_raises_the_notice_and_disables_the_key_routes(): void {
 		$this->answer( 'site_event', $this->fail_result( Result::INVALID_KEY, 401 ) );
 
 		$view = $this->repo()->get( 42 );
@@ -627,7 +627,37 @@ class EventRepositoryTest extends TestCase {
 		$this->assertSame( Event_View::UNAVAILABLE, $view->state() );
 		$this->assertSame( 1, $this->transient( Event_Repository::INVALID_KEY_NOTICE ) );
 		$this->assertSame( 12 * 3600, $this->ttl_of( Event_Repository::INVALID_KEY_NOTICE ) );
-		$this->assertSame( 1, $this->transient( Event_Repository::BACKOFF ) );
+		$this->assertTrue( ( new Options() )->is_connection_disabled() );
+		$this->assertSame( 3600, $this->ttl_of( Options::CONN_DISABLED_FLAG ) );
+		$this->assertCount( 0, $this->http_calls( 'public_event' ) );
+	}
+
+	public function test_a_revoked_key_falls_back_to_the_public_read_so_published_events_keep_showing(): void {
+		$payload = $this->payload();
+		$this->answer( 'site_event', $this->fail_result( Result::INVALID_KEY, 401 ) );
+		$this->answer( 'public_event', Result::ok( $payload ) );
+
+		$view = $this->repo()->get( 42, 'sommet-tech-abidjan-2026' );
+
+		$this->assertSame( Event_View::LIVE, $view->state() );
+		$this->assertFalse( $view->is_stale(), 'a fresh public copy, so Register stays' );
+		$this->assertSame( $payload['event'], $view->event() );
+		$this->assertSame(
+			array(
+				array( 'site_event', 42, 'en' ),
+				array( 'public_event', 'sommet-tech-abidjan-2026', 'en' ),
+			),
+			$this->calls
+		);
+		$this->assertSame( 1, $this->transient( Event_Repository::INVALID_KEY_NOTICE ) );
+		$this->assertTrue( ( new Options() )->is_connection_disabled() );
+		$this->assertNull( $this->transient( Event_Repository::BACKOFF ), 'the public read worked: no breaker' );
+
+		// The next request does not try the rejected key again.
+		$this->transients = array_intersect_key( $this->transients, array( Options::CONN_DISABLED_FLAG => 1 ) );
+		$this->answer( 'public_event', Result::ok( $payload ) );
+		$this->repo()->get( 42, 'sommet-tech-abidjan-2026' );
+		$this->assertCount( 1, $this->http_calls( 'site_event' ) );
 	}
 
 	public function test_invalid_key_with_last_good_serves_stale(): void {
@@ -1436,6 +1466,27 @@ class EventRepositoryTest extends TestCase {
 
 		$this->assertSame( 42, $this->repo()->resolve_id( 'sommet-tech-abidjan-2026' ) );
 		$this->assertTrue( ( new Options() )->is_connection_disabled() );
+	}
+
+	public function test_resolve_id_list_invalid_key_raises_the_notice_disables_and_uses_public_read(): void {
+		$this->answer( 'list_events', $this->fail_result( Result::INVALID_KEY, 401 ) );
+		$this->answer( 'public_event', Result::ok( $this->payload() ) );
+
+		$this->assertSame( 42, $this->repo()->resolve_id( 'sommet-tech-abidjan-2026' ) );
+		$this->assertTrue( ( new Options() )->is_connection_disabled() );
+		$this->assertSame( 1, $this->transient( Event_Repository::INVALID_KEY_NOTICE ) );
+		$this->assertNull( $this->transient( Event_Repository::BACKOFF ) );
+		$this->assertSame( array( 'public_event', 'sommet-tech-abidjan-2026', 'en' ), $this->http_calls( 'public_event' )[0] );
+	}
+
+	public function test_list_for_editors_still_reports_a_rejected_key_without_disabling_the_key_routes(): void {
+		$this->answer( 'list_events', $this->fail_result( Result::INVALID_KEY, 401 ) );
+
+		$result = $this->repo()->list_for_editors();
+
+		$this->assertSame( Result::INVALID_KEY, $result->code );
+		$this->assertFalse( ( new Options() )->is_connection_disabled() );
+		$this->assertSame( 1, $this->transient( Event_Repository::INVALID_KEY_NOTICE ) );
 	}
 
 	// ---- no key --------------------------------------------------------------------

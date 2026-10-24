@@ -86,7 +86,7 @@ example a call to the CDN's API with `get_permalink( $post_id )`).
 
 * **Cache lifetime:** an event's data is cached for the lifetime set in the settings (default 900 seconds).
 * **Last good copy:** every successful fetch of a public event is also saved as a copy that does not expire.
-  When Odavent cannot be reached (timeout, error, bad answer, invalid key) the page shows that copy.
+  When Odavent cannot be reached (timeout, error, bad answer) the page shows that copy.
 * **Circuit breaker:** after a failed request the plugin stops calling Odavent for **60 seconds** and serves
   the last good copy (or nothing) straight away, instead of every visitor waiting for the 8 second timeout.
 * **A stale view never shows Register.** A last good copy may say "open" for an event that has since been
@@ -119,9 +119,13 @@ for this Odavent block...".
 
 ### Connection states
 
-* **Site key rejected** (revoked, mistyped): Odavent answers `401`. The settings page shows "Your Odavent
-  site key was rejected; check it below." for up to 12 hours, and pages keep showing the last good copies
-  (as stale, without Register links). Fix the key in Settings > Odavent Events (or `wp-config.php`).
+* **Site key rejected** (revoked, rotated, mistyped): Odavent answers `401`. The settings page shows "Your
+  Odavent site key was rejected; check it below." for up to 12 hours. As with a plan that no longer includes
+  the plugin (below), the plugin stops using the key for an hour at a time and reads published events from
+  Odavent's public event pages by slug, so **published events keep showing, with their Register links**.
+  Blocks that were never given an event slug keep showing their last good copy (as stale, without Register
+  links). Draft previews, the event picker and live refresh stop until the key is fixed in Settings > Odavent
+  Events (or `wp-config.php`); a successful *Test connection* re-enables the key at once.
 * **Plan no longer includes the plugin** (Odavent answers `403`): the plugin stops using the key for
   an hour at a time and reads published events from Odavent's public event pages by slug instead. **Published
   events keep showing**, refreshed when the cache lifetime ends; draft previews, the event picker in the

@@ -272,11 +272,14 @@ class Settings_Page {
 			);
 		}
 
-		if ( $this->options->is_connection_disabled() ) {
+		$key_rejected = false !== get_transient( Event_Repository::INVALID_KEY_NOTICE );
+
+		// A rejected key disables the key routes too (published events keep showing): that is not a plan matter.
+		if ( $this->options->is_connection_disabled() && ! $key_rejected ) {
 			$this->notice( 'warning', $this->plan_required_text() );
 		}
 
-		if ( false !== get_transient( Event_Repository::INVALID_KEY_NOTICE ) ) {
+		if ( $key_rejected ) {
 			$this->notice( 'error', __( 'Your Odavent site key was rejected; check it below.', 'odavent-events' ) );
 		}
 

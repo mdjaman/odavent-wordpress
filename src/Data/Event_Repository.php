@@ -22,7 +22,9 @@ use Odavent\Events\Settings\Options;
  *   query. The `lastgood_` prefix keeps them inside the uninstaller's cleanup pattern.
  * - `odavent_events_backoff` transient, 60 s: circuit breaker. After an Odavent failure, page
  *   views skip HTTP (stale or UNAVAILABLE) instead of each waiting for the 8 s timeout.
- * - `odavent_events_invalid_key_notice` transient, 12 h: the settings page shows a notice.
+ * - `odavent_events_invalid_key_notice` transient, 12 h: the settings page shows a notice. A rejected key
+ *   (401 `invalid_key`) on a page view also disables the key routes for an hour, like 403 `plan_required`,
+ *   so published events keep showing through the public read.
  * - `odavent_events_contract_notice` transient, 12 h: a payload declared a newer contract than
  *   Client::SUPPORTED_CONTRACT; the payload is still used and the settings page asks for an update.
  *
@@ -361,8 +363,11 @@ class Event_Repository {
 				return Event_View::empty( Event_View::GONE );
 
 			case Result::INVALID_KEY:
+				// A revoked or rotated key: keep published events showing through the public read until a new
+				// key is pasted (an hour at most before the key route is tried again), and tell the admin.
 				set_transient( self::INVALID_KEY_NOTICE, 1, self::NOTICE_TTL );
-				return $this->failed( $id, $loc );
+				$this->options->set_connection_disabled( true );
+				return $this->public_read( $id, $slug_hint, $preview_allowed, $locale, $loc );
 
 			default:
 				return $this->failed( $id, $loc );
@@ -463,7 +468,7 @@ class Event_Repository {
 	}
 
 	/**
-	 * Odavent failed (unavailable, invalid key, malformed answer): trip the breaker and serve the
+	 * Odavent failed (unavailable, malformed answer): trip the breaker and serve the
 	 * last good copy as stale, or UNAVAILABLE.
 	 */
 	private function failed( int $id, string $loc ): Event_View {
@@ -498,12 +503,14 @@ class Event_Repository {
 			if ( $result->ok ) {
 				delete_transient( self::BACKOFF );
 			} else {
-				if ( Result::PLAN_REQUIRED === $result->code ) {
-					$this->options->set_connection_disabled( true );
-					return $this->resolve_public( $slug );
-				}
 				if ( Result::INVALID_KEY === $result->code ) {
 					set_transient( self::INVALID_KEY_NOTICE, 1, self::NOTICE_TTL );
+				}
+				if ( Result::PLAN_REQUIRED === $result->code || Result::INVALID_KEY === $result->code ) {
+					// The key no longer works for this site (plan, or revoked/rotated key): published events
+					// are still readable without it.
+					$this->options->set_connection_disabled( true );
+					return $this->resolve_public( $slug );
 				}
 				set_transient( self::BACKOFF, 1, self::BACKOFF_TTL );
 

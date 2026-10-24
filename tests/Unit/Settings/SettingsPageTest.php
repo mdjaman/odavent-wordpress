@@ -694,10 +694,15 @@ class SettingsPageTest extends TestCase {
 		$this->transients[ Event_Repository::CONTRACT_NOTICE ]    = 1;
 
 		$loud = $this->render( $this->page() );
-		$this->assertStringContainsString( 'Your Odavent plan no longer includes the WordPress plugin; published events keep showing.', $loud );
+		$this->assertStringNotContainsString( 'no longer includes', $loud, 'a rejected key disables the key routes too; that is not a plan matter' );
 		$this->assertStringContainsString( 'Your Odavent site key was rejected; check it below.', $loud );
 		$this->assertStringContainsString( 'Odavent has a newer data format than this plugin supports; update the Odavent plugin.', $loud );
 		$this->assertArrayHasKey( Event_Repository::INVALID_KEY_NOTICE, $this->transients, 'persistent, not consumed by viewing' );
+
+		unset( $this->transients[ Event_Repository::INVALID_KEY_NOTICE ] );
+		$plan = $this->render( $this->page() );
+		$this->assertStringContainsString( 'Your Odavent plan no longer includes the WordPress plugin; published events keep showing.', $plan );
+		$this->assertStringNotContainsString( 'was rejected', $plan );
 	}
 
 	public function test_the_two_action_forms_post_to_admin_post_with_nonces(): void {
