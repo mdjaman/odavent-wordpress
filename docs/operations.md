@@ -58,10 +58,11 @@ page-cache plugin that is active:
 
 **Blocks inside non-public sources are not detected.** The plugin finds pages by searching the content of
 posts. Odavent blocks placed in a **synced pattern**, a **block-theme template or template part** (the Site
-Editor) or a custom field are not in any post's content, so the pages that show them are not purged, and nothing tells the plugin to load the stylesheet early or to
-keep editors' previews out of the page cache. For those, add the pages yourself. (Widget areas are the exception: an Odavent widget,
-or an Odavent block or shortcode in a block, Text or Custom HTML widget, is detected and purges the whole
-site, see [widgets.md](widgets.md#page-caches).)
+Editor) or a custom field are not in any post's content, so the pages that show them are not purged, and
+nothing tells the plugin to load the stylesheet early or to keep editors' previews out of the page cache. For
+those, add the pages yourself. (Widget areas are the exception: an Odavent widget, or an Odavent block or
+shortcode in a block, Text or Custom HTML widget, is detected and purges the whole site, see
+[widgets.md](widgets.md#page-caches).)
 
 ```php
 // Pages that show a countdown from a template part.

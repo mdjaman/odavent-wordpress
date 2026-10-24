@@ -6,11 +6,12 @@ your own CSS or replace the HTML of any block from your theme.
 
 ## CSS variables
 
-The default stylesheet (`assets/css/odavent.css`) reads these variables. Set them on `:root`, on `body`
-or on any ancestor of the blocks, for example in Appearance > Customize > Additional CSS:
+The default stylesheet (`assets/css/odavent.css`) reads these variables. Set them on `body` or on any
+ancestor of the blocks (`:root` works too, but can lose to the Appearance settings, see
+[Which CSS wins](#which-css-wins)), for example in Appearance > Customize > Additional CSS:
 
 ```css
-:root {
+body {
 	--odv-accent: #0f766e;
 	--odv-accent-contrast: #ffffff;
 	--odv-radius: 4px;
@@ -60,8 +61,12 @@ screen only has an effect while **Default styles** is on. The generated CSS can 
 
 The settings are **defaults, declared on `:root`**, and the plugin never uses `!important` for them:
 
-* Your own CSS wins over the settings whenever it is declared closer or later: a variable set on `body`, on a
-  wrapper of the blocks, or on `:root` further down the page overrides the Appearance value.
+* Your own CSS wins over the settings when it is declared closer to the blocks: a variable set on `body`, on a
+  wrapper of the blocks, or with `html body` as the selector overrides the Appearance value wherever the
+  plugin's styles are printed. Avoid `:root` for this in Additional CSS: on a classic theme, when the blocks
+  are in content the plugin cannot see before the page starts (an archive, a theme template, a page
+  builder), the stylesheet and the Appearance `:root` style are printed in the footer, after Additional CSS,
+  and win over a `:root` rule of the same specificity.
 * The one exception is the **outline** button style. It is a rule set on the buttons themselves, with a
   higher specificity (`.odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"])`
   and `.odv-tickets .odv-tickets__register`). To restyle those buttons yourself while the outline style is

@@ -69,14 +69,19 @@ Widgets in the inactive area (the "Inactive widgets" list) do not count. The sam
 stylesheet in the page head and keeps editors' previews out of page caches, see
 [`odavent_events_page_has_content`](hooks.md#odavent_events_page_has_content).
 
-A whole-site purge is heavier than a per-page one. If your widgets sit in an area your cache never stores, or
-you prefer to purge by hand, turn it off:
+A whole-site purge is heavier than a per-page one, and it can come several times in a row: a speaker or venue
+edited on Odavent changes every event they appear in, and each of those events sends its own refresh, so a
+site with an Odavent widget may see one whole-site purge per event. If your widgets sit in an area your cache
+never stores, or you prefer to purge by hand, turn it off with the `odavent_events_purge_all_on_widget`
+filter:
 
 ```php
 add_filter( 'odavent_events_purge_all_on_widget', '__return_false' );
 ```
 
 See [`odavent_events_purge_all_on_widget`](hooks.md#odavent_events_purge_all_on_widget). Without the
-whole-site purge, a page that shows the widget refreshes when its cache expires (the cache lifetime in
-Settings > Odavent Events) or when you purge it yourself. A widget placed in a block theme's template parts
+whole-site purge, a page that shows the widget stays as your **page-cache plugin** stored it until that
+plugin's own cache lifetime ends (often hours, for example with WP Rocket's default) or you purge it yourself.
+The plugin's cache lifetime in Settings > Odavent Events only decides how fresh the event data is when such a
+page is rendered again. A widget placed in a block theme's template parts
 (not a widget area) is not detected at all; see [operations.md](operations.md#page-caches).

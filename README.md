@@ -54,7 +54,9 @@ You do not need to write any code. Five steps take you from an empty page to a l
    block shows everything: the title and dates, a countdown, the Register button, tickets, speakers, the
    agenda, sponsors, the venue and the add-to-calendar links. Prefer to place and style the parts yourself?
    Insert the **Full event page** pattern instead (open the **Patterns** tab and look under **Odavent**): it
-   puts every part on the page as its own block, and you can move, remove or restyle each one.
+   puts every part on the page as its own block, and you can move, remove or restyle each one. The pattern's
+   blocks name no event, so first choose your event as **Default event** in **Settings > Odavent Events**, or
+   pick the event in each block.
 3. **Choose what to show.** Select the Event page block and, in the panel on the right, switch the
    sections you want on or off: header, countdown, register button, tickets, find my registration,
    speakers, agenda, sponsors, venue and calendar. You can also turn the section headings off, choose the
@@ -68,7 +70,9 @@ You do not need to write any code. Five steps take you from an empty page to a l
 5. **Use the widgets.** If your theme has widget areas (a sidebar or a footer), go to **Appearance >
    Widgets**: every Odavent block is also there as an **Odavent: ...** widget, for example a countdown or a
    list of speakers in your sidebar. On a block theme the widgets screen does not exist; use the blocks
-   (in the Site Editor too) instead.
+   (in the Site Editor too) instead. Blocks placed in Site Editor templates or template parts are not
+   refreshed automatically when the event changes; your webmaster can set that up, see
+   [docs/operations.md](docs/operations.md#page-caches).
 
 **When something looks off**
 
