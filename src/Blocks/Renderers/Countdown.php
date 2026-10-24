@@ -18,6 +18,9 @@ use Odavent\Events\Render\Template;
  * event, a paused event whose start has passed, a stale copy, or a missing/invalid start date. A paused event
  * that is still upcoming carries data-odv-paused so the script hides the block itself when the start passes
  * (a page left open, or served from a page cache, must not announce "Live now" for a paused event).
+ *
+ * On an event page the countdown shows only while the event is upcoming or live: an ended or paused event
+ * renders nothing there, because the page's single notice at the top already says so.
  */
 final class Countdown implements Renderer {
 
@@ -36,7 +39,8 @@ final class Countdown implements Renderer {
 		$now    = self::now();
 		$begins = $starts->getTimestamp();
 
-		if ( Event_View::PAUSED === $view->state() && $now >= $begins ) {
+		$in_page = Attributes::flag( $atts, Event_Page::IN_PAGE, false );
+		if ( Event_View::PAUSED === $view->state() && ( $in_page || $now >= $begins ) ) {
 			return '';
 		}
 
@@ -47,6 +51,10 @@ final class Countdown implements Renderer {
 			$state = 'live';
 		} else {
 			$state = 'upcoming';
+		}
+
+		if ( $in_page && 'ended' === $state ) {
+			return '';
 		}
 
 		$left = max( 0, $begins - $now );

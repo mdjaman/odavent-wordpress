@@ -21,7 +21,7 @@ class LifecycleMatrixTest extends BlockTestCase {
 	const CONTENT_BLOCKS = array( 'speakers', 'agenda', 'sponsors', 'countdown', 'venue', 'add-to-calendar' );
 
 	/** Every block, for the tests that must hold for all of them. */
-	const ALL_BLOCKS = array( 'event-header', 'register-button', 'tickets', 'find-registration', 'speakers', 'agenda', 'sponsors', 'countdown', 'venue', 'add-to-calendar' );
+	const ALL_BLOCKS = array( 'event-header', 'register-button', 'tickets', 'find-registration', 'speakers', 'agenda', 'sponsors', 'countdown', 'venue', 'add-to-calendar', 'event-page' );
 
 	/**
 	 * state label, editor?, links expected?, lifecycle text expected on header/register (null: none), text on tickets.

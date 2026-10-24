@@ -5,6 +5,7 @@ use Odavent\Events\Blocks\Renderers\Add_To_Calendar;
 use Odavent\Events\Blocks\Renderers\Agenda;
 use Odavent\Events\Blocks\Renderers\Countdown;
 use Odavent\Events\Blocks\Renderers\Event_Header;
+use Odavent\Events\Blocks\Renderers\Event_Page;
 use Odavent\Events\Blocks\Renderers\Find_Registration;
 use Odavent\Events\Blocks\Renderers\Register_Button;
 use Odavent\Events\Blocks\Renderers\Speakers;
@@ -22,8 +23,8 @@ use Odavent\Events\Settings\Options;
  *
  * render_block() decides everything around a block: which event (attribute id, then slug, then the
  * default event), whether there is anything to show (visitors get nothing for a deleted, unreachable or
- * draft event; editors get a notice), the lifecycle notice above the header and Register blocks, the
- * stylesheet, and that no error ever reaches the page.
+ * draft event; editors get a notice), the lifecycle notice above the header, Register and event page
+ * blocks, the stylesheet and scripts, and that no error ever reaches the page.
  */
 class Block_Registry {
 
@@ -32,8 +33,8 @@ class Block_Registry {
 	const EDITOR_HANDLE    = 'odavent-events-editor';
 	const EDITOR_DEPS      = array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-server-side-render', 'wp-api-fetch', 'wp-i18n' );
 
-	/** Blocks that carry the lifecycle notice (ended, paused, cancelled, draft preview). */
-	const NOTICE_BLOCKS = array( 'event-header', 'register-button' );
+	/** Blocks that carry the lifecycle notice (ended, paused, cancelled, draft preview); the event page once, above all its sections. */
+	const NOTICE_BLOCKS = array( 'event-header', 'register-button', 'event-page' );
 
 	/** Attributes the editor handles itself (event picker, core class name field). */
 	const EDITOR_MANAGED = array( 'eventId', 'eventSlug', 'className', 'lock', 'metadata' );
@@ -54,12 +55,13 @@ class Block_Registry {
 		'countdown'         => Countdown::class,
 		'venue'             => Venue::class,
 		'add-to-calendar'   => Add_To_Calendar::class,
+		'event-page'        => Event_Page::class,
 	);
 
 	/**
-	 * Browser scripts a block needs, by block slug => [script handle, marker that must be in the HTML].
-	 * The script is enqueued only when the rendered block contains the marker (the agenda needs its script
-	 * only when it shows filter buttons).
+	 * Browser scripts, by the block slug that introduced them => [script handle, marker that must be in the
+	 * HTML]. A script is enqueued when any rendered block contains its marker (the agenda needs its script
+	 * only when it shows filter buttons; an event page needs the scripts of the sections it shows).
 	 *
 	 * @var array<string, array{0: string, 1: string}>
 	 */
@@ -303,6 +305,9 @@ class Block_Registry {
 				return $this->editor_notice( $editor, self::empty_kind( $view ), self::empty_message( $view ) );
 			}
 
+			// Only the event page sets this for its sections: a block comment cannot.
+			unset( $attributes[ Event_Page::IN_PAGE ] );
+
 			$html = $renderer->render( $view, $attributes );
 			if ( in_array( $slug, self::NOTICE_BLOCKS, true ) ) {
 				$html = Lifecycle::notice_html( $view ) . $html;
@@ -310,8 +315,10 @@ class Block_Registry {
 
 			if ( '' !== $html ) {
 				$this->assets->enqueue_styles();
-				if ( isset( self::SCRIPTS[ $slug ] ) && false !== strpos( $html, self::SCRIPTS[ $slug ][1] ) ) {
-					$this->assets->enqueue_script( self::SCRIPTS[ $slug ][0] );
+				foreach ( self::SCRIPTS as $script ) {
+					if ( false !== strpos( $html, $script[1] ) ) {
+						$this->assets->enqueue_script( $script[0] );
+					}
 				}
 			}
 
@@ -537,6 +544,11 @@ class Block_Registry {
 			'showGoogle'       => __( 'Google Calendar link', 'odavent-events' ),
 			'showOutlook'      => __( 'Outlook link', 'odavent-events' ),
 			'showIcs'          => __( 'Calendar file (.ics) link', 'odavent-events' ),
+			'sections'         => __( 'Sections to show (comma list, blank for all)', 'odavent-events' ),
+			'showHeadings'     => __( 'Show section headings', 'odavent-events' ),
+			'speakersColumns'  => __( 'Speaker columns', 'odavent-events' ),
+			'sponsorsColumns'  => __( 'Sponsor columns', 'odavent-events' ),
+			'showSpeakerBio'   => __( 'Show speaker biographies', 'odavent-events' ),
 		);
 
 		foreach ( array( $block . '.' . $attribute, $attribute ) as $key ) {

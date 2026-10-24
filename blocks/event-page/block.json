@@ -1,0 +1,61 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/event-page",
+	"title": "Event page",
+	"category": "odavent-events",
+	"icon": "layout",
+	"description": "The whole event page in one block: header, countdown, registration, tickets, speakers, agenda, sponsors, venue and calendar links, kept up to date from Odavent.",
+	"keywords": [
+		"odavent",
+		"event",
+		"page",
+		"all-in-one"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"sections": {
+			"type": "string",
+			"default": ""
+		},
+		"showHeadings": {
+			"type": "boolean",
+			"default": true
+		},
+		"speakersColumns": {
+			"type": "integer",
+			"default": 3,
+			"minimum": 2,
+			"maximum": 4
+		},
+		"sponsorsColumns": {
+			"type": "integer",
+			"default": 4,
+			"minimum": 1,
+			"maximum": 6
+		},
+		"showSpeakerBio": {
+			"type": "boolean",
+			"default": false
+		},
+		"showAvailability": {
+			"type": "boolean",
+			"default": false
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

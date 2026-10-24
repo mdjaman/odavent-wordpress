@@ -88,10 +88,10 @@ class ShortcodesTest extends BlockTestCase {
 			$expected[] = 'odavent_' . str_replace( '-', '_', $slug );
 		}
 
-		$this->assertCount( 10, $expected );
+		$this->assertCount( 11, $expected );
 		$this->assertEqualsCanonicalizing( $expected, array_keys( $this->registered ) );
 		$this->assertEqualsCanonicalizing(
-			array( 'odavent_event_header', 'odavent_register_button', 'odavent_tickets', 'odavent_find_registration', 'odavent_speakers', 'odavent_agenda', 'odavent_sponsors', 'odavent_countdown', 'odavent_venue', 'odavent_add_to_calendar' ),
+			array( 'odavent_event_header', 'odavent_register_button', 'odavent_tickets', 'odavent_find_registration', 'odavent_speakers', 'odavent_agenda', 'odavent_sponsors', 'odavent_countdown', 'odavent_venue', 'odavent_add_to_calendar', 'odavent_event_page' ),
 			array_keys( $this->registered )
 		);
 	}
@@ -371,7 +371,7 @@ class ShortcodesTest extends BlockTestCase {
 	public function test_the_reference_lists_every_shortcode_with_snake_case_attributes(): void {
 		$reference = $this->shortcodes()->reference();
 
-		$this->assertCount( 10, $reference );
+		$this->assertCount( 11, $reference );
 		$this->assertArrayHasKey( 'odavent_speakers', $reference );
 		$speakers = $reference['odavent_speakers'];
 		$this->assertSame( 'speakers', $speakers['block'] );

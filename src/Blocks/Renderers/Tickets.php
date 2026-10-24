@@ -13,6 +13,10 @@ use Odavent\Events\Render\Template;
 /**
  * The ticket list. A ticket links to registration only while the event takes registrations, the ticket
  * is on sale and it is not full.
+ *
+ * On an event page, which prints the lifecycle and stale notices once at the top, the list does not repeat
+ * them: no stale notice, and no "why there are no links" line when a lifecycle notice already says it (the
+ * "Registration is closed." line of a live event has no notice above it, so it stays).
  */
 final class Tickets implements Renderer {
 
@@ -24,6 +28,8 @@ final class Tickets implements Renderer {
 		$permalink        = Attributes::permalink();
 		$label            = Attributes::text( $atts, 'buttonLabel', __( 'Register', 'odavent-events' ) );
 		$currency         = $event['currency'] ?? null;
+		$in_page          = Attributes::flag( $atts, Event_Page::IN_PAGE, false );
+		$page_says_why    = $in_page && null !== Lifecycle::notice( $view );
 
 		$rows      = array();
 		$any_links = false;
@@ -78,8 +84,8 @@ final class Tickets implements Renderer {
 				'event_id'     => Attributes::event_id( $event ),
 				'tickets'      => $rows,
 				'button_label' => $label,
-				'message'      => $view->is_stale() ? '' : Lifecycle::closed_message( $view ),
-				'stale_notice' => Lifecycle::stale_notice_html( $view ),
+				'message'      => $view->is_stale() || $page_says_why ? '' : Lifecycle::closed_message( $view ),
+				'stale_notice' => $in_page ? '' : Lifecycle::stale_notice_html( $view ),
 				'notice'       => $any_links ? __( 'Registration and payment are handled securely by Odavent.', 'odavent-events' ) : '',
 				'view'         => $view,
 			)

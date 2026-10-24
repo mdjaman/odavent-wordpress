@@ -21,7 +21,7 @@ class BlockJsonTest extends TestCase {
 
 	public function test_the_four_core_blocks_exist(): void {
 		$slugs = array_keys( $this->blocks() );
-		foreach ( array( 'event-header', 'register-button', 'tickets', 'find-registration', 'speakers', 'agenda', 'sponsors', 'countdown', 'venue', 'add-to-calendar' ) as $slug ) {
+		foreach ( array( 'event-header', 'register-button', 'tickets', 'find-registration', 'speakers', 'agenda', 'sponsors', 'countdown', 'venue', 'add-to-calendar', 'event-page' ) as $slug ) {
 			$this->assertContains( $slug, $slugs );
 		}
 	}
@@ -95,6 +95,7 @@ class BlockJsonTest extends TestCase {
 			'countdown'         => array( 'countdown', array( 'labelLive' => '', 'labelEnded' => '' ) ),
 			'venue'             => array( 'venue', array( 'showMapLink' => true ) ),
 			'add-to-calendar'   => array( 'add-to-calendar', array( 'showGoogle' => true, 'showOutlook' => true, 'showIcs' => true ) ),
+			'event-page'        => array( 'event-page', array( 'sections' => '', 'showHeadings' => true, 'speakersColumns' => 3, 'sponsorsColumns' => 4, 'showSpeakerBio' => false, 'showAvailability' => false ) ),
 		);
 	}
 

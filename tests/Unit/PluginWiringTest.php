@@ -266,7 +266,7 @@ class PluginWiringTest extends TestCase {
 			}
 		);
 		call_user_func( $late_init );
-		$this->assertCount( 10, $tags );
+		$this->assertCount( 11, $tags );
 		$this->assertContains( 'odavent_speakers', $tags );
 		$this->assertInstanceOf( \Odavent\Events\Shortcodes\Shortcodes::class, $plugin->shortcodes() );
 		$this->assertSame( $plugin->shortcodes(), $plugin->shortcodes() );

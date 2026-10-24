@@ -300,6 +300,11 @@
 
 .odv-notice--ended, .odv-notice--stale { border-inline-start-color: var(--_muted); }
 
+/* Event page: the sections of the matching blocks, one after the other, each under an optional heading */
+.odv-event-page { margin-block: calc(var(--odv-gap, 1rem) * 1.5); color: var(--odv-text, inherit); }
+.odv-event-page__section { margin-block: calc(var(--odv-gap, 1rem) * 2.5); }
+.odv-event-page__heading { margin-block: 0 var(--odv-gap, 1rem); }
+
 /* Keyboard focus, small screens, motion */
 .odv-agenda__filter:focus-visible,
 .odv-register .odv-register__button:focus-visible,

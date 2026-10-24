@@ -64,6 +64,7 @@ Every block renders one `section` with a root class, and its parts use BEM names
 | Countdown | `.odv-countdown` | `.odv-countdown__timer`, `.odv-countdown__unit`, `.odv-countdown__value`, `.odv-countdown__label`, `.odv-countdown__message` |
 | Venue | `.odv-venue` | `.odv-venue__name`, `.odv-venue__address`, `.odv-venue__map` |
 | Add to calendar | `.odv-calendar` | `.odv-calendar__list`, `.odv-calendar__link` |
+| Event page | `.odv-event-page` (a `div`) | `.odv-event-page__section` (one per section shown, with a `.odv-event-page__section--{section}` modifier and an `id` anchor such as `odv-speakers-42`), `.odv-event-page__heading`; each section holds the matching block's own markup |
 | Notices (lifecycle lines, editor messages) | `.odv-notice` | `.odv-notice--ended`, `.odv-notice--paused`, `.odv-notice--cancelled`, `.odv-notice--draft`, `.odv-notice--stale`, `.odv-notice--unavailable`, `.odv-notice--error` |
 
 What the scripts depend on, if you override these templates: `.odv-agenda__filter` buttons with a
@@ -110,6 +111,7 @@ All the block templates receive `$classes` (the root element classes, escape wit
 | `countdown` | `$starts_at`, `$ends_at` (ISO 8601), `$state` (`upcoming`, `live`, `ended`), `$ended_flag`, `$paused`, `$label_live`, `$label_ended`, `$days`, `$hours`, `$minutes`, `$seconds` |
 | `venue` | `$name`, `$address`, `$map_url` (`''` when the link is off) |
 | `add-to-calendar` | `$links` (rows: `url`, `label`, `download`) |
+| `event-page` | `$sections` (rows in page order: `slug`, `id` (unique anchor), `title` (`''` for sections without a heading), `html` (the section's own rendered markup)), `$show_headings`, `$stale_notice` (HTML of a notice, `''` unless the data is a stale copy) |
 | `notice` | `$kind` (the modifier: `ended`, `paused`, `cancelled`, `draft`, `stale`, `unavailable`, `choose`, `error`), `$message` (plain text). This template has no `$classes`, `$event_id` or `$view`. |
 
 To pass more variables to a template, or change them, use the
