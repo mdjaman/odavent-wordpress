@@ -16,7 +16,8 @@ use Odavent\Events\Render\Template;
  * the lifecycle notice above it, assets, errors). The sections are called directly, never through
  * render_block(), so that notice is printed once for the page; each section gets the internal attribute
  * `inEventPage`, which tells Register, Tickets and Countdown not to repeat it (and the stale notice, which
- * this page prints once instead). A section with nothing to show is dropped with its heading and wrapper,
+ * this page prints once instead); when the Register section is shown, the tickets also leave out its status
+ * and secure-payment lines. A section with nothing to show is dropped with its heading and wrapper,
  * and one that throws is dropped (editors see the error notice in its place) while the rest still render.
  */
 final class Event_Page implements Renderer {
@@ -44,6 +45,15 @@ final class Event_Page implements Renderer {
 	/** The attribute the page passes to its sections. Not in any block.json, and removed from block input by the registry. */
 	const IN_PAGE = 'inEventPage';
 
+	/**
+	 * Passed to the tickets section when the Register section above it rendered something: its status line
+	 * and secure-payment line are then already on the page. Internal too, removed from block input likewise.
+	 */
+	const IN_PAGE_REGISTER_SHOWN = 'inEventPageRegisterShown';
+
+	/** Every internal attribute, for the registry to strip from block and shortcode input. */
+	const INTERNAL_ATTRIBUTES = array( self::IN_PAGE, self::IN_PAGE_REGISTER_SHOWN );
+
 	/** @var array<string, int> Section ids handed out in this request => how many times. */
 	private static $ids = array();
 
@@ -66,21 +76,26 @@ final class Event_Page implements Renderer {
 		$event_id = Attributes::event_id( $view->event() );
 		$labels   = self::section_labels();
 
-		$sections = array();
+		$sections       = array();
+		$register_shown = false;
 		foreach ( $chosen as $slug ) {
 			$title = in_array( $slug, self::HEADED_SECTIONS, true ) ? $labels[ $slug ] : '';
 
+			$failed = false;
 			try {
-				$html = $this->section_renderer( $slug )->render( $view, self::section_attributes( $slug, $atts ) );
+				$html = $this->section_renderer( $slug )->render( $view, self::section_attributes( $slug, $atts, $register_shown ) );
 			} catch ( \Throwable $e ) {
 				self::log( $e );
-				$html  = self::error_notice();
-				$title = '';
+				$html   = self::error_notice();
+				$title  = '';
+				$failed = true;
 			}
 
 			if ( '' === trim( $html ) ) {
 				continue;
 			}
+			// Register comes before Tickets (fixed order): what it printed is known when Tickets renders.
+			$register_shown = $register_shown || ( 'register' === $slug && ! $failed );
 
 			$sections[] = array(
 				'slug'  => $slug,
@@ -90,19 +105,21 @@ final class Event_Page implements Renderer {
 			);
 		}
 
-		if ( array() === $sections ) {
-			return '';
-		}
-
 		// The stale notice stands in for the Register links, so it is shown only when the page offers them.
 		$offers_registration = in_array( 'register', $chosen, true ) || in_array( 'tickets', $chosen, true );
+		$stale_notice        = $offers_registration ? Lifecycle::stale_notice_html( $view ) : '';
+
+		// Nothing to show, unless the stale notice explains why the Register links are missing.
+		if ( array() === $sections && '' === $stale_notice ) {
+			return '';
+		}
 
 		return Template::render(
 			'event-page',
 			array(
 				'classes'       => Attributes::root_classes( 'odv-event-page', $atts ),
 				'event_id'      => $event_id,
-				'stale_notice'  => $offers_registration ? Lifecycle::stale_notice_html( $view ) : '',
+				'stale_notice'  => $stale_notice,
 				'sections'      => $sections,
 				'show_headings' => Attributes::flag( $atts, 'showHeadings', true ),
 				'view'          => $view,
@@ -177,10 +194,11 @@ final class Event_Page implements Renderer {
 	/**
 	 * What one section renderer gets: the in-page marker and the settings the page passes on to it.
 	 *
-	 * @param string $slug Section slug.
-	 * @param array  $atts The page's attributes.
+	 * @param string $slug           Section slug.
+	 * @param array  $atts           The page's attributes.
+	 * @param bool   $register_shown Whether the Register section rendered something above.
 	 */
-	private static function section_attributes( string $slug, array $atts ): array {
+	private static function section_attributes( string $slug, array $atts, bool $register_shown ): array {
 		$section = array( self::IN_PAGE => true );
 
 		switch ( $slug ) {
@@ -193,6 +211,9 @@ final class Event_Page implements Renderer {
 				break;
 			case 'tickets':
 				$section['showAvailability'] = Attributes::flag( $atts, 'showAvailability', false );
+				if ( $register_shown ) {
+					$section[ self::IN_PAGE_REGISTER_SHOWN ] = true;
+				}
 				break;
 		}
 

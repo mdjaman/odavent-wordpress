@@ -305,8 +305,10 @@ class Block_Registry {
 				return $this->editor_notice( $editor, self::empty_kind( $view ), self::empty_message( $view ) );
 			}
 
-			// Only the event page sets this for its sections: a block comment cannot.
-			unset( $attributes[ Event_Page::IN_PAGE ] );
+			// Only the event page sets these for its sections: a block comment cannot.
+			foreach ( Event_Page::INTERNAL_ATTRIBUTES as $internal ) {
+				unset( $attributes[ $internal ] );
+			}
 
 			$html = $renderer->render( $view, $attributes );
 			if ( in_array( $slug, self::NOTICE_BLOCKS, true ) ) {

@@ -331,11 +331,79 @@ class EventPageTest extends BlockTestCase {
 	public function test_live_event_closed_status_is_kept(): void {
 		$html = $this->page( $this->payload( self::state_overrides()['live closed'] ) );
 
-		$this->assertStringContainsString( 'Registration is closed.', $html );
-		$this->assertStringContainsString( '<p class="odv-tickets__message">Registration is closed.</p>', $html );
+		$this->assertSame( 1, substr_count( $html, 'Registration is closed.' ), 'once, under the Register section' );
 		$this->assertStringContainsString( '<p class="odv-register__status">Registration is closed.</p>', $html );
+		$this->assertStringNotContainsString( 'odv-tickets__message', $html );
+		$this->assertStringContainsString( 'odv-tickets__item', $html );
 		$this->assertStringNotContainsString( 'odv-notice', $html );
 		$this->assertStringContainsString( 'odv-countdown', $html, 'a live event keeps its countdown' );
+
+		// Without the Register section on the page, the tickets keep their line.
+		Event_Page::reset_ids();
+		$tickets = $this->page( $this->payload( self::state_overrides()['live closed'] ), array( 'eventId' => 42, 'sections' => 'tickets' ) );
+		$this->assertSame( 1, substr_count( $tickets, 'Registration is closed.' ) );
+		$this->assertStringContainsString( '<p class="odv-tickets__message">Registration is closed.</p>', $tickets );
+	}
+
+	public function test_the_secure_payment_line_is_shown_once_on_an_open_event(): void {
+		$line = 'Registration and payment are handled securely by Odavent.';
+		foreach ( array( 'live', 'ended open' ) as $state ) {
+			Event_Page::reset_ids();
+			$html = $this->page( $this->payload( self::state_overrides()[ $state ] ) );
+
+			$this->assertSame( 1, substr_count( $html, $line ), $state );
+			$this->assertStringContainsString( 'odv-register__button', $html, $state );
+			$this->assertStringContainsString( 'odv-tickets__register', $html, $state . ': the tickets keep their links' );
+			$this->assertSame( 1, substr_count( $html, '<p class="odv-register__notice">' ), $state . ': under the Register button' );
+		}
+
+		// Without the Register section, the tickets keep the line.
+		Event_Page::reset_ids();
+		$tickets = $this->page( $this->payload(), array( 'eventId' => 42, 'sections' => 'tickets' ) );
+		$this->assertSame( 1, substr_count( $tickets, $line ) );
+		$this->assertStringContainsString( 'odv-tickets__register', $tickets );
+	}
+
+	public function test_tickets_keep_their_lines_when_the_register_section_renders_nothing(): void {
+		$throwing = new class() implements Renderer {
+			public function render( Event_View $view, array $atts ): string {
+				throw new \RuntimeException( 'boom' );
+			}
+		};
+		$empty = new class() implements Renderer {
+			public function render( Event_View $view, array $atts ): string {
+				return '';
+			}
+		};
+
+		foreach ( array( 'empty' => $empty, 'throwing' => $throwing ) as $case => $register ) {
+			Event_Page::reset_ids();
+			$registry = $this->registry( $this->payload( self::state_overrides()['live closed'] ) );
+			$registry->use_renderer( 'event-page', new Event_Page( array( 'register' => $register ) ) );
+			$html = $registry->render_block( 'odavent-events/event-page', array( 'eventId' => 42 ) );
+
+			$this->assertStringNotContainsString( 'id="odv-register-', $html, $case );
+			$this->assertStringContainsString( '<p class="odv-tickets__message">Registration is closed.</p>', $html, $case );
+		}
+
+		Event_Page::reset_ids();
+		$registry = $this->registry( $this->payload() );
+		$registry->use_renderer( 'event-page', new Event_Page( array( 'register' => $empty ) ) );
+		$html = $registry->render_block( 'odavent-events/event-page', array( 'eventId' => 42 ) );
+		$this->assertSame( 1, substr_count( $html, 'Registration and payment are handled securely by Odavent.' ) );
+	}
+
+	public function test_a_stale_copy_with_only_the_register_section_still_explains(): void {
+		$html = $this->page( $this->payload(), array( 'eventId' => 42, 'sections' => 'register' ), true );
+
+		$this->assertStringStartsWith( '<div class="odv-event-page" data-odv-event="42">' . "\n\t" . '<div class="odv-notice odv-notice--stale"', trim( $html ) );
+		$this->assertSame( 1, substr_count( $html, 'Registration details could not be refreshed.' ) );
+		$this->assertStringNotContainsString( 'odv-event-page__section', $html );
+		$this->assertStringNotContainsString( 'odv-register__button', $html );
+		$this->assertSame( array( 'odavent-events' ), $this->enqueued_styles );
+
+		// A fresh copy with nothing to show still renders nothing.
+		$this->assertSame( '', $this->page( $this->payload( array( 'status' => 'published' ), 'payload-v1-minimal' ), array( 'eventId' => 42, 'sections' => 'tickets' ) ) );
 	}
 
 	public function test_a_paused_upcoming_event_has_no_countdown_on_the_page_but_keeps_it_as_a_block(): void {
@@ -356,6 +424,25 @@ class EventPageTest extends BlockTestCase {
 
 		$stale = $this->registry( $this->payload(), Event_View::UNAVAILABLE, array(), 0, true )->render_block( 'odavent-events/register-button', array( 'eventId' => 42, 'inEventPage' => true ) );
 		$this->assertStringContainsString( 'odv-notice--stale', $stale );
+	}
+
+	public function test_the_register_shown_attribute_cannot_be_set_on_a_block_or_a_shortcode(): void {
+		$line = 'Registration and payment are handled securely by Odavent.';
+		$atts = array( 'eventId' => 42, 'inEventPage' => true, 'inEventPageRegisterShown' => true );
+
+		$closed = $this->registry( $this->payload( self::state_overrides()['live closed'] ) )->render_block( 'odavent-events/tickets', $atts );
+		$this->assertStringContainsString( '<p class="odv-tickets__message">Registration is closed.</p>', $closed );
+
+		$open = $this->registry( $this->payload() )->render_block( 'odavent-events/tickets', $atts );
+		$this->assertStringContainsString( $line, $open );
+
+		$shortcodes = new Shortcodes( $this->registry( $this->payload() ) );
+		foreach ( array( 'in_event_page_register_shown', 'inEventPageRegisterShown', 'in_event_page' ) as $name ) {
+			$this->assertArrayNotHasKey( 'inEventPageRegisterShown', $shortcodes->to_block_attributes( 'tickets', array( $name => 'yes' ) ), $name );
+			$this->assertArrayNotHasKey( 'inEventPage', $shortcodes->to_block_attributes( 'tickets', array( $name => 'yes' ) ), $name );
+			$this->assertStringContainsString( $line, $shortcodes->handle( 'tickets', array( 'event_id' => '42', $name => 'yes', 'in_event_page' => 'yes' ) ), $name );
+		}
+		$this->assertSame( array( 'inEventPage', 'inEventPageRegisterShown' ), Event_Page::INTERNAL_ATTRIBUTES );
 	}
 
 	public function test_one_failing_section_does_not_hide_the_others(): void {

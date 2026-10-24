@@ -16,7 +16,9 @@ use Odavent\Events\Render\Template;
  *
  * On an event page, which prints the lifecycle and stale notices once at the top, the list does not repeat
  * them: no stale notice, and no "why there are no links" line when a lifecycle notice already says it (the
- * "Registration is closed." line of a live event has no notice above it, so it stays).
+ * "Registration is closed." line of a live event has no notice above it, so it stays, unless the page's
+ * Register section already printed it). When that Register section is shown, the secure-payment line under
+ * the list is left out too, as the Register section carries it.
  */
 final class Tickets implements Renderer {
 
@@ -29,7 +31,8 @@ final class Tickets implements Renderer {
 		$label            = Attributes::text( $atts, 'buttonLabel', __( 'Register', 'odavent-events' ) );
 		$currency         = $event['currency'] ?? null;
 		$in_page          = Attributes::flag( $atts, Event_Page::IN_PAGE, false );
-		$page_says_why    = $in_page && null !== Lifecycle::notice( $view );
+		$register_shown   = Attributes::flag( $atts, Event_Page::IN_PAGE_REGISTER_SHOWN, false );
+		$page_says_why    = $register_shown || ( $in_page && null !== Lifecycle::notice( $view ) );
 
 		$rows      = array();
 		$any_links = false;
@@ -86,7 +89,7 @@ final class Tickets implements Renderer {
 				'button_label' => $label,
 				'message'      => $view->is_stale() || $page_says_why ? '' : Lifecycle::closed_message( $view ),
 				'stale_notice' => $in_page ? '' : Lifecycle::stale_notice_html( $view ),
-				'notice'       => $any_links ? __( 'Registration and payment are handled securely by Odavent.', 'odavent-events' ) : '',
+				'notice'       => $any_links && ! $register_shown ? __( 'Registration and payment are handled securely by Odavent.', 'odavent-events' ) : '',
 				'view'         => $view,
 			)
 		);
