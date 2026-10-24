@@ -21,6 +21,23 @@ function odv_entry_label( Translation $t ): string {
 	return ( null !== $t->getContext() ? '[' . $t->getContext() . '] ' : '' ) . '"' . $t->getOriginal() . '"';
 }
 
+/**
+ * The scripts (assets/js/*.js, without line numbers) an entry is referenced from, sorted.
+ *
+ * @return string[]
+ */
+function odv_js_references( Translation $t ): array {
+	$scripts = array();
+	foreach ( array_keys( $t->getReferences()->toArray() ) as $reference ) {
+		if ( 1 === preg_match( '#^assets/js/.+\.js$#', (string) $reference ) ) {
+			$scripts[] = (string) $reference;
+		}
+	}
+	sort( $scripts );
+
+	return $scripts;
+}
+
 /** @return Translations[] Locale => parsed .po files of a plugin tree. */
 function odv_load_po_files( string $source ): array {
 	$files = glob( $source . '/languages/' . ODV_SLUG . '-*.po' );
@@ -77,6 +94,13 @@ function odv_check_translations( string $source ): array {
 			if ( ! isset( $pot[ $key ] ) ) {
 				$errors[] = "{$name}: msgid not in the .pot (stale or misspelt): {$label}";
 				continue;
+			}
+
+			// Browser translations depend on the `#: assets/js/x.js` references: odv_js_translation_files()
+			// puts a string in a script's JSON file only when the .po lists that script for it.
+			$missing_scripts = array_diff( odv_js_references( $pot[ $key ] ), odv_js_references( $t ) );
+			foreach ( $missing_scripts as $script ) {
+				$errors[] = "{$name}: {$label} is used by {$script} in the .pot but the .po has no '#: {$script}' reference for it (the browser translation would be missing).";
 			}
 
 			// The library reads an empty msgstr as null.

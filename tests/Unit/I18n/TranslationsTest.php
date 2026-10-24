@@ -127,7 +127,10 @@ class TranslationsTest extends TestCase {
 			'empty msgstr'     => preg_replace( '/msgstr "Complet"/u', 'msgstr ""', $po, 1 ),
 			'unknown msgid'    => $po . "\nmsgid \"Not in the template\"\nmsgstr \"Absent du modèle\"\n",
 			'placeholder lost' => str_replace( 'Événement n° %d', 'Événement n° ', $po ),
+			// Complete in every other way, but the browser would not get the string.
+			'js reference lost' => preg_replace( '/(?:^#: assets\/js\/editor\.js:\d+\n)+/m', '', $po, 1 ),
 		);
+		$this->assertNotSame( $po, $cases['js reference lost'], 'The case must really change the .po.' );
 		foreach ( $cases as $label => $broken ) {
 			file_put_contents( $tmp . '/languages/odavent-events-fr_FR.po', $broken );
 			exec( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( $script ) . ' --source=' . escapeshellarg( $tmp ) . ' 2>&1', $out, $code );
