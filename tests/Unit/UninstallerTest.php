@@ -22,13 +22,18 @@ class UninstallerTest extends TestCase {
 		parent::tearDown();
 	}
 
+	/** @var array Every options-API call: "function:name". */
+	private $calls = array();
+
 	/**
-	 * A $wpdb double that records every prepared query.
+	 * A $wpdb double: get_col() answers each prepared LIKE from $rows (table => names) and records the query.
+	 * It has no query() method, so a raw DELETE fails the test.
 	 *
-	 * @param array $queries Collected by reference: list of [sql, arg].
+	 * @param array $queries Collected by reference: list of prepared SQL.
+	 * @param array $rows    table => option or meta names in that table.
 	 */
-	private function fake_wpdb( array &$queries ): \Mockery\MockInterface {
-		$wpdb          = \Mockery::mock( 'wpdb' );
+	private function fake_wpdb( array &$queries, array $rows ): \Mockery\MockInterface {
+		$wpdb           = \Mockery::mock( 'wpdb' );
 		$wpdb->options  = 'wp_options';
 		$wpdb->sitemeta = 'wp_sitemeta';
 
@@ -42,10 +47,19 @@ class UninstallerTest extends TestCase {
 				return $sql . ' [' . $arg . ']';
 			}
 		);
-		$wpdb->shouldReceive( 'query' )->andReturnUsing(
-			static function ( $sql ) use ( &$queries ) {
+		$wpdb->shouldReceive( 'get_col' )->andReturnUsing(
+			static function ( $sql ) use ( &$queries, $rows ) {
 				$queries[] = $sql;
-				return 1;
+				preg_match( '/FROM (\S+) .*\[(.*)%\]$/', $sql, $m );
+				$prefix = stripcslashes( str_replace( array( '\\_', '\\%' ), array( '_', '%' ), $m[2] ) );
+				return array_values(
+					array_filter(
+						$rows[ $m[1] ] ?? array(),
+						static function ( $name ) use ( $prefix ) {
+							return 0 === strpos( $name, $prefix );
+						}
+					)
+				);
 			}
 		);
 
@@ -54,42 +68,98 @@ class UninstallerTest extends TestCase {
 		return $wpdb;
 	}
 
-	public function test_single_site_deletes_settings_lastgood_options_and_transients(): void {
+	private function record_api(): void {
+		foreach ( array( 'delete_option', 'delete_transient', 'delete_site_transient', 'delete_site_option' ) as $fn ) {
+			Functions\when( $fn )->alias(
+				function ( $name ) use ( $fn ) {
+					$this->calls[] = $fn . ':' . $name;
+					return true;
+				}
+			);
+		}
+	}
+
+	public function test_single_site_deletes_settings_lastgood_options_and_transients_through_the_options_api(): void {
 		Functions\when( 'is_multisite' )->justReturn( false );
-		Functions\expect( 'delete_option' )->once()->with( 'odavent_events_settings' );
+		$this->record_api();
 
 		$queries = array();
-		$this->fake_wpdb( $queries );
+		$this->fake_wpdb(
+			$queries,
+			array(
+				'wp_options' => array(
+					'odavent_events_lastgood_42_en',
+					'_transient_odavent_events_ev_42_en',
+					'_transient_timeout_odavent_events_ev_42_en',
+					'_site_transient_odavent_events_update',
+					'_site_transient_timeout_odavent_events_update',
+					'other_plugin_option',
+				),
+			)
+		);
 
 		\Odavent\Events\Uninstaller::run();
 
 		$this->assertCount( 5, $queries );
-		$this->assertStringContainsString( 'DELETE FROM wp_options WHERE option_name LIKE %s [odavent\_events\_lastgood\_%]', $queries[0] );
+		$this->assertStringContainsString( 'SELECT option_name FROM wp_options WHERE option_name LIKE %s [odavent\_events\_lastgood\_%]', $queries[0] );
 		$this->assertStringContainsString( '[\_transient\_odavent\_events\_%]', $queries[1] );
 		$this->assertStringContainsString( '[\_transient\_timeout\_odavent\_events\_%]', $queries[2] );
 		$this->assertStringContainsString( '[\_site\_transient\_odavent\_events\_%]', $queries[3] );
 		$this->assertStringContainsString( '[\_site\_transient\_timeout\_odavent\_events\_%]', $queries[4] );
+
+		foreach ( array(
+			'delete_option:odavent_events_settings',
+			'delete_transient:odavent_events_list',
+			'delete_transient:odavent_events_backoff',
+			'delete_transient:odavent_events_invalid_key_notice',
+			'delete_transient:odavent_events_contract_notice',
+			'delete_transient:odavent_events_conn_disabled',
+			'delete_site_transient:odavent_events_update',
+			'delete_option:odavent_events_lastgood_42_en',
+			'delete_option:_transient_odavent_events_ev_42_en',
+			'delete_transient:odavent_events_ev_42_en',
+			'delete_option:_transient_timeout_odavent_events_ev_42_en',
+			'delete_option:_site_transient_odavent_events_update',
+			'delete_option:_site_transient_timeout_odavent_events_update',
+		) as $call ) {
+			$this->assertContains( $call, $this->calls );
+		}
+		$this->assertNotContains( 'delete_option:other_plugin_option', $this->calls );
+		$this->assertNotContains( 'delete_transient:timeout_odavent_events_ev_42_en', $this->calls, 'a timeout row is not a transient' );
 	}
 
 	public function test_multisite_cleans_every_site(): void {
 		Functions\when( 'is_multisite' )->justReturn( true );
 		Functions\expect( 'get_sites' )->once()->andReturn( array( 1, 4 ) );
 		Functions\expect( 'switch_to_blog' )->once()->with( 1 )->ordered();
-		Functions\expect( 'delete_option' )->twice()->with( 'odavent_events_settings' );
 		Functions\expect( 'restore_current_blog' )->twice();
 		Functions\expect( 'switch_to_blog' )->once()->with( 4 );
+		$this->record_api();
 
 		$queries = array();
-		$this->fake_wpdb( $queries );
+		$this->fake_wpdb(
+			$queries,
+			array(
+				'wp_options'  => array( 'odavent_events_lastgood_7_fr' ),
+				'wp_sitemeta' => array( '_site_transient_odavent_events_update', '_site_transient_timeout_odavent_events_update', 'site_admins' ),
+			)
+		);
 
 		\Odavent\Events\Uninstaller::run();
 
-		// Five per site, plus the two network-wide site-transient rows in sitemeta.
+		// Five per site, plus the two network-wide site-transient lookups in sitemeta.
 		$this->assertCount( 12, $queries );
 
 		$network = array_slice( $queries, 10 );
-		$this->assertStringContainsString( 'DELETE FROM wp_sitemeta WHERE meta_key LIKE %s [\_site\_transient\_odavent\_events\_%]', $network[0] );
-		$this->assertStringContainsString( 'DELETE FROM wp_sitemeta WHERE meta_key LIKE %s [\_site\_transient\_timeout\_odavent\_events\_%]', $network[1] );
+		$this->assertStringContainsString( 'SELECT meta_key FROM wp_sitemeta WHERE meta_key LIKE %s [\_site\_transient\_odavent\_events\_%]', $network[0] );
+		$this->assertStringContainsString( 'SELECT meta_key FROM wp_sitemeta WHERE meta_key LIKE %s [\_site\_transient\_timeout\_odavent\_events\_%]', $network[1] );
+
+		$counts = array_count_values( $this->calls );
+		$this->assertSame( 2, $counts['delete_option:odavent_events_settings'] );
+		$this->assertSame( 2, $counts['delete_option:odavent_events_lastgood_7_fr'] );
+		$this->assertSame( 1, $counts['delete_site_option:_site_transient_odavent_events_update'] );
+		$this->assertSame( 1, $counts['delete_site_option:_site_transient_timeout_odavent_events_update'] );
+		$this->assertArrayNotHasKey( 'delete_site_option:site_admins', $counts );
 	}
 
 	public function test_uninstall_file_is_guarded_by_the_wordpress_constant(): void {
@@ -114,11 +184,13 @@ define( "WP_UNINSTALL_PLUGIN", "odavent-events/odavent-events.php" );
 $log = array();
 function is_multisite() { return false; }
 function delete_option( $name ) { global $log; $log[] = "delete_option:" . $name; }
+function delete_transient( $name ) { global $log; $log[] = "delete_transient:" . $name; }
+function delete_site_transient( $name ) { global $log; $log[] = "delete_site_transient:" . $name; }
 class FakeDb {
 	public $options = "wp_options";
 	public function esc_like( $t ) { return $t; }
 	public function prepare( $sql, $arg ) { return $arg; }
-	public function query( $q ) { global $log; $log[] = "query:" . $q; return 1; }
+	public function get_col( $q ) { global $log; $log[] = "select:" . $q; return "odavent_events_lastgood_%" === $q ? array( "odavent_events_lastgood_1_en" ) : array(); }
 }
 $wpdb = new FakeDb();
 require ' . var_export( dirname( __DIR__, 2 ) . '/uninstall.php', true ) . ';
@@ -129,7 +201,7 @@ echo implode( "|", $log );'
 		unlink( $script );
 
 		$this->assertSame(
-			'delete_option:odavent_events_settings|query:odavent_events_lastgood_%|query:_transient_odavent_events_%|query:_transient_timeout_odavent_events_%|query:_site_transient_odavent_events_%|query:_site_transient_timeout_odavent_events_%',
+			'delete_option:odavent_events_settings|delete_transient:odavent_events_list|delete_transient:odavent_events_backoff|delete_transient:odavent_events_invalid_key_notice|delete_transient:odavent_events_contract_notice|delete_transient:odavent_events_conn_disabled|delete_site_transient:odavent_events_update|select:odavent_events_lastgood_%|delete_option:odavent_events_lastgood_1_en|select:_transient_odavent_events_%|select:_transient_timeout_odavent_events_%|select:_site_transient_odavent_events_%|select:_site_transient_timeout_odavent_events_%',
 			trim( (string) $output )
 		);
 	}
