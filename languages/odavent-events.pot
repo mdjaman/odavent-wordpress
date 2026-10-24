@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-24T02:58:52+00:00\n"
+"POT-Creation-Date: 2026-10-24T10:11:08+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: odavent-events\n"
@@ -18,7 +18,7 @@ msgstr ""
 #: odavent-events.php
 #: src/Settings/Settings_Page.php:59
 #: src/Settings/Settings_Page.php:60
-#: src/Settings/Settings_Page.php:220
+#: src/Settings/Settings_Page.php:226
 msgid "Odavent Events"
 msgstr ""
 
@@ -29,7 +29,7 @@ msgstr ""
 
 #. Description of the plugin
 #: odavent-events.php
-#: src/Updates/Update_Checker.php:186
+#: src/Updates/Update_Checker.php:189
 msgid "Show live speakers, agenda, sponsors and tickets from your Odavent events on your own WordPress site."
 msgstr ""
 
@@ -214,15 +214,15 @@ msgstr ""
 msgid "Registration is closed."
 msgstr ""
 
-#: src/Blocks/Renderers/Add_To_Calendar.php:22
+#: src/Blocks/Renderers/Add_To_Calendar.php:28
 msgid "Google Calendar"
 msgstr ""
 
-#: src/Blocks/Renderers/Add_To_Calendar.php:23
+#: src/Blocks/Renderers/Add_To_Calendar.php:29
 msgid "Outlook"
 msgstr ""
 
-#: src/Blocks/Renderers/Add_To_Calendar.php:24
+#: src/Blocks/Renderers/Add_To_Calendar.php:30
 msgid "Download .ics file"
 msgstr ""
 
@@ -266,20 +266,20 @@ msgstr ""
 msgid "Registration and payment are handled securely by Odavent."
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:124
+#: src/Blocks/Renderers/Sponsors.php:139
 msgid "Sponsors"
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:126
+#: src/Blocks/Renderers/Sponsors.php:141
 msgid "Exhibitors"
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:128
+#: src/Blocks/Renderers/Sponsors.php:143
 msgid "Media partners"
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:130
-#: src/Blocks/Renderers/Sponsors.php:135
+#: src/Blocks/Renderers/Sponsors.php:145
+#: src/Blocks/Renderers/Sponsors.php:150
 msgid "Partners"
 msgstr ""
 
@@ -295,19 +295,19 @@ msgid_plural "%s spots left"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Refresh/Refresh_Controller.php:73
+#: src/Refresh/Refresh_Controller.php:74
 msgid "The refresh could not be completed."
 msgstr ""
 
-#: src/Refresh/Refresh_Controller.php:82
+#: src/Refresh/Refresh_Controller.php:83
 msgid "The request body is too large."
 msgstr ""
 
-#: src/Refresh/Refresh_Controller.php:113
+#: src/Refresh/Refresh_Controller.php:114
 msgid "The request is not a valid refresh."
 msgstr ""
 
-#: src/Refresh/Refresh_Controller.php:177
+#: src/Refresh/Refresh_Controller.php:200
 msgid "Invalid or missing signature."
 msgstr ""
 
@@ -379,107 +379,107 @@ msgstr ""
 msgid "Default styles"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:142
+#: src/Settings/Settings_Page.php:148
 msgid "Enter a site key first."
 msgstr ""
 
 #. translators: %d: number of events.
-#: src/Settings/Settings_Page.php:158
+#: src/Settings/Settings_Page.php:164
 #, php-format
 msgid "Connected: %d event found."
 msgid_plural "Connected: %d events found."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Settings/Settings_Page.php:163
+#: src/Settings/Settings_Page.php:169
 msgid "The site key was rejected."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:168
+#: src/Settings/Settings_Page.php:174
 msgid "Could not reach Odavent. Check the URL and try again."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:178
+#: src/Settings/Settings_Page.php:184
 msgid "Cache cleared."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:188
+#: src/Settings/Settings_Page.php:194
 msgid "You do not have permission to do this."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:232
+#: src/Settings/Settings_Page.php:238
 msgid "Tools"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:233
+#: src/Settings/Settings_Page.php:239
 msgid "Test the connection with the saved settings, or clear everything this plugin has cached."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:234
+#: src/Settings/Settings_Page.php:240
 msgid "Test connection"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:235
+#: src/Settings/Settings_Page.php:241
 msgid "Clear cache"
 msgstr ""
 
 #. translators: %d: number of minutes.
-#: src/Settings/Settings_Page.php:264
+#: src/Settings/Settings_Page.php:270
 #, php-format
 msgid "Live updates need pretty permalinks; pages refresh every %d minute instead."
 msgid_plural "Live updates need pretty permalinks; pages refresh every %d minutes instead."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Settings/Settings_Page.php:280
+#: src/Settings/Settings_Page.php:289
 msgid "Your Odavent site key was rejected; check it below."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:284
+#: src/Settings/Settings_Page.php:293
 msgid "Odavent has a newer data format than this plugin supports; update the Odavent plugin."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:293
+#: src/Settings/Settings_Page.php:302
 msgid "ODAVENT_SITE_KEY in wp-config.php is not a valid site key (it starts with odv_wp_), so it is ignored."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:297
+#: src/Settings/Settings_Page.php:306
 msgid "Your Odavent plan no longer includes the WordPress plugin; published events keep showing."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:320
+#: src/Settings/Settings_Page.php:329
 msgid "Defined in wp-config.php"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:320
+#: src/Settings/Settings_Page.php:329
 msgid "A key is stored"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:327
+#: src/Settings/Settings_Page.php:336
 msgid "Leave blank to keep the stored key. Find your site key in your Odavent organization settings."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:342
+#: src/Settings/Settings_Page.php:351
 msgid "Could not load your events from Odavent, so enter the event ID. 0 means none."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:347
+#: src/Settings/Settings_Page.php:356
 msgid "None"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:360
+#: src/Settings/Settings_Page.php:369
 msgid "Used by blocks and shortcodes that do not name an event."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:371
+#: src/Settings/Settings_Page.php:380
 msgid "seconds (60 to 86400)"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:379
+#: src/Settings/Settings_Page.php:388
 msgid "Load the default styles for Odavent blocks"
 msgstr ""
 
-#: src/Updates/Update_Checker.php:189
+#: src/Updates/Update_Checker.php:192
 msgid "View the changelog"
 msgstr ""
 
