@@ -144,9 +144,9 @@ Odavent's cache (README, "How Odavent serves the update").
 ## Uninstall
 
 Deleting the plugin from the Plugins screen removes its settings option, all cached event data, "last good"
-copies, transients and the update check. On multisite it does this for every site and for the network-wide
+copies, transients, the update check and the widgets' settings. On multisite it does this for every site and for the network-wide
 update check. The blocks and shortcodes you added to pages stay in your content (and show as unknown
-blocks); the `ODAVENT_SITE_KEY` constant stays in your `wp-config.php`, where you can remove it.
+blocks), widgets you placed disappear from their widget areas; the `ODAVENT_SITE_KEY` constant stays in your `wp-config.php`, where you can remove it.
 
 ## Reporting a vulnerability
 
