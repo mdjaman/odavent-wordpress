@@ -53,7 +53,7 @@ the order you typed. A sidebar is narrow: this widget is best for a short select
 
 A widget is not part of a post's content and can appear on every page. So when a signed refresh arrives from
 Odavent (the event changed) and **an Odavent widget is active**, the plugin cannot know which pages show it
-and purges the **whole-site** page cache instead of only the posts that contain Odavent blocks (WP Rocket,
+and purges the **whole-site** page cache as well as the posts that contain Odavent blocks (WP Rocket,
 W3 Total Cache, WP Super Cache and LiteSpeed Cache are purged by the plugin itself, anything else through the
 [`odavent_events_purge_all`](hooks.md#odavent_events_purge_all) action).
 

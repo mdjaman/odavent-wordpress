@@ -9,8 +9,8 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-24T22:07:37+00:00\n"
-"PO-Revision-Date: 2026-10-24T22:08:39+00:00\n"
+"POT-Creation-Date: 2026-10-24T22:13:09+00:00\n"
+"PO-Revision-Date: 2026-10-24T22:13:22+00:00\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: odavent-events\n"
 "Language: fr_FR\n"
@@ -676,28 +676,34 @@ msgid "View the changelog"
 msgstr "Voir les nouveautés de la version"
 
 #. translators: %s: block title, such as "Speakers".
-#: src/Widgets/Block_Widget.php:40
+#: src/Widgets/Block_Widget.php:41
 #, php-format
 msgid "Odavent: %s"
 msgstr "Odavent : %s"
 
-#: src/Widgets/Block_Widget.php:104
+#: src/Widgets/Block_Widget.php:105
 msgid "Title (optional)"
 msgstr "Titre (facultatif)"
 
-#: src/Widgets/Block_Widget.php:150
+#: src/Widgets/Block_Widget.php:154
 msgid "Enter the Odavent event ID, or leave empty to use the default event from Settings > Odavent Events."
 msgstr "Saisissez l’identifiant de l’événement Odavent, ou laissez vide pour utiliser l’événement par défaut défini dans Réglages > Odavent Events."
 
-#: src/Widgets/Block_Widget.php:155
+#: src/Widgets/Block_Widget.php:159
 msgid "Default event (Settings > Odavent Events)"
 msgstr "Événement par défaut (Réglages > Odavent Events)"
 
 #. translators: %d: Odavent event ID.
-#: src/Widgets/Block_Widget.php:162
+#: src/Widgets/Block_Widget.php:166
 #, php-format
 msgid "Event %d (not found in your Odavent events)"
 msgstr "Événement %d (introuvable parmi vos événements Odavent)"
+
+#. translators: %s: the section names separated by commas, such as "header, countdown, register".
+#: src/Widgets/Block_Widget.php:187
+#, php-format
+msgid "Section names separated by commas: %s. Leave empty to show all of them."
+msgstr "Noms de sections séparés par des virgules : %s. Laissez vide pour toutes les afficher."
 
 #: templates/agenda.php:57
 msgid "Filter by track"

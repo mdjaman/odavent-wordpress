@@ -458,9 +458,11 @@ class ShortcodesTest extends BlockTestCase {
 		$docs    = (string) file_get_contents( dirname( __DIR__, 3 ) . '/docs/shortcodes.md' );
 		$section = $this->docs_section( $docs, '[odavent_event_page]' );
 
+		// The section table: names are listed there in page order (earlier mentions are prose).
+		$table    = substr( $section, (int) strpos( $section, '### How' ) );
 		$previous = -1;
 		foreach ( \Odavent\Events\Blocks\Renderers\Event_Page::DEFAULT_SECTIONS as $name ) {
-			$at = strpos( $section, '`' . $name . '`' );
+			$at = strpos( $table, '`' . $name . '`' );
 			$this->assertNotFalse( $at, 'the section list names ' . $name );
 			$this->assertGreaterThan( $previous, $at, $name . ' is listed in page order' );
 			$previous = $at;

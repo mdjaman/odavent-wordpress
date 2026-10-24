@@ -440,6 +440,45 @@ class WidgetsTest extends BlockTestCase {
 		$this->assertSame( 'Button text', $registry->attribute_label( 'register-button', 'label' ) );
 	}
 
+	public function test_the_event_page_form_explains_the_sections_field_and_no_other_form_does(): void {
+		$registry = $this->registry( $this->payload() );
+
+		foreach ( array_keys( $registry->renderers() ) as $slug ) {
+			$html  = $this->form( $this->widget( $slug, $registry ), array() );
+			$xpath = new \DOMXPath( $this->dom( $html ) );
+			$hints = $xpath->query( '//small[contains(concat(" ", normalize-space(@class), " "), " description ")]' );
+
+			if ( 'event-page' !== $slug ) {
+				$this->assertSame( 0, $hints->length, $slug . ' has no sections hint' );
+				continue;
+			}
+
+			$this->assertSame( 1, $hints->length );
+			$text = $hints->item( 0 )->textContent;
+			$this->assertStringContainsString( implode( ', ', Event_Page::DEFAULT_SECTIONS ), $text, 'every section name, in page order, comma separated' );
+			$this->assertStringContainsString( 'Leave empty to show all of them', $text );
+			$this->assertNotFalse( strpos( $html, '[sections]' ) );
+			$this->assertGreaterThan( strpos( $html, '[sections]' ), strpos( $html, 'class="description"' ), 'the hint comes right after the sections field' );
+		}
+	}
+
+	public function test_the_sections_hint_is_escaped(): void {
+		$widget = $this->widget( 'event-page' );
+
+		// A translation (or a future section name) with markup in it never reaches the page as markup.
+		\Brain\Monkey\Functions\when( '__' )->alias(
+			function ( $text ) {
+				return 'Names: %s <img src=x onerror=alert(1)>';
+			}
+		);
+
+		$html = $this->form( $widget, array() );
+
+		$this->assertStringContainsString( 'class="description"', $html, 'the hint is printed' );
+		$this->assertStringNotContainsString( '<img src=x', $html );
+		$this->assertStringContainsString( '&lt;img src=x onerror=alert(1)&gt;', $html );
+	}
+
 	public function test_event_field_is_a_list_when_the_connection_has_one_and_a_number_otherwise(): void {
 		// No list (no key, rejected, unreachable): a number field, empty for the default event.
 		$repo   = $this->repo();

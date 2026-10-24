@@ -158,7 +158,8 @@ The whole event page in one shortcode: header, countdown, Register button, ticke
 speakers, agenda, sponsors, venue and calendar links, always in that order. A section with nothing to show
 is left out together with its heading. An ended, paused or cancelled event's notice appears once, at the
 top, and the stale-data notice (when Odavent could not be reached and a saved copy is shown) once, inside
-the page.
+the page, when `register` or `tickets` is among the chosen sections (it stands in for the missing Register
+links).
 
 | Attribute | Type | Default |
 |---|---|---|

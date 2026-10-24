@@ -2,6 +2,7 @@
 namespace Odavent\Events\Widgets;
 
 use Odavent\Events\Blocks\Block_Registry;
+use Odavent\Events\Blocks\Renderers\Event_Page;
 use Odavent\Events\Shortcodes\Shortcodes;
 
 /**
@@ -117,6 +118,9 @@ class Block_Widget extends \WP_Widget {
 					$this->number_field( $name, $label, $definition, is_int( $value ) || is_float( $value ) ? (string) $value : '' );
 				} else {
 					$this->text_field( $name, $label, is_string( $value ) ? $value : '' );
+					if ( 'event-page' === $this->slug && 'sections' === $name ) {
+						$this->sections_hint();
+					}
 				}
 			}
 		} catch ( \Throwable $e ) {
@@ -172,6 +176,17 @@ class Block_Widget extends \WP_Widget {
 			$checked ? ' checked' : '',
 			esc_html( $label )
 		);
+	}
+
+	/**
+	 * Under the Event page widget's `sections` field: the valid names, as the shortcode takes them. A widget
+	 * form has no toggles, so without this the field would be a bare text input.
+	 */
+	private function sections_hint(): void {
+		/* translators: %s: the section names separated by commas, such as "header, countdown, register". */
+		$text = sprintf( __( 'Section names separated by commas: %s. Leave empty to show all of them.', 'odavent-events' ), implode( ', ', Event_Page::DEFAULT_SECTIONS ) );
+
+		echo '<p><small class="description">' . esc_html( $text ) . '</small></p>';
 	}
 
 	/**
