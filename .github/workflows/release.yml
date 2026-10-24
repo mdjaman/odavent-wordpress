@@ -16,6 +16,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The whole history, so the next step can tell whether the tagged commit is on main.
+          fetch-depth: 0
+
+      # Only code that went through main (and its CI) is released: a tag pushed on a side branch fails here.
+      # GITHUB_SHA reaches the shell as an environment variable, never interpolated into the script.
+      - name: Check the tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The tagged commit $GITHUB_SHA is not on main. Merge it into main (CI green), then tag the merge commit."
+            exit 1
+          fi
 
       - name: Check the tag against the plugin header
         env:

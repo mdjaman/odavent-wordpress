@@ -143,6 +143,104 @@ class ReleaseMetadataTest extends TestCase {
 		$this->assertStringContainsString( 'bin/check-translations.php', $ci );
 	}
 
+	public function test_the_release_only_runs_for_a_commit_that_is_on_main(): void {
+		$yml = $this->read( '.github/workflows/release.yml' );
+
+		// Full history, or origin/main and the ancestry check would not be there on the runner.
+		$this->assertMatchesRegularExpression( '/actions\/checkout@v4\s*\n\s+with:\s*\n(?:\s+#[^\n]*\n)*\s+fetch-depth: 0/', $yml );
+		$this->assertStringContainsString( 'git merge-base --is-ancestor "$GITHUB_SHA" origin/main', $yml );
+
+		// The SHA reaches the shell as an environment variable, not pasted into the script text.
+		$this->assertDoesNotMatchRegularExpression( '/merge-base[^\n]*\$\{\{/', $yml );
+
+		// And the check runs before anything is tested, built or published.
+		$check = strpos( $yml, 'git merge-base --is-ancestor' );
+		$this->assertNotFalse( $check );
+		foreach ( array( 'composer install', 'vendor/bin/phpunit', 'bin/build-zip.php', 'gh release create' ) as $later ) {
+			$this->assertLessThan( (int) strpos( $yml, $later ), $check, "The main-branch check must come before: {$later}" );
+		}
+	}
+
+	public function test_the_ancestry_check_accepts_main_history_and_rejects_a_side_branch(): void {
+		$dir = sys_get_temp_dir() . '/odv-git-' . bin2hex( random_bytes( 4 ) );
+		mkdir( $dir );
+		$git = 'git -C ' . escapeshellarg( $dir ) . ' -c user.name=t -c user.email=t@example.com ';
+		$run = function ( string $command ) use ( &$lines ): int {
+			$lines = array();
+			exec( $command . ' 2>&1', $lines, $code );
+
+			return $code;
+		};
+		if ( 0 !== $run( 'git --version' ) ) {
+			$this->markTestSkipped( 'git is not installed.' );
+		}
+
+		// "origin/main" is a remote-tracking ref: create it by hand, as a fetch would.
+		$run( $git . 'init -q -b main' );
+		$run( $git . 'commit -q --allow-empty -m one' );
+		$on_main = trim( (string) shell_exec( $git . 'rev-parse HEAD' ) );
+		$run( $git . 'update-ref refs/remotes/origin/main HEAD' );
+		$run( $git . 'checkout -q -b side' );
+		$run( $git . 'commit -q --allow-empty -m side' );
+		$on_side = trim( (string) shell_exec( $git . 'rev-parse HEAD' ) );
+
+		$this->assertSame( 0, $run( $git . 'merge-base --is-ancestor ' . escapeshellarg( $on_main ) . ' origin/main' ) );
+		$this->assertNotSame( 0, $run( $git . 'merge-base --is-ancestor ' . escapeshellarg( $on_side ) . ' origin/main' ) );
+
+		self::remove_tree( $dir );
+	}
+
+	private static function remove_tree( string $dir ): void {
+		$items = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::CHILD_FIRST );
+		foreach ( $items as $item ) {
+			$item->isDir() && ! $item->isLink() ? rmdir( $item->getPathname() ) : unlink( $item->getPathname() );
+		}
+		rmdir( $dir );
+	}
+
+	/**
+	 * A workflow that is not valid YAML never runs. The PHP image has no YAML extension, so this uses whatever
+	 * parser the machine has (the yaml extension, Ruby or Python with PyYAML) and is skipped when there is none:
+	 * the checks above still pin the structure. Validated for this change with
+	 * `docker run --rm -v "$PWD":/w -w /w ruby:3 ruby -ryaml -e 'YAML.load_file(".github/workflows/release.yml")'`.
+	 */
+	public function test_the_workflows_parse_as_yaml(): void {
+		$files = array( '.github/workflows/release.yml', '.github/workflows/ci.yml' );
+
+		if ( function_exists( 'yaml_parse_file' ) ) {
+			foreach ( $files as $file ) {
+				$this->assertIsArray( yaml_parse_file( $this->root . '/' . $file ), $file );
+			}
+
+			return;
+		}
+
+		$parsers = array(
+			'ruby -ryaml -e ' . escapeshellarg( 'ARGV.each { |f| YAML.load_file(f) }' ),
+			'python3 -c ' . escapeshellarg( 'import sys, yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]' ),
+		);
+		foreach ( $parsers as $parser ) {
+			$binary = strtok( $parser, ' ' );
+			exec( 'command -v ' . escapeshellarg( (string) $binary ) . ' 2>&1', $found, $code );
+			if ( 0 !== $code ) {
+				continue;
+			}
+			$arguments = implode( ' ', array_map( function ( $file ) { return escapeshellarg( $this->root . '/' . $file ); }, $files ) );
+			exec( $parser . ' ' . $arguments . ' 2>&1', $lines, $code );
+			if ( 0 === $code ) {
+				$this->assertSame( 0, $code );
+
+				return;
+			}
+			if ( false !== stripos( implode( "\n", $lines ), 'No module named' ) ) {
+				continue; // Python without PyYAML.
+			}
+			$this->fail( "A workflow is not valid YAML:\n" . implode( "\n", $lines ) );
+		}
+
+		$this->markTestSkipped( 'No YAML parser (yaml extension, Ruby, Python with PyYAML) is available.' );
+	}
+
 	public function test_export_ignore_covers_the_dev_files(): void {
 		$attributes = $this->read( '.gitattributes' );
 
