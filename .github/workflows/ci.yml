@@ -48,7 +48,7 @@ jobs:
         run: bin/test-js
 
   # The smoke and browser tests need Docker and take minutes, so on pull requests they run only when
-  # runtime code or the dev environment changed. Push to main and manual runs always run them.
+  # runtime code, translations, fixtures, the dev environment, the tests or this workflow changed. Push to main and manual runs always run them.
   changes:
     name: Runtime files changed?
     runs-on: ubuntu-latest
@@ -59,10 +59,14 @@ jobs:
         with:
           fetch-depth: 0
       - id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
+          if [ "$EVENT_NAME" != "pull_request" ]; then
             echo "runtime=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Eq '^(src|blocks|assets|templates|docker|bin)/'; then
+          elif git diff --name-only "origin/$BASE_REF...HEAD" \
+            | grep -Eq '^(src|blocks|assets|templates|docker|bin|languages|tests/fixtures|tests/e2e)/|^(odavent-events\.php|uninstall\.php|\.github/workflows/ci\.yml)$'; then
             echo "runtime=true" >> "$GITHUB_OUTPUT"
           else
             echo "runtime=false" >> "$GITHUB_OUTPUT"
@@ -121,6 +125,11 @@ jobs:
         run: bin/dev-up
       - name: Playwright
         run: bin/e2e
+      - name: Logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker/docker-compose.yml logs --tail 200
+          bin/wp eval 'echo @file_get_contents( WP_CONTENT_DIR . "/debug.log" );' || true
       - name: Keep screenshots and traces (workflow artifact, not a release)
         if: always()
         uses: actions/upload-artifact@v4
