@@ -88,5 +88,12 @@ make_page cancelled-2 "Cancelled event 2" "$(blocks_markup '{"eventId":2}')"
 make_page draft-3 "Draft event 3" "$(blocks_markup '{"eventId":3}')"
 make_page hostile-5 "Hostile event 5" "$(blocks_markup '{"eventId":5}')"
 make_page slug-only "Blocks by slug" "$(blocks_markup '{"eventSlug":"sommet-tech-abidjan-2026"}')"
+# The event page block and shortcode: event 6 (a "both" partner, a logo and a cover that 404) and its cancelled twin 7.
+make_page event-page-6 "Event page, event 6" '<!-- wp:odavent-events/event-page {"eventId":6} /-->'
+make_page event-page-7 "Event page, cancelled event 7" '<!-- wp:odavent-events/event-page {"eventId":7} /-->'
+make_page event-page-shortcode-6 "Event page shortcode, event 6" '[odavent_event_page event_id="6"]'
+make_page event-page-shortcode-7 "Event page shortcode, cancelled event 7" '[odavent_event_page event_id="7"]'
+# No Odavent content: bin/smoke.sh places a widget in the dev footer area and watches this page.
+make_page widget-host "Widget host" '<!-- wp:paragraph --><p>No Odavent content in this page.</p><!-- /wp:paragraph -->'
 
-log "Ready in $(( $(date +%s) - started ))s: $ODV_SITE (admin / admin). Pages: /all-blocks-1/ /shortcodes-1/ /cancelled-2/ /draft-3/ /hostile-5/ /slug-only/"
+log "Ready in $(( $(date +%s) - started ))s: $ODV_SITE (admin / admin). Pages: /all-blocks-1/ /shortcodes-1/ /cancelled-2/ /draft-3/ /hostile-5/ /slug-only/ /event-page-6/ /event-page-7/ /event-page-shortcode-6/ /event-page-shortcode-7/ /widget-host/"

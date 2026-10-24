@@ -56,14 +56,22 @@ const PLACEHOLDER_SVG =
 	'<rect width="400" height="300" fill="#d9dde3"/><path d="M0 300 140 150l80 90 60-60 120 120z" fill="#b4bcc8"/>' +
 	'<circle cx="300" cy="80" r="36" fill="#b4bcc8"/></svg>';
 
+// The stub's broken images (event 6's cover and the logo of its "both" partner answer 404 there, on purpose).
+const BROKEN_IMAGE = /^http:\/\/127\.0\.0\.1:8081\/storage\/missing\//;
+
 const LOCAL = /^https?:\/\/(localhost:8089|127\.0\.0\.1(:\d+)?)(\/|$)/;
 
 /**
  * Prepares a page: fixture images are answered locally, any other external request is recorded (and listed in the
  * test's annotations), and console output is collected (see collectErrors()).
+ *
+ * @param {object}   [options]
+ * @param {RegExp[]} [options.expected404] URLs a test loads on purpose and expects to 404 (the stub's broken images):
+ *                                         the browser's "Failed to load resource" message for exactly those goes to
+ *                                         `errors.expected` instead of failing the test.
  */
-async function preparePage( page ) {
-	const errors = collectErrors( page );
+async function preparePage( page, options = {} ) {
+	const errors = collectErrors( page, options );
 	// wp-admin's avatars come from Gravatar (secure.gravatar.com, or 0-2.gravatar.com on 6.1): answered locally too, so no test needs the network.
 	await page.route( /^https?:\/\/(odavent\.com\/storage|(secure|[0-9])\.gravatar\.com\/avatar)\//, ( route ) =>
 		route.fulfill( { status: 200, contentType: 'image/svg+xml', body: PLACEHOLDER_SVG } )
@@ -90,9 +98,13 @@ const KNOWN_CORE_NOISE = [
 
 const PLUGIN_RELATED = /wp\.components\.|odavent|editor\.js|countdown\.js|agenda-filter\.js/i;
 
-/** Collects page errors and console output: `relevant` fails a test, `noise` is listed only. */
-function collectErrors( page ) {
-	const errors = { relevant: [], noise: [], external: [] };
+/**
+ * Collects page errors and console output: `relevant` fails a test, `noise` is listed only, `expected` holds the
+ * 404s a test asked for (options.expected404, see preparePage()).
+ */
+function collectErrors( page, options = {} ) {
+	const expected404 = options.expected404 || [];
+	const errors = { relevant: [], noise: [], external: [], expected: [] };
 	page.on( 'pageerror', ( error ) => errors.relevant.push( 'pageerror: ' + error.message ) );
 	page.on( 'console', ( message ) => {
 		const type = message.type();
@@ -100,6 +112,11 @@ function collectErrors( page ) {
 			return;
 		}
 		const text = message.text();
+		const url = ( message.location() && message.location().url ) || '';
+		if ( type === 'error' && /^Failed to load resource: the server responded with a status of 404/.test( text ) && expected404.some( ( re ) => re.test( url ) ) ) {
+			errors.expected.push( url );
+			return;
+		}
 		if ( KNOWN_CORE_NOISE.some( ( re ) => re.test( text ) ) && ! PLUGIN_RELATED.test( text ) ) {
 			errors.noise.push( type + ': ' + text );
 		} else {
@@ -109,4 +126,4 @@ function collectErrors( page ) {
 	return errors;
 }
 
-module.exports = { stub, refresh, login, preparePage, collectErrors, SITE_KEY };
+module.exports = { stub, refresh, login, preparePage, collectErrors, SITE_KEY, BROKEN_IMAGE };

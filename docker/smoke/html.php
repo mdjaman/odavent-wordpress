@@ -11,6 +11,10 @@
  *   dangerous    attribute problems: on* handlers, javascript:/data:/vbscript: URLs in URL attributes
  *   parse        libxml parse errors, except "tag X invalid" (libxml's HTML 4 parser does not know HTML5 tags)
  *   text         the visible text content
+ *   sections     each event page section in document order: {page, slug, id, heading}
+ *   images       every <img data-odv-img>: {kind, class, src, alt}
+ *   notices      every .odv-notice: {class, text}
+ *   style <id>   the text of <style id="<id>"> (null when absent)
  *   count <s>    occurrences of the literal string <s> in the raw HTML
  */
 
@@ -148,6 +152,47 @@ switch ( $command ) {
 			);
 		}
 		out( $found );
+
+	case 'sections':
+		$found = array();
+		foreach ( $xpath->query( '//*[contains(concat(" ", normalize-space(@class), " "), " odv-event-page__section ")]' ) as $el ) {
+			preg_match( '/(^|\s)odv-event-page__section--([a-z-]+)/', $el->getAttribute( 'class' ), $m );
+			$heading = $xpath->query( './*[contains(concat(" ", normalize-space(@class), " "), " odv-event-page__heading ")]', $el )->item( 0 );
+			$page    = $xpath->query( 'ancestor::*[contains(concat(" ", normalize-space(@class), " "), " odv-event-page ")]', $el )->item( 0 );
+			$found[] = array(
+				'page'    => $page instanceof DOMElement ? $page->getAttribute( 'data-odv-event' ) : null,
+				'slug'    => $m[2] ?? '',
+				'id'      => $el->getAttribute( 'id' ),
+				'heading' => null !== $heading ? trim( preg_replace( '/\s+/', ' ', $heading->textContent ) ) : null,
+			);
+		}
+		out( $found );
+
+	case 'images':
+		$found = array();
+		foreach ( $xpath->query( '//img[@data-odv-img]' ) as $img ) {
+			$found[] = array(
+				'kind'  => $img->getAttribute( 'data-odv-img' ),
+				'class' => $img->getAttribute( 'class' ),
+				'src'   => $img->getAttribute( 'src' ),
+				'alt'   => $img->getAttribute( 'alt' ),
+			);
+		}
+		out( $found );
+
+	case 'notices':
+		$found = array();
+		foreach ( $xpath->query( '//*[contains(concat(" ", normalize-space(@class), " "), " odv-notice ")]' ) as $el ) {
+			$found[] = array(
+				'class' => $el->getAttribute( 'class' ),
+				'text'  => trim( preg_replace( '/\s+/', ' ', $el->textContent ) ),
+			);
+		}
+		out( $found );
+
+	case 'style':
+		$style = $xpath->query( '//style[@id="' . str_replace( '"', '', (string) ( $argv[2] ?? '' ) ) . '"]' )->item( 0 );
+		out( null !== $style ? $style->textContent : null );
 
 	case 'text':
 		$body = $doc->getElementsByTagName( 'body' )->item( 0 );
