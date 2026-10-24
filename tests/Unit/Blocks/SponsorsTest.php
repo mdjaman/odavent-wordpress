@@ -114,6 +114,38 @@ class SponsorsTest extends BlockTestCase {
 		$this->assertSame( array( 'S1 featured sponsor', 'S2 sponsor', 'S3 sponsor', 'E1 featured exhibitor', 'E2 exhibitor', 'M1 media' ), $this->rendered_names( $html ) );
 	}
 
+	public function test_a_group_holding_a_featured_partner_comes_before_the_groups_without_one(): void {
+		$payload = $this->with_partners(
+			array(
+				$this->partner( array( 'id' => 1, 'name' => 'E1 featured exhibitor', 'type' => 'exhibitor', 'is_featured' => true ) ),
+				$this->partner( array( 'id' => 2, 'name' => 'S1 sponsor', 'type' => 'sponsor' ) ),
+				$this->partner( array( 'id' => 3, 'name' => 'P1 partner', 'type' => 'partner' ) ),
+				$this->partner( array( 'id' => 4, 'name' => 'E2 exhibitor', 'type' => 'exhibitor' ) ),
+				$this->partner( array( 'id' => 5, 'name' => 'S2 sponsor', 'type' => 'sponsor' ) ),
+			)
+		);
+		$html = $this->render( $payload );
+
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $html, $m );
+		$this->assertSame( array( 'Exhibitors', 'Sponsors', 'Partners' ), $m[1] );
+		$this->assertSame( array( 'E1 featured exhibitor', 'E2 exhibitor', 'S1 sponsor', 'S2 sponsor', 'P1 partner' ), $this->rendered_names( $html ) );
+	}
+
+	public function test_several_featured_groups_keep_the_fixed_order_among_themselves(): void {
+		$payload = $this->with_partners(
+			array(
+				$this->partner( array( 'id' => 1, 'name' => 'P1 featured partner', 'type' => 'partner', 'is_featured' => true ) ),
+				$this->partner( array( 'id' => 2, 'name' => 'M1 featured media', 'type' => 'media', 'is_featured' => true ) ),
+				$this->partner( array( 'id' => 3, 'name' => 'S1 sponsor', 'type' => 'sponsor' ) ),
+				$this->partner( array( 'id' => 4, 'name' => 'W1 host', 'type' => 'workshop_host' ) ),
+				$this->partner( array( 'id' => 5, 'name' => 'E1 exhibitor', 'type' => 'exhibitor' ) ),
+			)
+		);
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $this->render( $payload ), $m );
+
+		$this->assertSame( array( 'Media partners', 'Partners', 'Sponsors', 'Exhibitors', 'Workshop host' ), $m[1] );
+	}
+
 	public function test_a_non_ascii_type_is_lower_cased_safely(): void {
 		$payload = $this->with_partners(
 			array(

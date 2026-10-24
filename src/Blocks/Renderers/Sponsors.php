@@ -9,7 +9,8 @@ use Odavent\Events\Render\Template;
 
 /**
  * Sponsors, exhibitors and other partners, grouped by type. Odavent already orders the list (featured
- * first); the order inside a group is the payload's.
+ * first); the order inside a group is the payload's. Groups holding a featured (paid) placement come first,
+ * so a featured exhibitor is never shown below every plain sponsor.
  *
  * A logo links to the tracked `click_url` (featured placements) or else the partner's `website`. Both are
  * paid-for third-party links: rel="sponsored noopener". Without a usable logo the name is shown as text.
@@ -55,13 +56,27 @@ final class Sponsors implements Renderer {
 		}
 
 		if ( $group_by_type ) {
-			// Groups in a fixed order; payload order inside each group.
-			$buckets = array();
+			// Groups with a featured partner first, each part in the fixed order; payload order inside each group.
+			$buckets  = array();
+			$featured = array();
 			foreach ( $partners as $partner ) {
 				$buckets[ $partner['type'] ][] = $partner;
+				if ( $partner['featured'] ) {
+					$featured[ $partner['type'] ] = true;
+				}
+			}
+			$types  = self::ordered_types( array_keys( $buckets ) );
+			$first  = array();
+			$others = array();
+			foreach ( $types as $type ) {
+				if ( isset( $featured[ $type ] ) ) {
+					$first[] = $type;
+				} else {
+					$others[] = $type;
+				}
 			}
 			$groups = array();
-			foreach ( self::ordered_types( array_keys( $buckets ) ) as $type ) {
+			foreach ( array_merge( $first, $others ) as $type ) {
 				$groups[] = array(
 					'title' => self::type_label( $type ),
 					'items' => $buckets[ $type ],

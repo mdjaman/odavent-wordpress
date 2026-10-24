@@ -106,6 +106,11 @@ Sponsors, exhibitors and other partners.
 | `show_description` | boolean | `false` |
 | `columns` | integer | `4` |
 
+With `group_by_type` on, partners are shown in one group per type. Groups that hold a featured (paid)
+placement come first, then the others, each part in the order sponsors, exhibitors, media partners, partners,
+then any other type; inside a group the order is Odavent's (featured first). With it off, one list in
+Odavent's order.
+
 Example: `[odavent_sponsors event="annual-summit" columns="3" group_by_type="no"]`
 
 ## `[odavent_countdown]`
