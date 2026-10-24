@@ -14,4 +14,41 @@
 
     <config name="testVersion" value="7.4-"/>
     <rule ref="PHPCompatibilityWP"/>
+
+    <!--
+        PHPCompatibility skips an unqualified call inside a namespace (it could be a namespaced function), so it
+        misses str_contains() and friends in src/. Forbid the PHP 8-only functions outright: CI runs the suite on
+        PHP 7.4, but a branch that is never executed there would still ship a fatal on a 7.4 site. Use strpos() etc.
+    -->
+    <rule ref="Generic.PHP.ForbiddenFunctions">
+        <properties>
+            <property name="forbiddenFunctions" type="array">
+                <element key="str_contains" value="null"/>
+                <element key="str_starts_with" value="null"/>
+                <element key="str_ends_with" value="null"/>
+                <element key="get_debug_type" value="null"/>
+                <element key="get_resource_id" value="null"/>
+                <element key="fdiv" value="null"/>
+                <element key="preg_last_error_msg" value="null"/>
+                <element key="array_is_list" value="null"/>
+                <element key="enum_exists" value="null"/>
+                <element key="fsync" value="null"/>
+                <element key="fdatasync" value="null"/>
+                <element key="mb_str_split" value="null"/>
+                <element key="json_validate" value="null"/>
+                <element key="mb_str_pad" value="null"/>
+                <element key="str_increment" value="null"/>
+                <element key="str_decrement" value="null"/>
+                <element key="array_find" value="null"/>
+                <element key="array_find_key" value="null"/>
+                <element key="array_any" value="null"/>
+                <element key="array_all" value="null"/>
+                <element key="mb_trim" value="null"/>
+                <element key="mb_ltrim" value="null"/>
+                <element key="mb_rtrim" value="null"/>
+                <element key="mb_ucfirst" value="null"/>
+                <element key="mb_lcfirst" value="null"/>
+            </property>
+        </properties>
+    </rule>
 </ruleset>

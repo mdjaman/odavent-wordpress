@@ -108,9 +108,11 @@ bin/build-zip 0.1.0   # build dist/odavent-events-0.1.0.zip
 ```
 
 The plugin targets PHP 7.4+ and WordPress 6.1+ and has no runtime Composer dependency (`composer install`
-only brings the test tools). CI lints every PHP file, runs PHPUnit on PHP 7.4 and 8.3, checks PHP 7.4
-compatibility with PHPCS (`PHPCompatibilityWP`, see `phpcs.xml.dist`), checks the translations and
-syntax-checks and tests the scripts.
+only brings the test tools). CI lints every PHP file, runs PHPUnit on PHP 7.4 and 8.3, runs PHPCS
+(`PHPCompatibilityWP` for syntax and most newer functions, plus a deny-list of PHP 8-only functions such as
+`str_contains()` because PHPCompatibility skips unqualified calls inside a namespace; see `phpcs.xml.dist`),
+checks the translations and syntax-checks and tests the scripts. PHPCS cannot see every PHP 8 feature, so the
+PHP 7.4 test run is the real gate.
 
 ### Translations
 

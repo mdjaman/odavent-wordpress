@@ -7,9 +7,29 @@ cd "$(dirname "$0")/.."
 
 PHP_VERSION="${PHP_VERSION:-7.4}"
 IMAGE="odavent-events-test:${PHP_VERSION}"
+DOCKERFILE="docker/Dockerfile.test"
+LABEL="dev.odavent.dockerfile-hash"
 
-# docker build is layer-cached, so this is cheap when nothing changed.
-docker build --quiet --build-arg "PHP_VERSION=${PHP_VERSION}" -t "$IMAGE" -f docker/Dockerfile.test docker >/dev/null
+if command -v sha256sum >/dev/null 2>&1; then
+  HASH="$(sha256sum "$DOCKERFILE" | cut -d' ' -f1)"
+else
+  HASH="$(shasum -a 256 "$DOCKERFILE" | cut -d' ' -f1)"
+fi
 
-exec docker run --rm -v "$PWD":/app -w /app "$IMAGE" sh -c \
+# Skip the build when the image exists and was built from this exact Dockerfile (the hash is stored as a label).
+# A missing image makes `docker image inspect` fail, which leaves CURRENT empty and builds.
+CURRENT="$(docker image inspect --format "{{ index .Config.Labels \"${LABEL}\" }}" "$IMAGE" 2>/dev/null || true)"
+if [ "$CURRENT" != "$HASH" ]; then
+  docker build --quiet --build-arg "PHP_VERSION=${PHP_VERSION}" --label "${LABEL}=${HASH}" -t "$IMAGE" -f "$DOCKERFILE" docker >/dev/null
+fi
+
+# On Linux run as the host user so vendor/ and .phpunit.result.cache are not root-owned. Docker Desktop on
+# macOS maps file ownership itself, and a non-root user there only gets in the way.
+USER_ARGS=""
+if [ "$(uname -s)" = "Linux" ]; then
+  USER_ARGS="--user $(id -u):$(id -g) -e HOME=/tmp -e COMPOSER_HOME=/tmp/composer"
+fi
+
+# shellcheck disable=SC2086 -- USER_ARGS is deliberately word-split.
+exec docker run --rm $USER_ARGS -v "$PWD":/app -w /app "$IMAGE" sh -c \
   'composer install --no-interaction --prefer-dist --no-progress --quiet && vendor/bin/phpunit "$@"' sh "$@"

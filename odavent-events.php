@@ -20,25 +20,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// A second copy of the plugin (e.g. an `odavent-events-1` folder left by a manual upload) loaded in
+// the same request must do nothing: redefining the constants or the function below would be fatal.
+if ( defined( 'ODAVENT_EVENTS_VERSION' ) ) {
+	return;
+}
+
 define( 'ODAVENT_EVENTS_VERSION', '0.1.0' );
 define( 'ODAVENT_EVENTS_FILE', __FILE__ );
 define( 'ODAVENT_EVENTS_DIR', __DIR__ . '/' );
 
-/**
- * Whether the host meets the minimum PHP and WordPress versions.
- *
- * Kept free of PHP 7.4-only syntax so the notice below can render on older versions.
- *
- * @return bool
- */
-function odavent_events_requirements_met() {
-	global $wp_version;
+if ( ! function_exists( 'odavent_events_requirements_met' ) ) {
+	/**
+	 * Whether the host meets the minimum PHP and WordPress versions.
+	 *
+	 * Kept free of PHP 7.4-only syntax so the notice below can render on older versions.
+	 *
+	 * @return bool
+	 */
+	function odavent_events_requirements_met() {
+		global $wp_version;
 
-	if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
-		return false;
+		if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
+			return false;
+		}
+
+		return ! isset( $wp_version ) || version_compare( $wp_version, '6.1', '>=' );
 	}
-
-	return ! isset( $wp_version ) || version_compare( $wp_version, '6.1', '>=' );
 }
 
 if ( ! odavent_events_requirements_met() ) {
@@ -64,7 +72,13 @@ spl_autoload_register(
 			return;
 		}
 
-		$relative = str_replace( '\\', '/', substr( $class, strlen( $prefix ) ) );
+		// Only plain class names map to a file: no dots (`..`), no NUL byte, nothing outside the allowed set.
+		$name = substr( $class, strlen( $prefix ) );
+		if ( 1 !== preg_match( '/^[A-Za-z0-9_\\\\\/]+$/D', $name ) ) {
+			return;
+		}
+
+		$relative = str_replace( '\\', '/', $name );
 		$file     = ODAVENT_EVENTS_DIR . 'src/' . $relative . '.php';
 
 		if ( is_readable( $file ) ) {
