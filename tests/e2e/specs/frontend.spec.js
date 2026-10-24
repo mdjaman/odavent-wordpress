@@ -103,7 +103,7 @@ for ( const width of [ 390, 1280 ] ) {
 		await expect( page.locator( '.odv-header' ) ).toBeVisible();
 		const overflow = await page.evaluate( () => document.documentElement.scrollWidth - document.documentElement.clientWidth );
 		test.info().annotations.push( { type: 'horizontal overflow px', description: String( overflow ) } );
-		await page.screenshot( { path: `artifacts/all-blocks-1-${ width }.png`, fullPage: true } );
+		await page.screenshot( { path: `artifacts/all-blocks-1-wp${ process.env.WP_VERSION || 'x' }-${ width }.png`, fullPage: true } );
 		expect( overflow ).toBeLessThanOrEqual( 0 );
 	} );
 }

@@ -18,12 +18,13 @@ if [ -z "$container" ]; then
 fi
 
 mkdir -p "$ODV_ROOT/tests/e2e/artifacts"
-log "Playwright $version on $ODV_SITE (WordPress $(wp_cli core version))"
+wp_version=$(wp_cli core version | tr -d '\r')
+log "Playwright $version on $ODV_SITE (WordPress $wp_version)"
 
 # node_modules is an anonymous volume: installed per run, removed with the container (--rm).
 docker run --rm --init --ipc=host \
 	--network "container:$container" \
-	-e BASE_URL="$ODV_SITE" -e CI="${CI:-}" \
+	-e BASE_URL="$ODV_SITE" -e WP_VERSION="$wp_version" -e CI="${CI:-}" \
 	-v "$ODV_ROOT/tests/e2e:/e2e" -v /e2e/node_modules \
 	-w /e2e "$image" \
 	sh -c 'npm install --no-audit --no-fund --package-lock=false --loglevel=error >/dev/null && npx playwright test "$@"' sh "$@"
