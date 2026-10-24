@@ -2,6 +2,7 @@
 namespace Odavent\Events\Blocks\Renderers;
 
 use Odavent\Events\Blocks\Attributes;
+use Odavent\Events\Blocks\Lifecycle;
 use Odavent\Events\Blocks\Renderer;
 use Odavent\Events\Data\Clock;
 use Odavent\Events\Data\Event_View;
@@ -19,8 +20,9 @@ use Odavent\Events\Render\Template;
  * that is still upcoming carries data-odv-paused so the script hides the block itself when the start passes
  * (a page left open, or served from a page cache, must not announce "Live now" for a paused event).
  *
- * On an event page the countdown shows only while the event is upcoming or live: an ended or paused event
- * renders nothing there, because the page's single notice at the top already says so.
+ * On an event page a paused event renders nothing, and neither does an ended one when the page's single notice
+ * at the top already says so. An event over by time that Odavent has not flagged ended yet has no notice, so its
+ * countdown shows "Event ended" there, as the block does on its own.
  */
 final class Countdown implements Renderer {
 
@@ -53,7 +55,8 @@ final class Countdown implements Renderer {
 			$state = 'upcoming';
 		}
 
-		if ( $in_page && 'ended' === $state ) {
+		// The page's notice already says ended (or why not open); without one, "Event ended" is the only hint.
+		if ( $in_page && 'ended' === $state && null !== Lifecycle::notice( $view ) ) {
 			return '';
 		}
 

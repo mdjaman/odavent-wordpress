@@ -83,9 +83,14 @@ set_settings() { # set_settings [key]
 		--format=json --autoload=no >/dev/null
 }
 
+# The dev page cache (check 15) is switched off and emptied on every reset, so a run aborted inside check 15
+# cannot leave it on for the next run (reset_all also runs before check 1).
+CACHE_DIR="/var/www/html/wp-content/odv-dev-cache"
 reset_all() {
 	stub_control '{"reset": true}'
 	set_settings
+	wp_cli option delete odv_dev_page_cache >/dev/null 2>&1 || true
+	wp_exec sh -c "rm -rf '$CACHE_DIR'"
 	wp_cli eval '\Odavent\Events\Plugin::instance()->repository()->purge_all();' >/dev/null
 }
 
@@ -575,7 +580,6 @@ fi
 # widget sits in the dev widget area (docker/mu-plugins/odavent-dev-widget-area.php) on a page without Odavent
 # content, which only the whole-site purge can refresh.
 
-CACHE_DIR="/var/www/html/wp-content/odv-dev-cache"
 cache_state() { grep -i '^x-odv-dev-cache:' "$TMP/$1.h" | tr -d '\r' | awk '{ print toupper($2) }'; }
 purges() { wp_exec sh -c "if [ -f '$CACHE_DIR/$1' ]; then wc -l < '$CACHE_DIR/$1'; else echo 0; fi" | tr -d ' \r'; }
 wait_purges() { # wait_purges <log> <more than>: the purge runs on shutdown, after the ping's answer

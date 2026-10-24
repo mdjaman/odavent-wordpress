@@ -406,6 +406,28 @@ class EventPageTest extends BlockTestCase {
 		$this->assertSame( '', $this->page( $this->payload( array( 'status' => 'published' ), 'payload-v1-minimal' ), array( 'eventId' => 42, 'sections' => 'tickets' ) ) );
 	}
 
+	public function test_an_event_over_by_time_but_not_flagged_ended_says_event_ended_once(): void {
+		// Live on Odavent (no ended flag yet) but its end has passed: no notice, so the countdown's "Event
+		// ended" is the page's only hint, as on the standalone block.
+		$payload = $this->payload(
+			array_merge(
+				self::state_overrides()['live'],
+				array(
+					'starts_at' => '2026-10-20T09:00:00+00:00',
+					'ends_at'   => '2026-10-21T18:00:00+00:00',
+				)
+			)
+		);
+
+		$html = $this->page( $payload );
+
+		$this->assertStringNotContainsString( 'class="odv-notice ', $html, 'the payload does not say ended: no notice' );
+		$this->assertSame( 1, substr_count( $html, '<section class="odv-countdown' ), 'one countdown' );
+		$this->assertSame( 1, substr_count( $html, '<p class="odv-countdown__message">Event ended</p>' ), 'the ended hint, shown once' );
+		$this->assertSame( 1, substr_count( $html, 'data-state="ended"' ) );
+		$this->assertStringNotContainsString( 'This event has ended.', $html );
+	}
+
 	public function test_a_paused_upcoming_event_has_no_countdown_on_the_page_but_keeps_it_as_a_block(): void {
 		$payload = $this->payload( self::state_overrides()['paused'] );
 
