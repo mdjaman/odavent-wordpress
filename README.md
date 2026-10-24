@@ -131,7 +131,9 @@ A release is a Git tag. The version must be the same everywhere, and the tag mus
 1. Bump the version in `odavent-events.php` (the `Version:` header **and** `ODAVENT_EVENTS_VERSION`) and
    in `readme.txt` (`Stable tag`, and `Tested up to` / `Requires` if they changed), and add the version to
    the changelog in both `CHANGELOG.md` (a `## [X.Y.Z] - YYYY-MM-DD` section) and `readme.txt`.
-2. Regenerate the `.pot` if strings changed (`bin/make-pot.sh`) and finish the French translation.
+2. Run `bin/make-pot.sh` before tagging: it regenerates the `.pot` (strings, source references and the
+   `Project-Id-Version` header, which it reads from the plugin header's `Version:`), then finish the French
+   translation (and its `Project-Id-Version`, if you keep it in step).
 3. Run the local gates: `bin/test`, `PHP_VERSION=8.3 bin/test`, `bin/lint-js`, `bin/test-js`,
    `php bin/check-translations.php`, and PHPCS.
 4. Merge to `main`, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.

@@ -9,13 +9,15 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-24T02:42:56+00:00\n"
+"POT-Creation-Date: 2026-10-24T02:58:52+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: odavent-events\n"
 
 #. Plugin Name of the plugin
 #: odavent-events.php
+#: src/Settings/Settings_Page.php:59
+#: src/Settings/Settings_Page.php:60
 #: src/Settings/Settings_Page.php:220
 msgid "Odavent Events"
 msgstr ""
@@ -34,8 +36,6 @@ msgstr ""
 #. Author of the plugin
 #: odavent-events.php
 #: src/Blocks/Block_Registry.php:229
-#: src/Settings/Settings_Page.php:59
-#: src/Settings/Settings_Page.php:60
 msgid "Odavent"
 msgstr ""
 
@@ -234,11 +234,11 @@ msgstr ""
 msgid "%1$s – %2$s"
 msgstr ""
 
-#: src/Blocks/Renderers/Countdown.php:63
+#: src/Blocks/Renderers/Countdown.php:64
 msgid "Live now"
 msgstr ""
 
-#: src/Blocks/Renderers/Countdown.php:64
+#: src/Blocks/Renderers/Countdown.php:65
 msgid "Event ended"
 msgstr ""
 
@@ -295,19 +295,19 @@ msgid_plural "%s spots left"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Refresh/Refresh_Controller.php:65
+#: src/Refresh/Refresh_Controller.php:73
 msgid "The refresh could not be completed."
 msgstr ""
 
-#: src/Refresh/Refresh_Controller.php:74
+#: src/Refresh/Refresh_Controller.php:82
 msgid "The request body is too large."
 msgstr ""
 
-#: src/Refresh/Refresh_Controller.php:105
+#: src/Refresh/Refresh_Controller.php:113
 msgid "The request is not a valid refresh."
 msgstr ""
 
-#: src/Refresh/Refresh_Controller.php:144
+#: src/Refresh/Refresh_Controller.php:177
 msgid "Invalid or missing signature."
 msgstr ""
 

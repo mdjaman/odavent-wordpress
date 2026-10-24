@@ -241,6 +241,24 @@ class ReleaseMetadataTest extends TestCase {
 		$this->markTestSkipped( 'No YAML parser (yaml extension, Ruby, Python with PyYAML) is available.' );
 	}
 
+	public function test_the_pot_version_comes_from_the_plugin_header_and_make_pot_reads_it_from_there(): void {
+		$pot    = $this->read( 'languages/odavent-events.pot' );
+		$script = $this->read( 'bin/make-pot.sh' );
+
+		// A version bump without bin/make-pot.sh leaves a stale header: fail until the .pot is regenerated.
+		$this->assertStringContainsString( '"Project-Id-Version: Odavent Events ' . $this->header( 'Version' ) . '\n"', $pot );
+
+		// The script passes the version it reads from odavent-events.php; no number is typed into it.
+		$this->assertStringContainsString( 'Version:', $script );
+		$this->assertStringContainsString( 'odavent-events.php', $script );
+		$this->assertStringContainsString( 'Project-Id-Version', $script );
+		$this->assertStringContainsString( '${VERSION}', $script );
+		$this->assertDoesNotMatchRegularExpression( '/Project-Id-Version[^\n]*\d+\.\d+\.\d+/', $script );
+
+		// And the release steps tell the maintainer to run it before tagging.
+		$this->assertMatchesRegularExpression( '/bin\/make-pot\.sh` before tagging/', $this->read( 'README.md' ) );
+	}
+
 	public function test_export_ignore_covers_the_dev_files(): void {
 		$attributes = $this->read( '.gitattributes' );
 
