@@ -9,7 +9,8 @@ to check when something looks off.
 2. Odavent sends a signed `POST` to `https://your-site/wp-json/odavent/v1/refresh` with the event's id.
    Changes made in quick succession are combined, so it arrives within about a minute.
 3. Your site verifies the signature (see [security.md](security.md#refresh-pings)), forgets the cached copy of
-   that event and purges the page cache of the pages that show it.
+   that event and answers `200`. It then purges the page cache of the pages that show it after the answer has
+   been sent (where the server allows it), so a large site never makes Odavent's 10 second ping time out.
 4. The next visitor makes the plugin fetch the fresh data, and the new page is cached again.
 
 If a ping never arrives, nothing breaks: the cached copy expires after the **cache lifetime** (Settings >

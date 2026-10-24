@@ -98,7 +98,7 @@ class PageCachePurgerTest extends TestCase {
 		$this->assertStringContainsString( "post_status = 'publish'", $query );
 		$this->assertStringContainsString( 'post_type IN (%s, %s, %s)', $query );
 		$this->assertStringContainsString( 'post_content LIKE %s OR post_content LIKE %s', $query );
-		$this->assertStringEndsWith( 'LIMIT 500', trim( $query ) );
+		$this->assertStringEndsWith( 'ORDER BY ID DESC LIMIT 500', trim( $query ), 'the most recent posts win when the cap bites' );
 		$this->assertStringNotContainsString( 'odavent', $query, 'patterns are passed as prepared arguments, never inlined' );
 		$this->assertSame( array( 'post', 'page', 'talk', '%wp:odavent-events/%', '%[odavent\\_%' ), $args );
 	}
@@ -118,7 +118,7 @@ class PageCachePurgerTest extends TestCase {
 		Functions\when( 'rocket_clean_post' )->justReturn( null );
 		Functions\when( 'w3tc_flush_post' )->justReturn( null );
 		Functions\when( 'wp_cache_post_change' )->justReturn( null );
-		Filters\expectApplied( 'odavent_events_purge_post_ids' )->once()->with( array( 11, 12 ), 7 )->andReturn( array( 12, 30, '31', 0, -4, 'x', 30 ) );
+		Filters\expectApplied( 'odavent_events_purge_post_ids' )->once()->with( array( 11, 12 ), 7 )->andReturn( array( 12, 30, '31', 0, -4, 'x', 30, "5\n", '٣', '1e3', ' 8', '' ) );
 
 		$count = ( new Page_Cache_Purger() )->purge_event( 7 );
 

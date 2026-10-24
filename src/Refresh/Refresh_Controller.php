@@ -13,8 +13,13 @@ use Odavent\Events\Settings\Options;
  *  2. header present and well formed (Signature::parse);
  *  3. a site key is configured;
  *  4. timestamp within tolerance, HMAC compared with hash_equals (Signature::verify);
- *  5. not a replay: the v1 hash is remembered for 10 minutes, longer than the 2 x 300 s window
- *     in which a timestamp is accepted.
+ *  5. not a replay: the v1 hash is remembered for 2 x Signature::TOLERANCE + 60 s (11 minutes), longer
+ *     than the 2 x 300 s window in which a timestamp is accepted, so a captured ping cannot be replayed
+ *     while its timestamp still passes.
+ *
+ * The event's own cache is forgotten before answering (the next page view is fresh). Purging the page
+ * caches of the posts that show Odavent content can be slow on a big site, and Odavent gives a ping 10 s
+ * (then retries), so that part runs on `shutdown`, after the 200 has been sent when the server allows it.
  * Every authentication failure gets the same 401 response, so a caller cannot tell a missing key
  * from a wrong, stale or replayed signature. Rejections are not logged.
  */
@@ -24,7 +29,7 @@ class Refresh_Controller {
 	const ROUTE          = '/refresh';
 	const MAX_BODY_BYTES = 8192;
 	const SEEN_PREFIX    = 'odavent_events_seen_';
-	const SEEN_TTL       = 600;
+	const SEEN_TTL       = 2 * Signature::TOLERANCE + 60;
 	const HEADER         = 'x_odavent_signature';
 
 	/** @var Options */
@@ -51,6 +56,8 @@ class Refresh_Controller {
 				'callback'            => array( $this, 'handle' ),
 				// Public on purpose: authentication is the HMAC signature checked in handle().
 				'permission_callback' => '__return_true',
+				// A machine-to-machine endpoint: no reason to list it in the REST index.
+				'show_in_index'       => false,
 			)
 		);
 	}
@@ -109,30 +116,55 @@ class Refresh_Controller {
 		$slug     = isset( $data['event_slug'] ) && is_string( $data['event_slug'] ) ? sanitize_title( $data['event_slug'] ) : '';
 
 		$this->repository->purge( $event_id );
-		$this->purger->purge_event( $event_id );
 
-		/**
-		 * Fires after a signed refresh ping purged an event's cached data and the pages using it.
-		 *
-		 * @param int    $event_id Odavent event id.
-		 * @param string $slug     Event slug (sanitised), or '' when not sent.
-		 */
-		do_action( 'odavent_events_refreshed', $event_id, $slug );
+		add_action(
+			'shutdown',
+			function () use ( $event_id, $slug ) {
+				$this->finish_refresh( $event_id, $slug );
+			}
+		);
 
 		return new \WP_REST_Response( array( 'ok' => true ), 200 );
+	}
+
+	/**
+	 * The slow part of a refresh, run on `shutdown`: close the connection when the server can, purge the
+	 * page caches, then announce it. Nothing here may change the answer already sent, so nothing escapes.
+	 *
+	 * @param int    $event_id Odavent event id.
+	 * @param string $slug     Event slug (sanitised), or ''.
+	 */
+	private function finish_refresh( int $event_id, string $slug ): void {
+		if ( function_exists( 'fastcgi_finish_request' ) ) {
+			fastcgi_finish_request();
+		}
+
+		try {
+			$this->purger->purge_event( $event_id );
+
+			/**
+			 * Fires after a signed refresh ping purged an event's cached data and the pages using it. It runs
+			 * on `shutdown`, after the response was sent when the server allows it.
+			 *
+			 * @param int    $event_id Odavent event id.
+			 * @param string $slug     Event slug (sanitised), or '' when not sent.
+			 */
+			do_action( 'odavent_events_refreshed', $event_id, $slug );
+		} catch ( \Throwable $e ) {
+			return;
+		}
 	}
 
 	private function declared_length_too_large( \WP_REST_Request $request ): bool {
 		$declared = $request->get_header( 'content_length' );
 
-		return is_string( $declared ) && ctype_digit( $declared ) && ( strlen( $declared ) > 9 || (int) $declared > self::MAX_BODY_BYTES );
+		// preg_match, not ctype_digit(): ext-ctype is optional. The D modifier refuses a trailing newline.
+		return is_string( $declared ) && 1 === preg_match( '/^[0-9]+$/D', $declared ) && ( strlen( $declared ) > 9 || (int) $declared > self::MAX_BODY_BYTES );
 	}
 
 	private function signature_header( \WP_REST_Request $request ): string {
+		// WP_REST_Request canonicalises header names (lowercase, dashes to underscores), so one lookup is enough.
 		$value = $request->get_header( self::HEADER );
-		if ( null === $value ) {
-			$value = $request->get_header( 'X-Odavent-Signature' );
-		}
 
 		return is_string( $value ) ? $value : '';
 	}

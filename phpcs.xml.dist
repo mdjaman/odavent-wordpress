@@ -19,6 +19,7 @@
         PHPCompatibility skips an unqualified call inside a namespace (it could be a namespaced function), so it
         misses str_contains() and friends in src/. Forbid the PHP 8-only functions outright: CI runs the suite on
         PHP 7.4, but a branch that is never executed there would still ship a fatal on a 7.4 site. Use strpos() etc.
+        ext-ctype is optional too (ctype_digit() is a fatal where it is missing): use preg_match().
     -->
     <rule ref="Generic.PHP.ForbiddenFunctions">
         <properties>
@@ -48,6 +49,17 @@
                 <element key="mb_rtrim" value="null"/>
                 <element key="mb_ucfirst" value="null"/>
                 <element key="mb_lcfirst" value="null"/>
+                <element key="ctype_alnum" value="null"/>
+                <element key="ctype_alpha" value="null"/>
+                <element key="ctype_cntrl" value="null"/>
+                <element key="ctype_digit" value="null"/>
+                <element key="ctype_graph" value="null"/>
+                <element key="ctype_lower" value="null"/>
+                <element key="ctype_print" value="null"/>
+                <element key="ctype_punct" value="null"/>
+                <element key="ctype_space" value="null"/>
+                <element key="ctype_upper" value="null"/>
+                <element key="ctype_xdigit" value="null"/>
             </property>
         </properties>
     </rule>

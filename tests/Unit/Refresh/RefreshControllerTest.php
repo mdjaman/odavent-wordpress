@@ -8,6 +8,7 @@ use Mockery;
 use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Refresh\Page_Cache_Purger;
 use Odavent\Events\Refresh\Refresh_Controller;
+use Odavent\Events\Refresh\Signature;
 use Odavent\Events\Settings\Options;
 use Odavent\Events\Tests\TestCase;
 use WP_REST_Request;
@@ -40,6 +41,9 @@ class RefreshControllerTest extends TestCase {
 	/** @var string The site key Options returns. */
 	private $key = self::KEY;
 
+	/** @var callable[] Callbacks the controller hooked on `shutdown`, not yet run. */
+	private $shutdown = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 		$GLOBALS['wp_version'] = '6.5';
@@ -69,6 +73,15 @@ class RefreshControllerTest extends TestCase {
 			}
 		);
 
+		Functions\when( 'add_action' )->alias(
+			function ( $hook, $callback ) {
+				if ( 'shutdown' === $hook ) {
+					$this->shutdown[] = $callback;
+				}
+				return true;
+			}
+		);
+
 		$this->options = Mockery::mock( Options::class );
 		$this->options->shouldReceive( 'site_key' )->andReturnUsing(
 			function () {
@@ -77,6 +90,26 @@ class RefreshControllerTest extends TestCase {
 		)->byDefault();
 		$this->repository = Mockery::mock( Event_Repository::class );
 		$this->purger     = Mockery::mock( Page_Cache_Purger::class );
+	}
+
+	/**
+	 * Runs what the controller deferred to PHP's shutdown, like the end of a real request.
+	 */
+	private function run_shutdown(): void {
+		$callbacks      = $this->shutdown;
+		$this->shutdown = array();
+		foreach ( $callbacks as $callback ) {
+			call_user_func( $callback );
+		}
+	}
+
+	/**
+	 * Most tests care about the whole refresh, so a request left to end normally runs its shutdown work here;
+	 * the tests about the deferral itself run (or deliberately skip) it first.
+	 */
+	protected function assertPostConditions(): void {
+		$this->run_shutdown();
+		parent::assertPostConditions();
 	}
 
 	private function controller(): Refresh_Controller {
@@ -141,6 +174,7 @@ class RefreshControllerTest extends TestCase {
 		$this->assertSame( '/refresh', $captured[1] );
 		$this->assertSame( 'POST', $captured[2]['methods'] );
 		$this->assertSame( '__return_true', $captured[2]['permission_callback'] );
+		$this->assertFalse( $captured[2]['show_in_index'] );
 		$this->assertSame( array( $controller, 'handle' ), $captured[2]['callback'] );
 	}
 
@@ -178,9 +212,110 @@ class RefreshControllerTest extends TestCase {
 
 		$v1 = substr( $sig, strpos( $sig, 'v1=' ) + 3 );
 		$this->assertSame(
-			array( array( 'odavent_events_seen_' . substr( sha1( $v1 ), 0, 32 ), 1, 600 ) ),
+			array( array( 'odavent_events_seen_' . substr( sha1( $v1 ), 0, 32 ), 1, 660 ) ),
 			$this->transient_writes
 		);
+	}
+
+	public function test_replay_marker_outlives_the_whole_timestamp_window(): void {
+		// A timestamp passes for +/- TOLERANCE, so a captured ping stays acceptable for 2 x TOLERANCE.
+		$this->assertSame( 2 * Signature::TOLERANCE + 60, Refresh_Controller::SEEN_TTL );
+		$this->assertGreaterThan( 2 * Signature::TOLERANCE, Refresh_Controller::SEEN_TTL );
+	}
+
+	public function test_the_response_is_sent_before_the_page_caches_are_purged(): void {
+		$body   = $this->valid_body( 7 );
+		$events = array();
+		$this->repository->shouldReceive( 'purge' )->once()->with( 7 )->andReturnUsing(
+			static function () use ( &$events ) {
+				$events[] = 'repository purged';
+			}
+		);
+		$this->purger->shouldReceive( 'purge_event' )->once()->with( 7 )->andReturnUsing(
+			static function () use ( &$events ) {
+				$events[] = 'page caches purged';
+				return 3;
+			}
+		);
+		Actions\expectDone( 'odavent_events_refreshed' )->once()->with( 7, 'annual-tech-summit' );
+
+		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
+		$events[] = 'response returned';
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array( 'repository purged', 'response returned' ), $events, 'the slow purge has not run yet' );
+		$this->assertCount( 1, $this->shutdown );
+
+		$this->run_shutdown();
+
+		$this->assertSame( array( 'repository purged', 'response returned', 'page caches purged' ), $events );
+		$this->run_shutdown();
+		$this->assertCount( 3, $events, 'it runs exactly once' );
+	}
+
+	public function test_a_purger_that_throws_does_not_change_the_answer_nor_escape_shutdown(): void {
+		$body = $this->valid_body( 7 );
+		$this->repository->shouldReceive( 'purge' )->once();
+		$this->purger->shouldReceive( 'purge_event' )->once()->andThrow( new \RuntimeException( 'cache plugin exploded ' . self::KEY ) );
+		Actions\expectDone( 'odavent_events_refreshed' )->never();
+
+		$response = $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array( 'ok' => true ), $response->get_data() );
+
+		$this->run_shutdown(); // must not throw
+		$this->addToAssertionCount( 1 );
+	}
+
+	public function test_nothing_is_deferred_when_the_ping_is_rejected(): void {
+		$body = $this->valid_body( 7 );
+		$this->expect_no_purge();
+
+		$this->controller()->handle( $this->request( $body, $this->sign( $body, self::NOW, 'odv_wp_otherkey12345' ) ) );
+		$this->controller()->handle( $this->request( 'not json', $this->sign( 'not json' ) ) );
+
+		$this->assertSame( array(), $this->shutdown );
+	}
+
+	public function test_a_repository_failure_defers_nothing(): void {
+		$body = $this->valid_body( 7 );
+		$this->repository->shouldReceive( 'purge' )->andThrow( new \RuntimeException( 'db down' ) );
+		$this->purger->shouldNotReceive( 'purge_event' );
+
+		$this->assertSame( 500, $this->controller()->handle( $this->request( $body, $this->sign( $body ) ) )->get_status() );
+		$this->assertSame( array(), $this->shutdown );
+	}
+
+	/**
+	 * Where the server offers it, the connection is closed before the slow purge starts. Separate process: a
+	 * function Brain Monkey defines would otherwise exist for every later test.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_the_connection_is_closed_before_the_purge_when_the_server_can(): void {
+		$this->assertFalse( function_exists( 'fastcgi_finish_request' ) );
+		$events = array();
+		Functions\expect( 'fastcgi_finish_request' )->once()->andReturnUsing(
+			static function () use ( &$events ) {
+				$events[] = 'finished';
+			}
+		);
+		$body = $this->valid_body( 7 );
+		$this->repository->shouldReceive( 'purge' )->once();
+		$this->purger->shouldReceive( 'purge_event' )->once()->andReturnUsing(
+			static function () use ( &$events ) {
+				$events[] = 'purged';
+				return 0;
+			}
+		);
+
+		$this->controller()->handle( $this->request( $body, $this->sign( $body ) ) );
+		$this->assertSame( array(), $events );
+
+		$this->run_shutdown();
+		$this->assertSame( array( 'finished', 'purged' ), $events );
 	}
 
 	public function test_slug_is_optional_and_sanitised(): void {

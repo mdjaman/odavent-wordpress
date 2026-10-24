@@ -90,6 +90,6 @@ final class Countdown implements Renderer {
 	private static function now(): int {
 		$now = apply_filters( 'odavent_events_now', time() );
 
-		return is_int( $now ) || ( is_string( $now ) && ctype_digit( $now ) ) ? (int) $now : time();
+		return is_int( $now ) || ( is_string( $now ) && 1 === preg_match( '/^[0-9]+$/D', $now ) ) ? (int) $now : time();
 	}
 }

@@ -38,7 +38,7 @@ to the internet, so its only protection is a signature:
   keyed with your site key.
 * The timestamp must be within **300 seconds** of your server's clock, in either direction. Keep your server
   clock accurate (NTP).
-* **Replay protection:** once a signature has been accepted, its hash is remembered for 10 minutes and the same
+* **Replay protection:** once a signature has been accepted, its hash is remembered for 11 minutes (twice the timestamp window plus a minute) and the same
   request is refused. (The remembering uses transients; with a persistent object cache that evicts entries
   early, a replay inside the 5 minute window could succeed, which is harmless, see below.)
 * **Body limit of 8 KB**, checked from the declared length and the real body before anything is hashed.

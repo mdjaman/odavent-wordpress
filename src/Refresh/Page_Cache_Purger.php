@@ -8,7 +8,7 @@ namespace Odavent\Events\Refresh;
  * shortcodes may name it by slug), so every published post of a public type containing an
  * Odavent block (`wp:odavent-events/`) or shortcode (`[odavent_`) is purged: correctness over
  * precision. Sites with special needs adjust the list with the `odavent_events_purge_post_ids`
- * filter.
+ * filter. When more than LIMIT posts qualify, the most recent ones (highest ids) are purged.
  */
 class Page_Cache_Purger {
 
@@ -76,7 +76,7 @@ class Page_Cache_Purger {
 
 		$placeholders = implode( ', ', array_fill( 0, count( $types ), '%s' ) );
 		$sql          = "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders})"
-			. ' AND (post_content LIKE %s OR post_content LIKE %s) ORDER BY ID LIMIT ' . self::LIMIT;
+			. ' AND (post_content LIKE %s OR post_content LIKE %s) ORDER BY ID DESC LIMIT ' . self::LIMIT;
 		$args         = array_merge(
 			$types,
 			array(
@@ -106,7 +106,8 @@ class Page_Cache_Purger {
 
 		$out = array();
 		foreach ( $ids as $id ) {
-			if ( is_int( $id ) || ( is_string( $id ) && ctype_digit( $id ) ) ) {
+			// preg_match, not ctype_digit(): ext-ctype is optional.
+			if ( is_int( $id ) || ( is_string( $id ) && 1 === preg_match( '/^[0-9]+$/D', $id ) ) ) {
 				$id = (int) $id;
 				if ( $id > 0 && ! in_array( $id, $out, true ) ) {
 					$out[] = $id;
