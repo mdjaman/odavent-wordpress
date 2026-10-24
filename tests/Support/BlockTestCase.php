@@ -36,6 +36,7 @@ abstract class BlockTestCase extends RenderTestCase {
 		$this->enqueued_scripts = array();
 
 		Functions\when( 'is_active_widget' )->justReturn( false );
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array() );
 		Functions\when( 'wp_script_is' )->justReturn( true );
 		Functions\when( 'wp_enqueue_script' )->alias(
 			function ( $handle ) {

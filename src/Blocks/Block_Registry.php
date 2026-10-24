@@ -534,11 +534,12 @@ class Block_Registry {
 
 	/**
 	 * Whether the current page shows Odavent content: the current singular post contains an Odavent block or
-	 * shortcode (a cheap string check), or an Odavent widget is active (a widget is not post content, and may
-	 * show on any page, singular or not).
+	 * shortcode (a cheap string check), or a widget area in an active sidebar holds Odavent content (one of our
+	 * classic widgets, or an Odavent block/shortcode inside a block, Text or Custom HTML widget; a widget is not
+	 * post content and may show on any page, singular or not; see Widgets::any_active()).
 	 *
-	 * Filter `odavent_events_page_has_content` (bool $has, object|null $post) to cover content the check
-	 * cannot see (synced patterns, template parts).
+	 * NOT detected: blocks in a block theme's templates and template parts, synced patterns, custom fields.
+	 * Filter `odavent_events_page_has_content` (bool $has, object|null $post) to cover those.
 	 */
 	public static function page_has_odavent_content(): bool {
 		$post = null;

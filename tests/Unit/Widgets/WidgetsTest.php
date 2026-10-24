@@ -13,6 +13,7 @@ use Odavent\Events\Data\Event_View;
 use Odavent\Events\Render\Format;
 use Odavent\Events\Shortcodes\Shortcodes;
 use Odavent\Events\Tests\Support\BlockTestCase;
+use Odavent\Events\Tests\Support\WpStubs;
 use Odavent\Events\Widgets\Block_Widget;
 use Odavent\Events\Widgets\Widgets;
 
@@ -516,5 +517,100 @@ class WidgetsTest extends BlockTestCase {
 		}
 
 		return $out + $values;
+	}
+
+	// ---- Odavent content placed in a widget area (block widgets, Text widgets) -----------------------
+
+	/**
+	 * @param array<string, mixed> $sidebars Sidebar => widget ids, as wp_get_sidebars_widgets() answers.
+	 */
+	private function sidebars( array $sidebars ): void {
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( $sidebars );
+	}
+
+	public function test_nothing_is_active_on_a_site_without_odavent_widgets(): void {
+		$this->sidebars( array( 'sidebar-1' => array( 'search-2', 'block-3' ) ) );
+		WpStubs::$options['widget_block'] = array( 3 => array( 'content' => '<!-- wp:paragraph --><p>Hi</p><!-- /wp:paragraph -->' ) );
+
+		$this->assertFalse( Widgets::any_active() );
+	}
+
+	public function test_an_odavent_block_in_a_block_widget_area_counts_as_active(): void {
+		$this->sidebars( array( 'sidebar-1' => array( 'search-2', 'block-3' ) ) );
+		WpStubs::$options['widget_block'] = array( 3 => array( 'content' => '<!-- wp:odavent-events/countdown {"eventId":42} /-->' ) );
+
+		$this->assertTrue( Widgets::any_active() );
+	}
+
+	public function test_a_shortcode_in_a_text_widget_counts_as_active(): void {
+		$this->sidebars( array( 'footer-1' => array( 'text-5' ) ) );
+		WpStubs::$options['widget_text'] = array( 5 => array( 'text' => '<p>[odavent_tickets event="42"]</p>' ) );
+
+		$this->assertTrue( Widgets::any_active() );
+	}
+
+	public function test_a_shortcode_in_a_custom_html_widget_counts_as_active(): void {
+		$this->sidebars( array( 'footer-1' => array( 'custom_html-2' ) ) );
+		WpStubs::$options['widget_custom_html'] = array( 2 => array( 'content' => '[odavent_countdown]' ) );
+
+		$this->assertTrue( Widgets::any_active() );
+	}
+
+	public function test_odavent_content_in_an_inactive_or_orphaned_widget_is_ignored(): void {
+		$this->sidebars(
+			array(
+				'wp_inactive_widgets'  => array( 'block-3' ),
+				'orphaned_widgets_1'   => array( 'text-5' ),
+				'sidebar-1'            => array(),
+				'array_version'        => 3,
+			)
+		);
+		WpStubs::$options['widget_block'] = array( 3 => array( 'content' => '<!-- wp:odavent-events/countdown /-->' ) );
+		WpStubs::$options['widget_text']  = array( 5 => array( 'text' => '[odavent_countdown]' ) );
+
+		$this->assertFalse( Widgets::any_active() );
+	}
+
+	public function test_a_widget_placed_in_a_sidebar_but_with_other_content_is_not_odavent(): void {
+		$this->sidebars( array( 'sidebar-1' => array( 'block-4' ) ) );
+		WpStubs::$options['widget_block'] = array(
+			3 => array( 'content' => '<!-- wp:odavent-events/countdown /-->' ), // Exists but is not placed.
+			4 => array( 'content' => '<p>Hello</p>' ),
+		);
+
+		$this->assertFalse( Widgets::any_active() );
+	}
+
+	public function test_malformed_widget_data_never_fatals_and_is_not_odavent(): void {
+		foreach (
+			array(
+				'sidebars not an array' => array( 'sidebars' => 'junk', 'block' => array() ),
+				'sidebar not an array'  => array( 'sidebars' => array( 'sidebar-1' => 'block-3' ), 'block' => array() ),
+				'ids not strings'       => array( 'sidebars' => array( 'sidebar-1' => array( 3, null, array( 'block-3' ) ) ), 'block' => array() ),
+				'odd ids'               => array( 'sidebars' => array( 'sidebar-1' => array( 'block-', 'block-x', 'block-3 ', "block-3\n", 'unknown-3', '' ) ), 'block' => array( 3 => array( 'content' => '[odavent_x]' ) ) ),
+				'option not an array'   => array( 'sidebars' => array( 'sidebar-1' => array( 'block-3' ) ), 'block' => 'junk' ),
+				'instance not an array' => array( 'sidebars' => array( 'sidebar-1' => array( 'block-3' ) ), 'block' => array( 3 => 'junk' ) ),
+				'content not a string'  => array( 'sidebars' => array( 'sidebar-1' => array( 'block-3' ) ), 'block' => array( 3 => array( 'content' => array( '[odavent_x]' ) ) ) ),
+				'content missing'       => array( 'sidebars' => array( 'sidebar-1' => array( 'block-3' ) ), 'block' => array( 3 => array() ) ),
+				'instance missing'      => array( 'sidebars' => array( 'sidebar-1' => array( 'block-3' ) ), 'block' => array( 9 => array( 'content' => '[odavent_x]' ) ) ),
+			) as $label => $case
+		) {
+			$this->sidebars( array( 'sidebar-1' => array() ) );
+			Functions\when( 'wp_get_sidebars_widgets' )->justReturn( $case['sidebars'] );
+			WpStubs::$options['widget_block'] = $case['block'];
+
+			$this->assertFalse( Widgets::any_active(), $label );
+		}
+	}
+
+	public function test_the_classic_widget_check_wins_without_reading_the_content_options(): void {
+		Functions\when( 'is_active_widget' )->alias(
+			static function ( $callback, $widget_id, $id_base ) {
+				return 'odavent_events_speakers' === $id_base ? 'sidebar-1' : false;
+			}
+		);
+		Functions\expect( 'wp_get_sidebars_widgets' )->never();
+
+		$this->assertTrue( Widgets::any_active() );
 	}
 }

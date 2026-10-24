@@ -688,6 +688,16 @@ class BlockRegistryTest extends BlockTestCase {
 		$this->assertSame( array( 'odavent-events' ), $this->enqueued_styles );
 	}
 
+	public function test_a_block_in_a_block_widget_area_counts_as_odavent_content_everywhere(): void {
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array( 'sidebar-1' => array( 'block-3' ) ) );
+		\Odavent\Events\Tests\Support\WpStubs::$options['widget_block'] = array( 3 => array( 'content' => '<!-- wp:odavent-events/countdown /-->' ) );
+		$this->on_post( '<p>Hello</p>', false );
+
+		$this->assertTrue( Block_Registry::page_has_odavent_content() );
+		$this->registry( null )->enqueue_early_styles();
+		$this->assertSame( array( 'odavent-events' ), $this->enqueued_styles );
+	}
+
 	public function test_a_widget_also_counts_on_a_singular_page_without_blocks(): void {
 		$this->widget_active();
 		$this->on_post( '<p>Hello</p>' );

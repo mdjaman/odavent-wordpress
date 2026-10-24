@@ -67,14 +67,66 @@ final class Widgets {
 		return array_map( array( self::class, 'id_base' ), Block_Registry::slugs() );
 	}
 
+	/** Widget types whose content is free text: id prefix => [option, content field]. */
+	const CONTENT_WIDGETS = array(
+		'block'       => array( 'widget_block', 'content' ),
+		'text'        => array( 'widget_text', 'text' ),
+		'custom_html' => array( 'widget_custom_html', 'content' ),
+	);
+
 	/**
-	 * Whether any Odavent widget sits in a sidebar (inactive ones do not count). A widget is not post content,
+	 * Whether Odavent content sits in a widget area: one of our classic widgets, or an Odavent block or
+	 * shortcode inside a block widget, a Text widget or a Custom HTML widget. A widget is not post content,
 	 * so the page cache purge, the preview no-cache headers and the early stylesheet ask this separately.
+	 * Inactive widgets do not count.
 	 */
 	public static function any_active(): bool {
 		foreach ( self::id_bases() as $id_base ) {
 			if ( is_active_widget( false, false, $id_base, true ) ) {
 				return true;
+			}
+		}
+
+		return self::content_in_widget_areas();
+	}
+
+	/**
+	 * A plain string search of the (autoloaded) widget options for an Odavent block comment or shortcode,
+	 * restricted to the widgets placed in an active sidebar. Cheap and database-free on the front end; a
+	 * false positive (the text only mentions `[odavent_`) just costs an extra purge or no-cache, so this
+	 * stays simple. Malformed options and instances are ignored, never fatal.
+	 */
+	private static function content_in_widget_areas(): bool {
+		$areas = wp_get_sidebars_widgets();
+		if ( ! is_array( $areas ) ) {
+			return false;
+		}
+
+		$placed = array();
+		foreach ( $areas as $sidebar => $ids ) {
+			$sidebar = (string) $sidebar;
+			if ( 'wp_inactive_widgets' === $sidebar || 0 === strpos( $sidebar, 'orphaned_widgets' ) || ! is_array( $ids ) ) {
+				continue;
+			}
+			foreach ( $ids as $id ) {
+				if ( is_string( $id ) && 1 === preg_match( '/^([a-z_]+)-([0-9]+)$/D', $id, $m ) && isset( self::CONTENT_WIDGETS[ $m[1] ] ) ) {
+					$placed[ $m[1] ][] = (int) $m[2];
+				}
+			}
+		}
+
+		foreach ( $placed as $type => $numbers ) {
+			list( $option, $field ) = self::CONTENT_WIDGETS[ $type ];
+
+			$instances = get_option( $option, array() );
+			if ( ! is_array( $instances ) ) {
+				continue;
+			}
+			foreach ( $numbers as $number ) {
+				$content = isset( $instances[ $number ] ) && is_array( $instances[ $number ] ) ? ( $instances[ $number ][ $field ] ?? null ) : null;
+				if ( is_string( $content ) && ( false !== strpos( $content, 'wp:odavent-events/' ) || false !== strpos( $content, '[odavent_' ) ) ) {
+					return true;
+				}
 			}
 		}
 

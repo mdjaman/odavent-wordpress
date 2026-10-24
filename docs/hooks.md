@@ -107,11 +107,17 @@ stylesheet in the page head (so blocks do not flash unstyled) and to send no-cac
 who may see a draft preview.
 
 `$has` is `true` when the current singular post's own content contains an `odavent-events/` block or an
-`[odavent_` shortcode. `$post` is that post, or `null` when the request is not a singular page.
+`[odavent_` shortcode, or when a widget area holds Odavent content: one of the plugin's classic widgets, or
+an Odavent block or shortcode inside a block widget, a Text widget or a Custom HTML widget placed in an
+active sidebar (widgets can show on any page, so this holds on non-singular pages too). `$post` is the
+current singular post, or `null` when the request is not a singular page.
 
-The check reads the post's own content, and treats a page as using Odavent content on every page (singular
-or not) while an Odavent widget is active. It cannot see blocks that live elsewhere: synced patterns,
-template parts and block-theme templates, ACF fields. Return `true` for those pages:
+Widgets also matter for the page cache: while such a widget is active, a refresh from Odavent purges the
+whole-site cache (see [`odavent_events_purge_all_on_widget`](#odavent_events_purge_all_on_widget)).
+
+It does **not** detect blocks that live in a block theme's templates or template parts (header, footer,
+sidebar parts of the Site Editor), in synced patterns, or in custom fields such as ACF. Return `true` for
+those pages:
 
 ```php
 add_filter( 'odavent_events_page_has_content', function ( bool $has, $post ): bool {
@@ -168,8 +174,8 @@ add_filter( 'odavent_events_purge_post_ids', function ( array $post_ids, int $ev
 apply_filters( 'odavent_events_purge_all_on_widget', bool $purge, int $event_id ): bool
 ```
 
-A widget is not post content and can show on any page, so while at least one Odavent widget is active
-in a sidebar the plugin purges the whole-site page cache when a signed refresh arrives for `$event_id`
+A widget is not post content and can show on any page, so while a sidebar holds Odavent content (one of
+the plugin's classic widgets, or an Odavent block or shortcode in a block, Text or Custom HTML widget) the plugin purges the whole-site page cache when a signed refresh arrives for `$event_id`
 (WP Rocket `rocket_clean_domain()`, else W3 Total Cache `w3tc_flush_all()`, else WP Super Cache
 `wp_cache_clear_cache()`, plus the `litespeed_purge_all` action and
 [`odavent_events_purge_all`](#odavent_events_purge_all)). Default: `true`. Return `false` when the
