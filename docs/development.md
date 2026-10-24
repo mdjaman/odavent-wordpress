@@ -115,7 +115,12 @@ non-blocking for now).
 13. the release zip (`bin/build-zip 0.1.0`) installed into a fresh WordPress at `/pkg`: checks 1 and 5 again,
     and in `fr_FR` the Register button reads "S’inscrire".
 
-Every check also reads `wp-content/debug.log`: a PHP warning, notice or fatal fails the run.
+`wp-content/debug.log` is read by check 0 (after install and activation), 4 (during the failures), 8 (hostile
+event), 11 (update checks), 13 (the packaged site's log and the dev site's meanwhile) and a final check over the
+whole run: a PHP warning, notice, deprecation or fatal there fails. Check 0 (and 13 for the packaged site) first
+writes a canary line through `error_log()` and requires it in the log, and a missing log fails these checks, so
+they cannot pass on a site whose logging is broken. A full run must print `EXPECTED_PASSES` PASS lines (set at
+the top of `bin/smoke.sh`): a skipped section fails the run.
 
 Note: `wp plugin delete` (WP-CLI) does not run `uninstall.php` by design; check 12 uses core's
 `delete_plugins()`, which is what the Plugins screen calls.
@@ -129,6 +134,11 @@ WordPress container's network and installs `@playwright/test` inside the contain
   Event select lists the stub events with translated statuses; choosing event 1 previews its speakers
   (ServerSideRender); "Show biography" changes the preview; a slug-only block selects its event, not
   "Default event"; no console errors.
+* the fixtures' images (`https://odavent.com/storage/...`) and Gravatar avatars are answered with a local SVG
+  placeholder, so the browser never calls production and the tests run offline; any other external request
+  is listed in the test's annotations. Any console error or warning fails a test, except a few exact core
+  messages listed with their WordPress version in `tests/e2e/specs/helpers.js`. `bin/e2e` stores the admin's
+  editor preferences first (no welcome guide, no "Choose a pattern" modal for new pages).
 * front end: the agenda track filter (`aria-pressed`, `hidden`, rooms follow their parent); the countdown
   ticks without `NaN`; a paused event's countdown hides itself once the start passes; full-page screenshots at
   390 and 1280 px (light mode) in `tests/e2e/artifacts/` for a human to look at.
