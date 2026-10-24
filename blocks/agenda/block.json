@@ -1,0 +1,46 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/agenda",
+	"title": "Agenda",
+	"category": "odavent-events",
+	"icon": "schedule",
+	"description": "The event schedule by day, with breakout rooms and an optional track filter.",
+	"keywords": [
+		"odavent",
+		"event",
+		"schedule",
+		"sessions",
+		"program"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"showSpeakers": {
+			"type": "boolean",
+			"default": true
+		},
+		"showDescription": {
+			"type": "boolean",
+			"default": false
+		},
+		"trackFilter": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

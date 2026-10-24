@@ -1,0 +1,40 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/register-button",
+	"title": "Register button",
+	"category": "odavent-events",
+	"icon": "tickets-alt",
+	"description": "A button to the event's registration page on Odavent, shown only while registration is open.",
+	"keywords": [
+		"odavent",
+		"event"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"label": {
+			"type": "string",
+			"default": ""
+		},
+		"ticketId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

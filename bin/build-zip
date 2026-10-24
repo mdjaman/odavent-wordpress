@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+# Builds dist/odavent-events-X.Y.Z.zip with bin/build-zip.php inside the project's Docker image
+# (PHP with the Zip extension and Composer; no local PHP needed).
+# Usage: bin/build-zip X.Y.Z
+# CI and the release workflow call `php bin/build-zip.php X.Y.Z` directly.
+set -e
+cd "$(dirname "$0")/.."
+
+PHP_VERSION="${PHP_VERSION:-7.4}"
+IMAGE="odavent-events-test:${PHP_VERSION}"
+
+docker build --quiet --build-arg "PHP_VERSION=${PHP_VERSION}" -t "$IMAGE" -f docker/Dockerfile.test docker >/dev/null
+
+exec docker run --rm --user "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer -v "$PWD":/app -w /app "$IMAGE" sh -c \
+  'composer install --no-interaction --prefer-dist --no-progress --quiet && php bin/build-zip.php "$@"' sh "$@"

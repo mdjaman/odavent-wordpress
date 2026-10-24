@@ -1,0 +1,140 @@
+name: Release
+
+# Runs ONLY when a version tag is pushed (git tag v0.1.0 && git push origin v0.1.0). Never on
+# pull requests or branch pushes: this is the only workflow that publishes anything.
+#
+# Two jobs, so the token that can write releases never meets third-party code:
+# - build: read-only token, not persisted in the checkout; runs Composer, the tests and builds the zip.
+# - publish: the only job with contents: write. No checkout, no Composer, no project code: it downloads
+#   the zip and the notes built above and creates the release.
+# Every third-party action is pinned to a full commit SHA (the version is in the trailing comment).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test and package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # The whole history, so the next step can tell whether the tagged commit is on main.
+          fetch-depth: 0
+          # Composer and the tests run in this job: leave no token in .git/config for them to find.
+          persist-credentials: false
+
+      # Only code that went through main (and its CI) is released: a tag pushed on a side branch fails here.
+      # GITHUB_SHA reaches the shell as an environment variable, never interpolated into the script.
+      - name: Check the tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The tagged commit $GITHUB_SHA is not on main. Merge it into main (CI green), then tag the merge commit."
+            exit 1
+          fi
+
+      - name: Check the tag against the plugin header
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          case "$VERSION" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::Tag '$TAG' is not vX.Y.Z"; exit 1 ;;
+          esac
+          HEADER="$(sed -n 's/^[[:space:]]*\*[[:space:]]*Version:[[:space:]]*\([^[:space:]]*\)[[:space:]]*$/\1/p' odavent-events.php | head -n 1)"
+          if [ "$HEADER" != "$VERSION" ]; then
+            echo "::error::Tag $TAG does not match the plugin header Version ($HEADER). Bump the header, readme.txt and CHANGELOG.md, then re-tag."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # The plugin's PHP floor, so a syntax the minimum version cannot parse fails the release.
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '7.4'
+          tools: composer:v2
+          extensions: zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Lint PHP files
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+
+      - name: PHPCS (PHPCompatibilityWP, PHP 7.4+)
+        run: vendor/bin/phpcs
+
+      - name: JS syntax and tests
+        run: |
+          bin/lint-js
+          bin/test-js
+
+      - name: Check translations
+        run: php bin/check-translations.php
+
+      - name: Build the plugin zip
+        run: php bin/build-zip.php "$VERSION"
+
+      - name: Write the release notes
+        run: php bin/release-notes.php "$VERSION" > release-notes.md
+
+      - name: Collect the release files
+        run: |
+          mkdir release
+          cp "dist/odavent-events-$VERSION.zip" release-notes.md release/
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish the GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release
+          path: release
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          ZIP="release/odavent-events-$VERSION.zip"
+          if [ "$(find release -maxdepth 1 -name '*.zip' | wc -l)" -ne 1 ] || [ ! -f "$ZIP" ] || [ ! -s release/release-notes.md ]; then
+            echo "::error::Expected exactly $ZIP and release/release-notes.md from the build job."
+            exit 1
+          fi
+          PRERELEASE=""
+          case "$VERSION" in
+            *-*) PRERELEASE="--prerelease" ;;
+          esac
+          gh release create "$TAG" "$ZIP" \
+            --title "Odavent Events $VERSION" \
+            --notes-file release/release-notes.md \
+            --verify-tag \
+            $PRERELEASE

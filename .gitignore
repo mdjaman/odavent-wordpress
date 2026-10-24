@@ -1,0 +1,6 @@
+.superpowers/
+vendor/
+dist/
+.phpunit.result.cache
+tests/e2e/node_modules/
+tests/e2e/artifacts/

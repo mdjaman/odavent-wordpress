@@ -1,0 +1,48 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/sponsors",
+	"title": "Sponsors",
+	"category": "odavent-events",
+	"icon": "awards",
+	"description": "Sponsors, exhibitors and partners with their logos, grouped by type.",
+	"keywords": [
+		"odavent",
+		"event",
+		"partners",
+		"exhibitors",
+		"logos"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"groupByType": {
+			"type": "boolean",
+			"default": true
+		},
+		"showDescription": {
+			"type": "boolean",
+			"default": false
+		},
+		"columns": {
+			"type": "integer",
+			"default": 4,
+			"minimum": 1,
+			"maximum": 6
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

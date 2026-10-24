@@ -1,0 +1,57 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "odavent-events/speakers",
+	"title": "Speakers",
+	"category": "odavent-events",
+	"icon": "groups",
+	"description": "The event's speakers with photo, role and an optional bio, kept up to date from Odavent.",
+	"keywords": [
+		"odavent",
+		"event",
+		"speaker",
+		"people"
+	],
+	"textdomain": "odavent-events",
+	"attributes": {
+		"eventId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"eventSlug": {
+			"type": "string",
+			"default": ""
+		},
+		"columns": {
+			"type": "integer",
+			"default": 3,
+			"minimum": 2,
+			"maximum": 4
+		},
+		"showBio": {
+			"type": "boolean",
+			"default": false
+		},
+		"showCompany": {
+			"type": "boolean",
+			"default": true
+		},
+		"limit": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"speakerId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		}
+	},
+	"supports": {
+		"html": false,
+		"className": true
+	},
+	"editorScript": "odavent-events-editor",
+	"editorStyle": "odavent-events"
+}

@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.3']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Locate the Composer cache
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ matrix.php }}-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Lint PHP files
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+
+      - name: PHPCS (PHPCompatibilityWP, PHP 7.4+)
+        run: vendor/bin/phpcs
+
+      - name: Translations (complete, consistent with the .pot)
+        run: php bin/check-translations.php
+
+      - name: JS syntax (node --check)
+        run: bin/lint-js
+
+      - name: JS tests (plain node)
+        run: bin/test-js
+
+  # The smoke and browser tests need Docker and take minutes, so on pull requests they run only when
+  # runtime code, translations, fixtures, the dev environment, the tests or this workflow changed. Push to main and manual runs always run them.
+  changes:
+    name: Runtime files changed?
+    runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.diff.outputs.runtime }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "runtime=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "origin/$BASE_REF...HEAD" \
+            | grep -Eq '^(src|blocks|assets|templates|docker|bin|languages|tests/fixtures|tests/e2e)/|^(odavent-events\.php|uninstall\.php|\.github/workflows/ci\.yml)$'; then
+            echo "runtime=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "runtime=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # End-to-end on a real WordPress against the stub Odavent API (bin/dev-up + bin/smoke.sh, see
+  # docs/development.md). Non-blocking for the first release while its runtime and stability are measured.
+  smoke:
+    name: Smoke (WordPress ${{ matrix.wp.label }})
+    needs: changes
+    if: needs.changes.outputs.runtime == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        wp:
+          - { label: latest, image: 'wordpress:php8.3-apache' }
+          - { label: '6.1-php7.4', image: 'wordpress:6.1-php7.4-apache' }
+    env:
+      WP_IMAGE: ${{ matrix.wp.image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Start WordPress, the stub Odavent API and WP-CLI
+        run: bin/dev-up
+      - name: Smoke test
+        run: bin/smoke.sh
+      - name: Logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker/docker-compose.yml logs --tail 200
+          bin/wp eval 'echo @file_get_contents( WP_CONTENT_DIR . "/debug.log" );' || true
+      - name: Stop
+        if: always()
+        run: bin/dev-down
+
+  e2e:
+    name: Browser e2e (WordPress ${{ matrix.wp.label }})
+    needs: changes
+    if: needs.changes.outputs.runtime == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        wp:
+          - { label: latest, image: 'wordpress:php8.3-apache' }
+          - { label: '6.1-php7.4', image: 'wordpress:6.1-php7.4-apache' }
+    env:
+      WP_IMAGE: ${{ matrix.wp.image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Start WordPress, the stub Odavent API and WP-CLI
+        run: bin/dev-up
+      - name: Playwright
+        run: bin/e2e
+      - name: Logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker/docker-compose.yml logs --tail 200
+          bin/wp eval 'echo @file_get_contents( WP_CONTENT_DIR . "/debug.log" );' || true
+      - name: Keep screenshots and traces (workflow artifact, not a release)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-${{ matrix.wp.label }}
+          path: tests/e2e/artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Stop
+        if: always()
+        run: bin/dev-down

@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Starts the dev stack (docker/docker-compose.yml), installs WordPress, activates the plugin against the stub
+# Odavent API and creates one test page per scenario. Safe to run again (pages are recreated).
+#
+# Usage: bin/dev-up
+#        WP_IMAGE=wordpress:6.1-php7.4-apache bin/dev-up    # the plugin's minimum WordPress/PHP
+# Then:  open http://localhost:8089 (admin / admin), bin/smoke.sh, bin/e2e, bin/dev-down.
+set -euo pipefail
+# shellcheck source=lib/dev.sh
+. "$(dirname "$0")/lib/dev.sh"
+
+started=$(date +%s)
+log "Starting $COMPOSE_PROJECT_NAME with $WP_IMAGE (CLI $WPCLI_IMAGE) on $ODV_SITE"
+dc up -d --quiet-pull --wait db >/dev/null
+dc up -d --quiet-pull wordpress stub wpcli >/dev/null
+
+log "Waiting for WordPress..."
+for _ in $(seq 1 120); do
+	code=$(curl -s -o /dev/null -w '%{http_code}' "$ODV_SITE/wp-includes/version.php" || true)
+	if [ "$code" = "200" ] && wp_cli core version >/dev/null 2>&1; then
+		break
+	fi
+	sleep 1
+done
+wp_cli core version >/dev/null || { log "WordPress did not come up"; dc logs --tail 50 wordpress; exit 1; }
+
+for _ in $(seq 1 30); do
+	if dc exec -T wordpress curl -s -o /dev/null http://127.0.0.1:8081/__state; then break; fi
+	sleep 1
+done
+
+if ! wp_cli core is-installed >/dev/null 2>&1; then
+	wp_cli core install --url="$ODV_SITE" --title="Odavent dev" --admin_user=admin --admin_password=admin \
+		--admin_email=admin@example.com --skip-email >/dev/null
+fi
+
+# A clean log from here on (bin/smoke.sh reads it, activation included). Installing WordPress from the
+# CLI logs core's own "Undefined array key HTTP_HOST" warning, which is not the plugin's.
+wp_exec sh -c 'rm -f /var/www/html/wp-content/debug.log'
+log "WordPress $(wp_cli core version) on PHP $(wp_exec php -r 'echo PHP_VERSION;')"
+
+wp_cli rewrite structure '/%postname%/' --hard >/dev/null
+# Deactivate first, so every run exercises activation (and its log output) on the real WordPress.
+wp_cli plugin deactivate odavent-events >/dev/null 2>&1 || true
+wp_cli plugin activate odavent-events >/dev/null
+
+stub_control '{"reset": true, "reset_log": true}'
+
+settings=$(printf '{"base_url":"http://127.0.0.1:8081","site_key":"%s","cache_ttl":60,"default_event_id":0,"load_css":true}' "$ODV_STUB_KEY")
+wp_cli option delete odavent_events_settings >/dev/null 2>&1 || true
+wp_cli option add odavent_events_settings "$settings" --format=json --autoload=no >/dev/null
+wp_cli eval '\Odavent\Events\Plugin::instance()->repository()->purge_all();' >/dev/null
+
+BLOCKS="event-header register-button tickets find-registration speakers agenda sponsors countdown venue add-to-calendar"
+
+# All ten blocks with the given attributes JSON.
+blocks_markup() {
+	local attrs="$1" out="" b
+	for b in $BLOCKS; do
+		out="${out}<!-- wp:odavent-events/${b} ${attrs} /-->"$'\n\n'
+	done
+	printf '%s' "$out"
+}
+
+# All ten shortcodes (classic content) with the given attribute string.
+shortcodes_markup() {
+	local attrs="$1" out="" b
+	for b in $BLOCKS; do
+		out="${out}[odavent_${b//-/_} ${attrs}]"$'\n\n'
+	done
+	printf '%s' "$out"
+}
+
+make_page() {
+	local slug="$1" title="$2" content="$3" ids
+	ids=$(wp_cli post list --post_type=page --name="$slug" --post_status=any --field=ID --format=ids)
+	if [ -n "$ids" ]; then
+		# shellcheck disable=SC2086
+		wp_cli post delete $ids --force >/dev/null
+	fi
+	printf '%s' "$content" | wp_cli post create - --post_type=page --post_status=publish --post_name="$slug" \
+		--post_title="$title" --porcelain >/dev/null
+}
+
+make_page all-blocks-1 "All blocks, event 1" "$(blocks_markup '{"eventId":1}')"
+make_page shortcodes-1 "All shortcodes, event 1" "$(shortcodes_markup 'event_id="1"')"
+make_page cancelled-2 "Cancelled event 2" "$(blocks_markup '{"eventId":2}')"
+make_page draft-3 "Draft event 3" "$(blocks_markup '{"eventId":3}')"
+make_page hostile-5 "Hostile event 5" "$(blocks_markup '{"eventId":5}')"
+make_page slug-only "Blocks by slug" "$(blocks_markup '{"eventSlug":"sommet-tech-abidjan-2026"}')"
+
+log "Ready in $(( $(date +%s) - started ))s: $ODV_SITE (admin / admin). Pages: /all-blocks-1/ /shortcodes-1/ /cancelled-2/ /draft-3/ /hostile-5/ /slug-only/"

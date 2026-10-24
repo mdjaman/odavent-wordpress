@@ -1,0 +1,321 @@
+/*
+ * Odavent Events: default styles.
+ *
+ * Override --odv-accent, --odv-accent-contrast, --odv-text, --odv-muted, --odv-border, --odv-radius and
+ * --odv-gap on any ancestor to match your theme. Button and active-filter text is --odv-accent-contrast
+ * (default white), which assumes a dark accent: set it to a dark colour for a light accent. Fonts and text colour are inherited from the theme. Turn this file off
+ * under Settings > Odavent Events ("Load default styles") to style the markup yourself.
+ */
+
+.odv-header,
+.odv-speakers,
+.odv-agenda,
+.odv-sponsors,
+.odv-tickets,
+.odv-register,
+.odv-countdown,
+.odv-venue,
+.odv-calendar,
+.odv-find-registration,
+.odv-notice {
+	--_accent: var(--odv-accent, #3730a3);
+	--_contrast: var(--odv-accent-contrast, #fff);
+	--_muted: var(--odv-muted, #5b6270);
+	--_border: var(--odv-border, #d9dce3);
+	--_radius: var(--odv-radius, 8px);
+	--_gap: var(--odv-gap, 1rem);
+	--_surface: rgba(127, 127, 127, 0.07);
+
+	box-sizing: border-box;
+	margin-block: calc(var(--_gap) * 1.5);
+	color: var(--odv-text, inherit);
+	font-family: inherit;
+	line-height: 1.5;
+}
+
+/* Muted text follows the theme's text colour when the browser can mix colours. */
+@supports (color: color-mix(in srgb, red, blue)) {
+	.odv-header, .odv-speakers, .odv-agenda, .odv-sponsors, .odv-tickets, .odv-register, .odv-countdown, .odv-venue, .odv-calendar, .odv-find-registration, .odv-notice {
+		--_muted: var(--odv-muted, color-mix(in srgb, currentColor 70%, transparent));
+	}
+}
+
+.odv-header *,
+.odv-speakers *,
+.odv-agenda *,
+.odv-sponsors *,
+.odv-tickets *,
+.odv-countdown *,
+.odv-notice * { box-sizing: border-box; }
+
+.odv-header img,
+.odv-speakers img,
+.odv-sponsors img { display: block; max-width: 100%; height: auto; }
+
+/* Header */
+.odv-header { display: grid; gap: var(--_gap); }
+
+.odv-header__cover { width: 100%; max-height: 22rem; object-fit: cover; border-radius: var(--_radius); }
+
+.odv-header__logo { max-height: 4rem; width: auto; }
+
+.odv-header__title,
+.odv-header__meta,
+.odv-header__dates { margin: 0; }
+
+.odv-header__meta,
+.odv-header__dates { color: var(--_muted); }
+
+.odv-header__description { max-width: 70ch; }
+
+/* Speakers and sponsors: cards in a responsive grid */
+.odv-speakers__list,
+.odv-sponsors__list,
+.odv-tickets__list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+	gap: var(--_gap);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.odv-speakers__item,
+.odv-sponsors__item,
+.odv-tickets__item {
+	display: grid;
+	align-content: start;
+	gap: 0.5rem;
+	padding: var(--_gap);
+	border: 1px solid var(--_border);
+	border-radius: var(--_radius);
+	background: var(--_surface);
+}
+
+.odv-speakers__item--featured,
+.odv-sponsors__item--featured { border-color: var(--_accent); }
+
+.odv-speakers__photo { width: 6rem; height: 6rem; object-fit: cover; border-radius: 50%; }
+
+.odv-speakers__photo--placeholder {
+	display: grid;
+	place-items: center;
+	background: var(--_accent);
+	color: var(--_contrast);
+	font-size: 1.5rem;
+	font-weight: 600;
+}
+
+/* Column count: --_cols applies once there is room; narrower screens keep the auto-fit grid above. */
+.odv-speakers__list--cols-2 { --_cols: 2; }
+.odv-speakers__list--cols-3 { --_cols: 3; }
+.odv-speakers__list--cols-4 { --_cols: 4; }
+.odv-speakers__list--single { --_cols: 1; max-width: 20rem; }
+.odv-sponsors__list--cols-1 { --_cols: 1; }
+.odv-sponsors__list--cols-2 { --_cols: 2; }
+.odv-sponsors__list--cols-3 { --_cols: 3; }
+.odv-sponsors__list--cols-4 { --_cols: 4; }
+.odv-sponsors__list--cols-5 { --_cols: 5; }
+.odv-sponsors__list--cols-6 { --_cols: 6; }
+
+@media (min-width: 48rem) {
+	.odv-speakers__list,
+	.odv-sponsors__list { grid-template-columns: repeat(var(--_cols, 3), minmax(0, 1fr)); }
+}
+
+.odv-speakers__name,
+.odv-sponsors__name,
+.odv-tickets__name,
+.odv-agenda__title,
+.odv-venue__name { margin: 0; font-weight: 600; }
+
+.odv-speakers__role,
+.odv-speakers__company,
+.odv-speakers__bio,
+.odv-sponsors__description,
+.odv-agenda__description,
+.odv-tickets__description,
+.odv-tickets__status,
+.odv-venue__address { margin: 0; color: var(--_muted); }
+
+.odv-sponsors__group { margin-block-end: var(--_gap); }
+
+.odv-sponsors__group-title {
+	margin-block: var(--_gap) 0.5rem;
+	color: var(--_muted);
+	font-size: 0.85em;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.odv-sponsors__logo { max-height: 5rem; width: auto; margin-inline: auto; object-fit: contain; }
+
+.odv-sponsors a { color: inherit; text-decoration: none; }
+
+.odv-sponsors__item { justify-items: center; text-align: center; }
+
+.odv-sponsors__link { display: block; }
+
+/* Agenda */
+.odv-agenda__filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-block-end: var(--_gap); }
+
+.odv-agenda__filter {
+	padding: 0.4rem 0.9rem;
+	border: 1px solid var(--_border);
+	border-radius: 999px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.odv-agenda__filter--active,
+.odv-agenda__filter[aria-pressed="true"] { border-color: var(--_accent); background: var(--_accent); color: var(--odv-accent-contrast, #fff); }
+
+.odv-agenda__day-title { margin-block: calc(var(--_gap) * 1.5) 0.75rem; }
+
+.odv-agenda__list {
+	display: grid;
+	gap: 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.odv-agenda__session {
+	display: grid;
+	grid-template-columns: minmax(6rem, 9rem) 1fr;
+	gap: 0.25rem var(--_gap);
+	padding: var(--_gap);
+	border: 1px solid var(--_border);
+	border-inline-start: 4px solid var(--_accent);
+	border-radius: var(--_radius);
+}
+
+.odv-agenda__session--child { margin-inline-start: var(--_gap); border-inline-start-color: var(--_border); }
+
+.odv-agenda__session[hidden],
+.odv-agenda__day[hidden] { display: none; }
+
+.odv-agenda__time { grid-column: 1; grid-row: 1; margin: 0; color: var(--_muted); font-variant-numeric: tabular-nums; }
+
+.odv-agenda__title { grid-column: 2; grid-row: 1; }
+
+.odv-agenda__description { grid-column: 2; margin: 0; }
+
+.odv-agenda__rooms {
+	display: grid;
+	grid-column: 1 / -1;
+	gap: 0.75rem;
+	margin: 0.5rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.odv-agenda__location,
+.odv-agenda__track,
+.odv-agenda__speakers { grid-column: 2; margin: 0; color: var(--_muted); font-size: 0.925em; }
+
+/* Tickets and registration */
+.odv-tickets__item--sold-out { opacity: 0.65; }
+
+.odv-tickets__price { margin: 0; font-size: 1.25em; font-weight: 700; }
+
+.odv-register .odv-register__button,
+.odv-tickets .odv-tickets__register {
+	display: inline-block;
+	padding: 0.65rem 1.25rem;
+	border: 1px solid var(--_accent);
+	border-radius: var(--_radius);
+	background: var(--_accent);
+	color: var(--_contrast);
+	font: inherit;
+	font-weight: 600;
+	text-align: center;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"]):hover,
+.odv-tickets .odv-tickets__register:hover { filter: brightness(1.1); color: var(--_contrast); text-decoration: none; }
+
+.odv-register .odv-register__button--disabled,
+.odv-register .odv-register__button[aria-disabled="true"] { border-color: var(--_border); background: transparent; color: var(--_muted); cursor: not-allowed; }
+
+.odv-register__notice, .odv-register__status, .odv-tickets__message { margin: 0.5rem 0 0; color: var(--_muted); font-size: 0.875em; }
+.odv-find-registration__link { font-weight: 600; }
+
+.odv-countdown__timer,
+.odv-calendar__list { display: flex; flex-wrap: wrap; gap: var(--_gap); }
+
+.odv-calendar__list { margin: 0; padding: 0; list-style: none; }
+
+.odv-countdown[hidden],
+.odv-countdown [hidden] { display: none; }
+
+.odv-countdown__message { margin: 0; font-size: 1.25em; font-weight: 600; }
+
+.odv-countdown__unit {
+	display: grid;
+	min-width: 5rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--_border);
+	border-radius: var(--_radius);
+	text-align: center;
+}
+
+.odv-countdown__value { font-size: 1.75em; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.odv-countdown__label { color: var(--_muted); font-size: 0.8em; text-transform: uppercase; }
+
+/* Calendar links */
+.odv-calendar .odv-calendar__link {
+	padding: 0.4rem 0.9rem;
+	border: 1px solid var(--_border);
+	border-radius: var(--_radius);
+	color: inherit;
+	text-decoration: none;
+}
+
+.odv-calendar .odv-calendar__link:hover { border-color: var(--_accent); }
+
+/* Venue */
+.odv-venue__map { font-weight: 600; }
+
+/* Notices */
+.odv-notice {
+	padding: var(--_gap);
+	border: 1px solid var(--_border);
+	border-inline-start: 4px solid var(--_accent);
+	border-radius: var(--_radius);
+	background: var(--_surface);
+}
+
+.odv-notice--cancelled,
+.odv-notice--unavailable,
+.odv-notice--error { border-inline-start-color: #b42318; }
+
+.odv-notice--paused,
+.odv-notice--draft { border-inline-start-color: #b54708; }
+
+.odv-notice--ended, .odv-notice--stale { border-inline-start-color: var(--_muted); }
+
+/* Keyboard focus, small screens, motion */
+.odv-agenda__filter:focus-visible,
+.odv-register .odv-register__button:focus-visible,
+.odv-tickets .odv-tickets__register:focus-visible,
+.odv-calendar .odv-calendar__link:focus-visible,
+.odv-sponsors a:focus-visible,
+.odv-venue__map:focus-visible { outline: 3px solid var(--odv-accent, #3730a3); outline-offset: 2px; }
+
+@media (max-width: 36rem) {
+	.odv-agenda__session { grid-template-columns: 1fr; }
+	.odv-agenda__time, .odv-agenda__title { grid-row: auto; }
+	.odv-agenda__time, .odv-agenda__title, .odv-agenda__description, .odv-agenda__location, .odv-agenda__track, .odv-agenda__speakers { grid-column: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.odv-register .odv-register__button, .odv-tickets .odv-tickets__register, .odv-calendar .odv-calendar__link, .odv-agenda__filter {
+		transition: filter 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+	}
+}

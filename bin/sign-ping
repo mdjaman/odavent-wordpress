@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+# Prints the X-Odavent-Signature header value Odavent sends with a refresh ping:
+#   t={unix time},v1={hex HMAC-SHA256 of "{t}.{raw body}" keyed by the site key}
+# Usage: bin/sign-ping <site key> <raw body> [unix time]
+# Example (dev stack):
+#   body='{"event_id":1,"event_slug":"sommet-tech-abidjan-2026","sent_at":"2026-10-23T10:00:00Z"}'
+#   curl -X POST -H "Content-Type: application/json" \
+#        -H "X-Odavent-Signature: $(bin/sign-ping odv_wp_stubkey_for_dev_0123456789 "$body")" \
+#        --data "$body" http://localhost:8089/wp-json/odavent/v1/refresh
+set -eu
+if [ $# -lt 2 ]; then
+	echo "Usage: bin/sign-ping <site key> <raw body> [unix time]" >&2
+	exit 2
+fi
+key="$1"
+body="$2"
+t="${3:-$(date +%s)}"
+mac=$(printf '%s.%s' "$t" "$body" | openssl dgst -sha256 -hmac "$key" | sed 's/^.*= *//')
+printf 't=%s,v1=%s\n' "$t" "$mac"

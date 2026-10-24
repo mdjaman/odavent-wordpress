@@ -1,0 +1,26 @@
+[
+    {
+        "id": 42,
+        "slug": "sommet-tech-abidjan-2026",
+        "name": "Sommet Tech d'Abidjan 2026",
+        "status": "published",
+        "starts_at": "2026-11-12T09:00:00+00:00",
+        "ends_at": "2026-11-13T18:00:00+00:00"
+    },
+    {
+        "id": 43,
+        "slug": "atelier-ia-2026",
+        "name": "Atelier IA",
+        "status": "draft",
+        "starts_at": "2026-12-03T14:00:00+00:00",
+        "ends_at": null
+    },
+    {
+        "id": 12,
+        "slug": "meetup-fintech-2025",
+        "name": "Meetup Fintech 2025",
+        "status": "archived",
+        "starts_at": "2025-05-20T18:00:00+00:00",
+        "ends_at": "2025-05-20T21:00:00+00:00"
+    }
+]

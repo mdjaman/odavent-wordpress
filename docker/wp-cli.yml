@@ -1,0 +1,5 @@
+# WP-CLI config for the dev stack (WP_CLI_CONFIG_PATH points here). The official image runs Apache with
+# mod_rewrite, which WP-CLI cannot detect from the CLI: without this, `wp rewrite structure --hard`
+# would not write .htaccess.
+apache_modules:
+  - mod_rewrite

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.6/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheResultFile=".phpunit.result.cache"
+         failOnWarning="true"
+         failOnRisky="true"
+         convertDeprecationsToExceptions="true">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory suffix="Test.php">tests/Unit</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <!-- The drift walk renders thousands of templates; Brain Monkey/Patchwork keep memory until the run ends. -->
+        <ini name="memory_limit" value="512M"/>
+    </php>
+</phpunit>
