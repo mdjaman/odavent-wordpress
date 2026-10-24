@@ -19,13 +19,19 @@ final class Assets {
 	}
 
 	/**
-	 * Registers the default stylesheet handle unless the site turned it off ("Load default styles").
+	 * Registers the default stylesheet handle.
 	 *
 	 * Runs on `init` before the blocks are registered: their block.json names the handle as editorStyle, so
-	 * the block editor loads it. With the setting off nothing is registered, and the editor matches the site.
+	 * the block editor loads it. On the front end a registered handle loads nothing by itself (only
+	 * enqueue_styles() does, and it checks "Load default styles"), so it is registered without reading the
+	 * settings: a page without Odavent content costs no option read. In wp-admin, where the block editor
+	 * loads editorStyle, nothing is registered when the setting is off, so the editor matches the site.
 	 */
 	public function register_styles(): void {
-		if ( ! $this->options->load_css() || wp_style_is( self::STYLE_HANDLE, 'registered' ) ) {
+		if ( wp_style_is( self::STYLE_HANDLE, 'registered' ) ) {
+			return;
+		}
+		if ( is_admin() && ! $this->options->load_css() ) {
 			return;
 		}
 

@@ -271,4 +271,38 @@ class PluginWiringTest extends TestCase {
 		$this->assertInstanceOf( \Odavent\Events\Shortcodes\Shortcodes::class, $plugin->shortcodes() );
 		$this->assertSame( $plugin->shortcodes(), $plugin->shortcodes() );
 	}
+
+	/**
+	 * A front-end request that renders no Odavent content must not read the (non-autoloaded) settings option:
+	 * every `init` callback the plugin adds runs without a single get_option() of it.
+	 */
+	public function test_init_on_the_front_end_reads_no_settings(): void {
+		Functions\when( 'is_admin' )->justReturn( false );
+		$init = array();
+		Functions\when( 'add_action' )->alias(
+			function ( $hook, $callback ) use ( &$init ) {
+				if ( 'init' === $hook ) {
+					$init[] = $callback;
+				}
+				return true;
+			}
+		);
+		Functions\when( 'add_filter' )->justReturn( true );
+		Functions\when( 'load_plugin_textdomain' )->justReturn( true );
+		Functions\when( 'plugins_url' )->justReturn( 'https://example.com/x' );
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\when( 'wp_register_style' )->justReturn( true );
+		Functions\when( 'wp_register_script' )->justReturn( true );
+		Functions\when( 'wp_set_script_translations' )->justReturn( true );
+		Functions\when( 'register_block_type' )->justReturn( true );
+		Functions\when( 'add_shortcode' )->justReturn( true );
+		Functions\expect( 'get_option' )->never();
+
+		$plugin = $this->fresh_plugin();
+		$plugin->boot();
+		$this->assertCount( 3, $init );
+		foreach ( $init as $callback ) {
+			call_user_func( $callback );
+		}
+	}
 }

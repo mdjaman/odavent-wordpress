@@ -9,6 +9,12 @@ use Odavent\Events\Tests\Support\RenderTestCase;
 
 class AssetsTest extends RenderTestCase {
 
+	protected function setUp(): void {
+		parent::setUp();
+		// A front-end request unless a test says otherwise.
+		Functions\when( 'is_admin' )->justReturn( false );
+	}
+
 	private function options( bool $load_css ): Options {
 		$options = Mockery::mock( Options::class );
 		$options->shouldReceive( 'load_css' )->andReturn( $load_css );
@@ -100,9 +106,31 @@ class AssetsTest extends RenderTestCase {
 		( new Assets( $this->options( true ) ) )->register_styles();
 	}
 
-	public function test_register_styles_does_nothing_when_the_stylesheet_is_off(): void {
+	public function test_register_styles_does_nothing_in_admin_when_the_stylesheet_is_off(): void {
+		// wp-admin hosts the block editor, which loads editorStyle: off means off there too.
+		Functions\when( 'is_admin' )->justReturn( true );
+		Functions\when( 'wp_style_is' )->justReturn( false );
 		Functions\expect( 'wp_register_style' )->never();
 
 		( new Assets( $this->options( false ) ) )->register_styles();
+	}
+
+	public function test_register_styles_on_the_front_end_registers_the_handle_without_reading_the_settings(): void {
+		Functions\when( 'is_admin' )->justReturn( false );
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\expect( 'wp_register_style' )->once()->with( 'odavent-events', \Mockery::type( 'string' ), array(), ODAVENT_EVENTS_VERSION );
+		Functions\expect( 'wp_enqueue_style' )->never();
+		$options = Mockery::mock( Options::class );
+		$options->shouldNotReceive( 'load_css' );
+
+		( new Assets( $options ) )->register_styles();
+	}
+
+	public function test_a_handle_registered_on_the_front_end_is_still_not_enqueued_when_the_stylesheet_is_off(): void {
+		Functions\when( 'is_admin' )->justReturn( false );
+		Functions\when( 'wp_style_is' )->justReturn( true );
+		Functions\expect( 'wp_enqueue_style' )->never();
+
+		( new Assets( $this->options( false ) ) )->enqueue_styles();
 	}
 }
