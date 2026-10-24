@@ -68,6 +68,20 @@ final class Widgets {
 	}
 
 	/**
+	 * Whether any Odavent widget sits in a sidebar (inactive ones do not count). A widget is not post content,
+	 * so the page cache purge, the preview no-cache headers and the early stylesheet ask this separately.
+	 */
+	public static function any_active(): bool {
+		foreach ( self::id_bases() as $id_base ) {
+			if ( is_active_widget( false, false, $id_base, true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Widget id base for a block slug.
 	 *
 	 * @param string $slug Block slug.

@@ -669,6 +669,67 @@ class BlockRegistryTest extends BlockTestCase {
 		$this->assertSame( array(), $this->enqueued_styles );
 	}
 
+	// ---- widgets are not post content ------------------------------------------------------------
+
+	private function widget_active(): void {
+		Functions\when( 'is_active_widget' )->alias(
+			static function ( $callback, $widget_id, $id_base, $skip_inactive ) {
+				return false === $callback && false === $widget_id && true === $skip_inactive && 'odavent_events_speakers' === $id_base ? 'sidebar-1' : false;
+			}
+		);
+	}
+
+	public function test_a_widget_makes_a_non_singular_page_count_as_odavent_content(): void {
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>', false );
+		$this->assertTrue( Block_Registry::page_has_odavent_content() );
+
+		$this->registry( null )->enqueue_early_styles();
+		$this->assertSame( array( 'odavent-events' ), $this->enqueued_styles );
+	}
+
+	public function test_a_widget_also_counts_on_a_singular_page_without_blocks(): void {
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>' );
+
+		$this->assertTrue( Block_Registry::page_has_odavent_content() );
+	}
+
+	public function test_the_filter_still_has_the_last_word_with_a_widget_active(): void {
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>', false );
+		Filters\expectApplied( 'odavent_events_page_has_content' )->once()->with( true, null )->andReturn( false );
+
+		$this->assertFalse( Block_Registry::page_has_odavent_content() );
+	}
+
+	/**
+	 * In a separate process: DONOTCACHEPAGE, once defined by another test, would stay defined.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_editor_on_a_page_with_a_widget_gets_no_cache_constant_before_theme(): void {
+		$this->editor = true;
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>', false );
+		Functions\expect( 'nocache_headers' )->once();
+		$this->assertFalse( defined( 'DONOTCACHEPAGE' ) );
+
+		$this->registry( null )->prevent_preview_caching();
+
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) );
+	}
+
+	public function test_a_visitor_on_a_page_with_a_widget_stays_cacheable(): void {
+		$this->editor = false;
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>', false );
+		Functions\expect( 'nocache_headers' )->never();
+
+		$this->registry( null )->prevent_preview_caching();
+	}
+
 	// ---- preview capability ---------------------------------------------------------------
 
 	public function test_the_preview_capability_defaults_to_edit_posts(): void {

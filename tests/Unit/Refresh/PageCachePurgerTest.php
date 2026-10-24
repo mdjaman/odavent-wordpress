@@ -59,6 +59,7 @@ class PageCachePurgerTest extends TestCase {
 				'talk' => 'talk',
 			)
 		);
+		Functions\when( 'is_active_widget' )->justReturn( false );
 		Functions\when( 'clean_post_cache' )->alias(
 			function ( $id ) {
 				$this->cleaned[] = $id;
@@ -162,5 +163,79 @@ class PageCachePurgerTest extends TestCase {
 
 		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
 		$this->assertFalse( function_exists( 'w3tc_flush_post' ) );
+	}
+
+	// ---- widgets are not post content: an active one needs the whole site purged ----------------
+
+	/** Which widget id bases the stub answers true for: all when true, none when false. */
+	private function widgets_active( bool $active ): void {
+		Functions\when( 'is_active_widget' )->alias(
+			function ( $callback, $widget_id, $id_base, $skip_inactive ) use ( $active ) {
+				return $active && false === $callback && false === $widget_id && true === $skip_inactive && 0 === strpos( (string) $id_base, 'odavent_events_' ) ? 'sidebar-1' : false;
+			}
+		);
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_an_active_widget_purges_the_whole_site_cache(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\expect( 'rocket_clean_domain' )->once();
+		Actions\expectDone( 'litespeed_purge_all' )->once();
+		Actions\expectDone( 'odavent_events_purge_all' )->once();
+		Filters\expectApplied( 'odavent_events_purge_all_on_widget' )->once()->with( true, 7 )->andReturn( true );
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	/**
+	 * Only the first plugin function that exists runs: W3TC's and WP Super Cache's are not called after WP Rocket's.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_only_the_first_existing_whole_site_function_runs(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		$this->assertFalse( function_exists( 'rocket_clean_domain' ) );
+		Functions\expect( 'w3tc_flush_all' )->once();
+		Functions\expect( 'wp_cache_clear_cache' )->never();
+
+		( new Page_Cache_Purger() )->purge_event( 7 );
+	}
+
+	public function test_the_filter_can_turn_the_whole_site_purge_off(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+		Filters\expectApplied( 'odavent_events_purge_all_on_widget' )->once()->andReturn( false );
+		Actions\expectDone( 'litespeed_purge_all' )->never();
+		Actions\expectDone( 'odavent_events_purge_all' )->never();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	public function test_no_widget_means_no_whole_site_purge(): void {
+		$this->widgets_active( false );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+		Actions\expectDone( 'litespeed_purge_all' )->never();
+		Actions\expectDone( 'odavent_events_purge_all' )->never();
+		Filters\expectApplied( 'odavent_events_purge_all_on_widget' )->never();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	public function test_an_active_widget_purges_the_whole_site_even_when_no_post_qualifies(): void {
+		$this->widgets_active( true );
+		$this->ids = array();
+		Actions\expectDone( 'odavent_events_purge_all' )->once();
+
+		$this->assertSame( 0, ( new Page_Cache_Purger() )->purge_event( 7 ) );
 	}
 }

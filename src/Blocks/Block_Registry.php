@@ -16,6 +16,7 @@ use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Data\Event_View;
 use Odavent\Events\Render\Assets;
 use Odavent\Events\Settings\Options;
+use Odavent\Events\Widgets\Widgets;
 
 /**
  * The Odavent blocks: registration with WordPress, the editor script, and the single render path that
@@ -532,10 +533,12 @@ class Block_Registry {
 	}
 
 	/**
-	 * Whether the current singular post contains an Odavent block or shortcode. A cheap string check.
+	 * Whether the current page shows Odavent content: the current singular post contains an Odavent block or
+	 * shortcode (a cheap string check), or an Odavent widget is active (a widget is not post content, and may
+	 * show on any page, singular or not).
 	 *
 	 * Filter `odavent_events_page_has_content` (bool $has, object|null $post) to cover content the check
-	 * cannot see (synced patterns, template parts, widgets).
+	 * cannot see (synced patterns, template parts).
 	 */
 	public static function page_has_odavent_content(): bool {
 		$post = null;
@@ -546,6 +549,8 @@ class Block_Registry {
 			$content = is_object( $post ) && isset( $post->post_content ) && is_string( $post->post_content ) ? $post->post_content : '';
 			$has     = false !== strpos( $content, '<!-- wp:' . self::NAMESPACE_PREFIX ) || false !== strpos( $content, '[odavent_' );
 		}
+
+		$has = $has || Widgets::any_active();
 
 		return (bool) apply_filters( 'odavent_events_page_has_content', $has, $post );
 	}

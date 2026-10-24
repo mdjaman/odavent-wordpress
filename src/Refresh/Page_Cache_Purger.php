@@ -1,6 +1,8 @@
 <?php
 namespace Odavent\Events\Refresh;
 
+use Odavent\Events\Widgets\Widgets;
+
 /**
  * Purges the full-page caches of posts that show Odavent content after an event changed.
  *
@@ -9,6 +11,9 @@ namespace Odavent\Events\Refresh;
  * Odavent block (`wp:odavent-events/`) or shortcode (`[odavent_`) is purged: correctness over
  * precision. Sites with special needs adjust the list with the `odavent_events_purge_post_ids`
  * filter. When more than LIMIT posts qualify, the most recent ones (highest ids) are purged.
+ *
+ * A widget is not post content and shows on any page, so while an Odavent widget is active the whole-site
+ * cache is purged too (filter `odavent_events_purge_all_on_widget`).
  */
 class Page_Cache_Purger {
 
@@ -16,6 +21,9 @@ class Page_Cache_Purger {
 
 	/** Page-cache plugin functions taking a post id, called when present. */
 	const CACHE_FUNCTIONS = array( 'rocket_clean_post', 'w3tc_flush_post', 'wp_cache_post_change' );
+
+	/** Page-cache plugin functions that purge the whole site, no arguments: the first one that exists runs. */
+	const SITE_CACHE_FUNCTIONS = array( 'rocket_clean_domain', 'w3tc_flush_all', 'wp_cache_clear_cache' );
 
 	/** @var int[]|null Post ids found in this request. */
 	private $post_ids = null;
@@ -52,7 +60,45 @@ class Page_Cache_Purger {
 			do_action( 'odavent_events_purge_post', $post_id );
 		}
 
+		$this->purge_site_for_widgets( $event_id );
+
 		return count( $post_ids );
+	}
+
+	/**
+	 * With an Odavent widget active, every cached page of the site may show the event: purge them all.
+	 *
+	 * @param int $event_id Odavent event id that changed.
+	 */
+	private function purge_site_for_widgets( int $event_id ): void {
+		if ( ! Widgets::any_active() ) {
+			return;
+		}
+
+		/**
+		 * Filters whether the whole-site page cache is purged when an Odavent event changes while an Odavent
+		 * widget is active. Return false on a site whose widgets sit in an area that is never cached.
+		 *
+		 * @param bool $purge    Default true.
+		 * @param int  $event_id Odavent event id.
+		 */
+		if ( ! apply_filters( 'odavent_events_purge_all_on_widget', true, $event_id ) ) {
+			return;
+		}
+
+		foreach ( self::SITE_CACHE_FUNCTIONS as $function ) {
+			if ( function_exists( $function ) ) {
+				call_user_func( $function );
+				break;
+			}
+		}
+		do_action( 'litespeed_purge_all' );
+
+		/**
+		 * Fires after an Odavent event changed while an Odavent widget is active, for page caches the plugin
+		 * does not know: purge the whole site.
+		 */
+		do_action( 'odavent_events_purge_all' );
 	}
 
 	/**
