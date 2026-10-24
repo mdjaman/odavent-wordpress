@@ -18,6 +18,12 @@ if [ -z "$container" ]; then
 fi
 
 mkdir -p "$ODV_ROOT/tests/e2e/artifacts"
+
+# The admin's editor preferences (WordPress 6.2+ keeps them in user meta): no welcome guide and no "Choose a
+# pattern" modal for new pages, which opens a moment after load and covers the inserter. Older versions ignore it.
+wp_cli user meta update admin wp_persisted_preferences \
+	'{"core":{"enableChoosePatternModal":false},"core/edit-post":{"welcomeGuide":false},"_modified":"2026-01-01T00:00:00.000Z"}' \
+	--format=json >/dev/null
 wp_version=$(wp_cli core version | tr -d '\r')
 log "Playwright $version on $ODV_SITE (WordPress $wp_version)"
 

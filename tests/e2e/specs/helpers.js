@@ -49,32 +49,64 @@ async function login( page ) {
 	await Promise.all( [ page.waitForURL( /wp-admin/ ), page.click( '#wp-submit' ) ] );
 }
 
-// Console messages that WordPress itself produces in a fresh dev site, not the plugin. Listed in the report.
-const KNOWN_NOISE = [
-	/Download the React DevTools/i,
-	/JQMIGRATE/i,
-	/wp\.editPost\.\w+ is deprecated/i,
-	/is deprecated since version/i,
-	/Failed to load resource: the server responded with a status of 404/i, // favicon.ico
-	/\[DOM\] Input elements should have autocomplete attributes/i,
-];
+// Placeholder for the fixtures' images (https://odavent.com/storage/...) and Gravatar avatars: the browser never reaches production,
+// so the tests work offline and the screenshots show a visible box where a photo or logo goes.
+const PLACEHOLDER_SVG =
+	'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">' +
+	'<rect width="400" height="300" fill="#d9dde3"/><path d="M0 300 140 150l80 90 60-60 120 120z" fill="#b4bcc8"/>' +
+	'<circle cx="300" cy="80" r="36" fill="#b4bcc8"/></svg>';
 
-/** Collects page errors and console errors, split into plugin-relevant and known WordPress noise. */
-function collectErrors( page ) {
-	const errors = { relevant: [], noise: [] };
-	page.on( 'pageerror', ( error ) => errors.relevant.push( 'pageerror: ' + error.message ) );
-	page.on( 'console', ( message ) => {
-		if ( message.type() !== 'error' && message.type() !== 'warning' ) {
-			return;
-		}
-		const text = message.type() + ': ' + message.text();
-		if ( message.type() === 'warning' || KNOWN_NOISE.some( ( re ) => re.test( text ) ) ) {
-			errors.noise.push( text );
-		} else {
-			errors.relevant.push( text );
+const LOCAL = /^https?:\/\/(localhost:8089|127\.0\.0\.1(:\d+)?)(\/|$)/;
+
+/**
+ * Prepares a page: fixture images are answered locally, any other external request is recorded (and listed in the
+ * test's annotations), and console output is collected (see collectErrors()).
+ */
+async function preparePage( page ) {
+	const errors = collectErrors( page );
+	// wp-admin's avatars come from Gravatar: answered locally too, so no test needs the network.
+	await page.route( /^https:\/\/(odavent\.com\/storage|secure\.gravatar\.com\/avatar)\//, ( route ) =>
+		route.fulfill( { status: 200, contentType: 'image/svg+xml', body: PLACEHOLDER_SVG } )
+	);
+	page.on( 'request', ( request ) => {
+		const url = request.url();
+		if ( ! LOCAL.test( url ) && ! /^(data|blob|about):/.test( url ) && ! /^https:\/\/(odavent\.com\/storage|secure\.gravatar\.com\/avatar)\//.test( url ) ) {
+			errors.external.push( url );
 		}
 	} );
 	return errors;
 }
 
-module.exports = { stub, refresh, login, collectErrors, SITE_KEY };
+// Console output WordPress core itself prints on a fresh dev site and that the plugin cannot avoid. Exact texts
+// only; anything else (any error, and any warning naming a wp.components control or the plugin's scripts) fails.
+const KNOWN_CORE_NOISE = [
+	// Chromium's notice for React development builds (SCRIPT_DEBUG is off, but some WP versions still print it).
+	/^Download the React DevTools for a better development experience/,
+	// jQuery Migrate's banner on wp-admin pages (core loads it; WordPress 6.1).
+	/^JQMIGRATE: Migrate is installed, version \d/,
+	// WordPress 6.9/7.x editor: core's own global-styles inline style copied into the iframed canvas.
+	/^global-styles-css-custom-properties-inline-css was added to the iframe incorrectly\. Please use block\.json or enqueue_block_assets to add styles to the iframe\./,
+];
+
+const PLUGIN_RELATED = /wp\.components\.|odavent|editor\.js|countdown\.js|agenda-filter\.js/i;
+
+/** Collects page errors and console output: `relevant` fails a test, `noise` is listed only. */
+function collectErrors( page ) {
+	const errors = { relevant: [], noise: [], external: [] };
+	page.on( 'pageerror', ( error ) => errors.relevant.push( 'pageerror: ' + error.message ) );
+	page.on( 'console', ( message ) => {
+		const type = message.type();
+		if ( type !== 'error' && type !== 'warning' ) {
+			return;
+		}
+		const text = message.text();
+		if ( KNOWN_CORE_NOISE.some( ( re ) => re.test( text ) ) && ! PLUGIN_RELATED.test( text ) ) {
+			errors.noise.push( type + ': ' + text );
+		} else {
+			errors.relevant.push( type + ': ' + text ); // any other error or warning fails the test
+		}
+	} );
+	return errors;
+}
+
+module.exports = { stub, refresh, login, preparePage, collectErrors, SITE_KEY };

@@ -1,6 +1,6 @@
 // Front end of /all-blocks-1/ (all ten blocks for event 1): agenda filter, countdown, screenshots.
 const { test, expect } = require( '@playwright/test' );
-const { stub, refresh, collectErrors } = require( './helpers' );
+const { stub, refresh, preparePage } = require( './helpers' );
 
 test.beforeEach( async ( { baseURL } ) => {
 	await stub( { reset: true } );
@@ -13,7 +13,7 @@ test.afterAll( async ( { baseURL } ) => {
 } );
 
 test( 'agenda track filter hides and shows sessions, rooms follow their parent', async ( { page } ) => {
-	const errors = collectErrors( page );
+	const errors = await preparePage( page );
 	await page.goto( '/all-blocks-1/' );
 
 	const agenda = page.locator( '.odv-agenda' );
@@ -51,12 +51,13 @@ test( 'agenda track filter hides and shows sessions, rooms follow their parent',
 
 	expect( errors.relevant ).toEqual( [] );
 	test.info().annotations.push( { type: 'console noise', description: JSON.stringify( errors.noise ) } );
+	test.info().annotations.push( { type: 'external requests', description: JSON.stringify( errors.external ) } );
 } );
 
 test( 'countdown to a start one hour ahead ticks and never shows NaN', async ( { page, baseURL } ) => {
 	await stub( { starts_in: { 1: 3600 } } );
 	await refresh( baseURL, 1 );
-	const errors = collectErrors( page );
+	const errors = await preparePage( page );
 	await page.goto( '/all-blocks-1/' );
 
 	const countdown = page.locator( '.odv-countdown' );
@@ -79,7 +80,7 @@ test( 'countdown to a start one hour ahead ticks and never shows NaN', async ( {
 test( 'a paused event: the countdown hides itself once the start has passed', async ( { page, baseURL } ) => {
 	await stub( { status: { 1: 'paused' }, starts_in: { 1: 6 } } );
 	await refresh( baseURL, 1 );
-	const errors = collectErrors( page );
+	const errors = await preparePage( page );
 	await page.goto( '/all-blocks-1/' );
 
 	const countdown = page.locator( '.odv-countdown' );
@@ -98,12 +99,20 @@ test( 'a paused event: the countdown hides itself once the start has passed', as
 
 for ( const width of [ 390, 1280 ] ) {
 	test( `screenshot of the front end at ${ width } px (light mode)`, async ( { page } ) => {
+		const errors = await preparePage( page );
 		await page.setViewportSize( { width, height: 900 } );
 		await page.goto( '/all-blocks-1/' );
 		await expect( page.locator( '.odv-header' ) ).toBeVisible();
+		// Load the lazy images (placeholders served by preparePage) so the full-page screenshot shows them.
+		await page.evaluate( () => document.querySelectorAll( 'img[loading="lazy"]' ).forEach( ( img ) => ( img.loading = 'eager' ) ) );
+		await expect
+			.poll( () => page.evaluate( () => [ ...document.images ].every( ( img ) => img.complete && img.naturalWidth > 0 ) ) )
+			.toBe( true );
 		const overflow = await page.evaluate( () => document.documentElement.scrollWidth - document.documentElement.clientWidth );
 		test.info().annotations.push( { type: 'horizontal overflow px', description: String( overflow ) } );
 		await page.screenshot( { path: `artifacts/all-blocks-1-wp${ process.env.WP_VERSION || 'x' }-${ width }.png`, fullPage: true } );
+		test.info().annotations.push( { type: 'external requests', description: JSON.stringify( errors.external ) } );
 		expect( overflow ).toBeLessThanOrEqual( 0 );
+		expect( errors.relevant ).toEqual( [] );
 	} );
 }

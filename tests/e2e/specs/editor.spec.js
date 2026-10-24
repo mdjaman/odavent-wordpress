@@ -1,7 +1,7 @@
 // Block editor: the Odavent blocks register (apiVersion 3), the Inspector's event picker lists the stub events,
 // ServerSideRender previews the chosen event, attribute toggles re-render, a slug-only block selects its event.
 const { test, expect } = require( '@playwright/test' );
-const { stub, refresh, login, collectErrors } = require( './helpers' );
+const { stub, refresh, login, preparePage } = require( './helpers' );
 
 test.describe.configure( { mode: 'serial' } );
 
@@ -21,10 +21,18 @@ async function canvas( page ) {
 	return page;
 }
 
+/**
+ * Closes the welcome guide. bin/e2e also stores the admin's editor preferences (no welcome guide, no "Choose a
+ * pattern" modal for new pages on WordPress 6.6+) before the browser starts: that modal opens a moment after
+ * load and would otherwise cover the inserter at random.
+ */
 async function dismissWelcomeGuide( page ) {
 	await page.evaluate( () => {
 		try {
 			window.wp.data.dispatch( 'core/preferences' ).set( 'core/edit-post', 'welcomeGuide', false );
+		} catch ( e ) {}
+		try {
+			window.wp.data.dispatch( 'core/preferences' ).set( 'core', 'enableChoosePatternModal', false );
 		} catch ( e ) {}
 		try {
 			const select = window.wp.data.select( 'core/edit-post' );
@@ -33,10 +41,6 @@ async function dismissWelcomeGuide( page ) {
 			}
 		} catch ( e ) {}
 	} );
-	const close = page.getByRole( 'dialog' ).getByRole( 'button', { name: /close/i } );
-	if ( await close.count() ) {
-		await close.first().click();
-	}
 }
 
 async function openSettingsSidebar( page ) {
@@ -47,7 +51,7 @@ async function openSettingsSidebar( page ) {
 }
 
 test( 'insert the Speakers block from the inserter, pick event 1, toggle the biography', async ( { page } ) => {
-	const errors = collectErrors( page );
+	const errors = await preparePage( page );
 	await login( page );
 	await page.goto( '/wp-admin/post-new.php?post_type=page' );
 	const editor = await canvas( page );
@@ -102,10 +106,11 @@ test( 'insert the Speakers block from the inserter, pick event 1, toggle the bio
 
 	expect( errors.relevant ).toEqual( [] );
 	test.info().annotations.push( { type: 'console noise', description: JSON.stringify( errors.noise ) } );
+	test.info().annotations.push( { type: 'external requests', description: JSON.stringify( errors.external ) } );
 } );
 
 test( 'a block holding only eventSlug selects that event, not "Default event"', async ( { page, request } ) => {
-	const errors = collectErrors( page );
+	const errors = await preparePage( page );
 	await login( page );
 	const found = await page.evaluate( async () => {
 		const pages = await window.fetch( '/wp-json/wp/v2/pages?slug=slug-only&_fields=id', { credentials: 'same-origin' } ).then( ( r ) => r.json() );
@@ -137,4 +142,5 @@ test( 'a block holding only eventSlug selects that event, not "Default event"', 
 
 	expect( errors.relevant ).toEqual( [] );
 	test.info().annotations.push( { type: 'console noise', description: JSON.stringify( errors.noise ) } );
+	test.info().annotations.push( { type: 'external requests', description: JSON.stringify( errors.external ) } );
 } );
