@@ -10,7 +10,9 @@ use Odavent\Events\Settings\Options;
  *
  * Storage (the locale part {loc} is Locale::current() or `default`):
  * - `odavent_events_ev_{id}_{loc}` transient, TTL = cache_ttl: a published/paused/cancelled/archived
- *   payload, or a content-free marker (`['__state' => 'draft'|'gone']`).
+ *   payload, or a content-free marker (`['__state' => 'draft'|'gone'|'unavailable']`: a single key, so a
+ *   payload that happens to carry `__state` is never mistaken for one; 'unavailable' = a status this
+ *   plugin does not know, kept for at most 5 minutes so every page view does not call Odavent again).
  * - `odavent_events_ev_{id}_{loc}_preview` transient, 60 s: a draft payload, read only by editors.
  * - `odavent_events_lastgood_{id}_{loc}` option, not autoloaded: the last good non-draft payload,
  *   served as stale when Odavent fails.
@@ -46,6 +48,8 @@ class Event_Repository {
 	const MARKER          = '__state';
 	const MARKER_DRAFT    = 'draft';
 	const MARKER_GONE     = 'gone';
+	const MARKER_UNKNOWN  = 'unavailable';
+	const MARKERS         = array( self::MARKER_DRAFT, self::MARKER_GONE, self::MARKER_UNKNOWN );
 
 	/** @var Client */
 	private $client;
@@ -55,6 +59,13 @@ class Event_Repository {
 
 	/** @var array<string, Event_View> Per-request memo keyed "{id}|{loc}|{preview}". */
 	private $memo = array();
+
+	/**
+	 * @var array<string, array> Per-request memo of the last DRAFT payload fetched, keyed "{id}|{loc}", so a
+	 *      visitor read followed by an editor read of the same draft makes one HTTP call. Never persisted and
+	 *      never turned into a visitor view (only an editor read may use it).
+	 */
+	private $raw_drafts = array();
 
 	public function __construct( Client $client, Options $options ) {
 		$this->client  = $client;
@@ -86,8 +97,20 @@ class Event_Repository {
 
 			return $view;
 		} catch ( \Throwable $e ) {
-			return Event_View::empty( Event_View::UNAVAILABLE );
+			// Still prefer the last good copy to nothing, but never let this fallback throw either.
+			try {
+				return $this->fallback( $event_id, Locale::key_part(), Event_View::UNAVAILABLE );
+			} catch ( \Throwable $inner ) {
+				return Event_View::empty( Event_View::UNAVAILABLE );
+			}
 		}
+	}
+
+	/**
+	 * Whether Odavent failed recently, so page views skip HTTP (the circuit breaker is set).
+	 */
+	public function is_backing_off(): bool {
+		return $this->breaker_active();
 	}
 
 	/**
@@ -126,6 +149,9 @@ class Event_Repository {
 		$result = $this->client->list_events();
 		if ( $result->ok ) {
 			$this->store_list( $result->data );
+			// A live answer proves the key and plan work again (an upgraded plan re-enables the key routes).
+			$this->options->set_connection_disabled( false );
+			delete_transient( self::BACKOFF );
 		} elseif ( Result::PLAN_REQUIRED === $result->code ) {
 			$this->options->set_connection_disabled( true );
 		} elseif ( Result::INVALID_KEY === $result->code && $this->options->has_key() ) {
@@ -142,18 +168,8 @@ class Event_Repository {
 	 * @param int $event_id Odavent event id.
 	 */
 	public function purge( int $event_id ): void {
-		foreach ( Locale::all_key_parts() as $loc ) {
-			delete_transient( $this->public_key( $event_id, $loc ) );
-			delete_transient( $this->preview_key( $event_id, $loc ) );
-			delete_option( $this->lastgood_key( $event_id, $loc ) );
-		}
+		$this->purge_event_caches( $event_id );
 		delete_transient( self::LIST_TRANSIENT );
-
-		foreach ( array_keys( $this->memo ) as $memo_key ) {
-			if ( 0 === strpos( $memo_key, $event_id . '|' ) ) {
-				unset( $this->memo[ $memo_key ] );
-			}
-		}
 
 		$slugs = $this->slug_map();
 		$kept  = array_filter(
@@ -174,11 +190,15 @@ class Event_Repository {
 
 	/**
 	 * Forgets everything this plugin cached, plus the breaker and the key/contract notices.
+	 *
+	 * The tracked index is the fast path; a database sweep then catches entries an index that lost an update
+	 * (two requests rewriting it at once) no longer lists.
 	 */
 	public function purge_all(): void {
 		foreach ( $this->index() as $event_id ) {
-			$this->purge( $event_id );
+			$this->purge_event_caches( $event_id );
 		}
+		$this->purge_untracked();
 
 		delete_transient( self::LIST_TRANSIENT );
 		delete_transient( self::BACKOFF );
@@ -186,7 +206,71 @@ class Event_Repository {
 		delete_transient( self::CONTRACT_NOTICE );
 		delete_option( self::SLUGS_OPTION );
 		delete_option( self::INDEX_OPTION );
-		$this->memo = array();
+		$this->memo       = array();
+		$this->raw_drafts = array();
+	}
+
+	/**
+	 * Per-event cache entries in every locale, plus this request's memos. The slug map and the index are the
+	 * caller's business (purge() edits them, purge_all() deletes them), so a bulk purge rewrites nothing per id.
+	 */
+	private function purge_event_caches( int $event_id ): void {
+		foreach ( Locale::all_key_parts() as $loc ) {
+			delete_transient( $this->public_key( $event_id, $loc ) );
+			delete_transient( $this->preview_key( $event_id, $loc ) );
+			delete_option( $this->lastgood_key( $event_id, $loc ) );
+		}
+
+		foreach ( array_keys( $this->memo ) as $memo_key ) {
+			if ( 0 === strpos( $memo_key, $event_id . '|' ) ) {
+				unset( $this->memo[ $memo_key ] );
+			}
+		}
+		foreach ( array_keys( $this->raw_drafts ) as $raw_key ) {
+			if ( 0 === strpos( $raw_key, $event_id . '|' ) ) {
+				unset( $this->raw_drafts[ $raw_key ] );
+			}
+		}
+	}
+
+	/**
+	 * Removes last-good copies and event transients found in the options table, whether or not the index
+	 * knows them. Names are looked up with a prepared, escaped LIKE and removed through the options API, so an
+	 * object cache is kept in step. A site without a usable $wpdb (or a failed query) skips the sweep.
+	 */
+	private function purge_untracked(): void {
+		global $wpdb;
+
+		if ( ! is_object( $wpdb ) || ! isset( $wpdb->options ) || ! method_exists( $wpdb, 'prepare' ) || ! method_exists( $wpdb, 'esc_like' ) || ! method_exists( $wpdb, 'get_col' ) ) {
+			return;
+		}
+
+		$sql   = "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s";
+		$names = $wpdb->get_col(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the table name is not user input; values are placeholders.
+			$wpdb->prepare(
+				$sql,
+				$wpdb->esc_like( self::LASTGOOD_PREFIX ) . '%',
+				$wpdb->esc_like( '_transient_' . self::PREFIX ) . '%',
+				$wpdb->esc_like( '_transient_timeout_' . self::PREFIX ) . '%'
+			)
+		);
+		if ( ! is_array( $names ) ) {
+			return;
+		}
+
+		foreach ( $names as $name ) {
+			if ( ! is_string( $name ) ) {
+				continue;
+			}
+			if ( 0 === strpos( $name, '_transient_timeout_' ) ) {
+				delete_option( $name );
+			} elseif ( 0 === strpos( $name, '_transient_' ) ) {
+				delete_transient( substr( $name, strlen( '_transient_' ) ) );
+			} else {
+				delete_option( $name );
+			}
+		}
 	}
 
 	// ---- loading -------------------------------------------------------------------
@@ -198,9 +282,12 @@ class Event_Repository {
 
 		$cached = get_transient( $this->public_key( $id, $loc ) );
 		if ( is_array( $cached ) ) {
-			$marker = $cached[ self::MARKER ] ?? null;
+			$marker = $this->marker_of( $cached );
 			if ( self::MARKER_GONE === $marker ) {
 				return $this->fallback( $id, $loc, Event_View::GONE );
+			}
+			if ( self::MARKER_UNKNOWN === $marker ) {
+				return Event_View::empty( Event_View::UNAVAILABLE );
 			}
 			if ( self::MARKER_DRAFT === $marker ) {
 				if ( ! $preview_allowed ) {
@@ -216,6 +303,11 @@ class Event_Repository {
 			if ( is_array( $preview ) && $this->is_payload_for( $preview, $id ) ) {
 				return Event_View::from_payload( $preview, true );
 			}
+		}
+
+		// The same draft was already fetched by a visitor read in this request: reuse it for the editor.
+		if ( $preview_allowed && isset( $this->raw_drafts[ $id . '|' . $loc ] ) ) {
+			return $this->accept( $this->raw_drafts[ $id . '|' . $loc ], $id, true, $loc );
 		}
 
 		if ( $this->breaker_active() ) {
@@ -270,6 +362,9 @@ class Event_Repository {
 		$result = $this->client->public_event( $slug_hint, $locale );
 
 		if ( $result->ok && Event_View::is_valid_payload( $result->data ) ) {
+			if ( $this->has_marker_key( $result->data ) ) {
+				return $this->failed( $id, $loc );
+			}
 			if ( $this->is_payload_for( $result->data, $id ) ) {
 				return $this->accept( $result->data, $id, $preview_allowed, $loc );
 			}
@@ -298,6 +393,12 @@ class Event_Repository {
 	 * @param array $payload Valid payload of event $id.
 	 */
 	private function accept( array $payload, int $id, bool $preview_allowed, string $loc ): Event_View {
+		// `__state` is the cache's own marker key: a payload carrying it is refused, so it can never be
+		// stored in a form that reads back as a marker (or smuggles one in).
+		if ( $this->has_marker_key( $payload ) ) {
+			return $this->failed( $id, $loc );
+		}
+
 		delete_transient( self::BACKOFF );
 
 		$contract = $payload['contract'] ?? null;
@@ -308,16 +409,23 @@ class Event_Repository {
 		$state = Event_View::state_of( $payload );
 
 		if ( Event_View::UNAVAILABLE === $state ) {
-			// Unknown status from a newer Odavent: show nothing and keep nothing.
+			// Unknown status from a newer Odavent: show nothing and keep no content. A content-free marker
+			// stops every page view from calling Odavent again for the same answer.
+			$this->set_marker( $id, $loc, self::MARKER_UNKNOWN, min( $this->ttl(), self::GONE_MAX_TTL ) );
+
 			return Event_View::empty( Event_View::UNAVAILABLE );
 		}
 
 		if ( Event_View::DRAFT === $state ) {
 			$this->set_marker( $id, $loc, self::MARKER_DRAFT, $this->ttl() );
-			// Unpublished: no locale may serve its old published copy as stale any more.
+			// Unpublished: no locale may serve its old published copy, as stale or from the cache, any more.
 			foreach ( Locale::all_key_parts() as $any_loc ) {
 				delete_option( $this->lastgood_key( $id, $any_loc ) );
+				if ( $any_loc !== $loc ) {
+					delete_transient( $this->public_key( $id, $any_loc ) );
+				}
 			}
+			$this->raw_drafts[ $id . '|' . $loc ] = $payload;
 			if ( ! $preview_allowed ) {
 				return Event_View::empty( Event_View::DRAFT );
 			}
@@ -367,7 +475,9 @@ class Event_Repository {
 			}
 
 			$result = $this->client->list_events();
-			if ( ! $result->ok ) {
+			if ( $result->ok ) {
+				delete_transient( self::BACKOFF );
+			} else {
 				if ( Result::PLAN_REQUIRED === $result->code ) {
 					$this->options->set_connection_disabled( true );
 					return $this->resolve_public( $slug );
@@ -384,7 +494,8 @@ class Event_Repository {
 		}
 
 		foreach ( $list as $row ) {
-			if ( is_array( $row ) && ( $row['slug'] ?? null ) === $slug && is_int( $row['id'] ?? null ) ) {
+			// A draft is not resolvable by slug: no visitor may tell a draft from an unknown slug.
+			if ( is_array( $row ) && 'draft' !== ( $row['status'] ?? null ) && ( $row['slug'] ?? null ) === $slug && is_int( $row['id'] ?? null ) ) {
 				return $row['id'];
 			}
 		}
@@ -491,10 +602,30 @@ class Event_Repository {
 	}
 
 	/**
+	 * The marker a cached array stands for, or null when it is a payload. A marker is exactly one key:
+	 * `__state` set to a known name. Anything else (a payload that carries `__state` among other keys) is no marker.
+	 *
+	 * @param array $cached Cached transient value.
+	 */
+	private function marker_of( array $cached ): ?string {
+		if ( 1 !== count( $cached ) ) {
+			return null;
+		}
+
+		$marker = $cached[ self::MARKER ] ?? null;
+
+		return is_string( $marker ) && in_array( $marker, self::MARKERS, true ) ? $marker : null;
+	}
+
+	private function has_marker_key( array $payload ): bool {
+		return array_key_exists( self::MARKER, $payload );
+	}
+
+	/**
 	 * @param array $payload Candidate payload.
 	 */
 	private function is_payload_for( array $payload, int $id ): bool {
-		return Event_View::is_valid_payload( $payload ) && $payload['event']['id'] === $id;
+		return Event_View::is_valid_payload( $payload ) && ! $this->has_marker_key( $payload ) && $payload['event']['id'] === $id;
 	}
 
 	private function set_marker( int $id, string $loc, string $state, int $ttl ): void {

@@ -351,7 +351,7 @@ class EventRepositoryTest extends TestCase {
 		$this->assertSame( $good, $this->options[ $this->lastgood( 42 ) ] );
 	}
 
-	public function test_unknown_status_is_unavailable_and_not_cached_nor_breaker(): void {
+	public function test_unknown_status_is_unavailable_and_caches_only_a_content_free_marker_not_the_breaker(): void {
 		$this->seed_last_good( 42, $this->payload() );
 		$this->answer( 'site_event', Result::ok( $this->payload( 'scheduled' ) ) );
 
@@ -359,8 +359,107 @@ class EventRepositoryTest extends TestCase {
 
 		$this->assertSame( Event_View::UNAVAILABLE, $view->state() );
 		$this->assertFalse( $view->has_content() );
-		$this->assertNull( $this->transient( $this->pub( 42 ) ) );
+		$this->assertSame( array( '__state' => 'unavailable' ), $this->transient( $this->pub( 42 ) ) );
 		$this->assertNull( $this->transient( Event_Repository::BACKOFF ) );
+		$this->assertStringNotContainsString( 'Sommet', $this->everything_written() . json_encode( $this->transient( $this->pub( 42 ) ) ) );
+	}
+
+	public function test_unknown_status_marker_saves_the_next_page_views_for_at_most_five_minutes(): void {
+		$this->answer( 'site_event', Result::ok( $this->payload( 'scheduled' ) ), Result::ok( $this->payload( 'scheduled' ) ) );
+		$this->repo()->get( 42 );
+
+		$this->assertSame( 300, $this->ttl_of( $this->pub( 42 ) ) );
+
+		// Another request, another repository: no second HTTP call while the marker lives.
+		$view = $this->repo()->get( 42 );
+		$this->assertSame( Event_View::UNAVAILABLE, $view->state() );
+		$this->assertFalse( $view->has_content() );
+		$this->assertCount( 1, $this->calls );
+
+		$this->now += 301;
+		$this->repo()->get( 42 );
+		$this->assertCount( 2, $this->calls );
+	}
+
+	public function test_unknown_status_marker_ttl_is_the_cache_ttl_when_shorter_and_purge_clears_it(): void {
+		$this->settings( array( 'site_key' => self::KEY, 'cache_ttl' => 120 ) );
+		$this->answer( 'site_event', Result::ok( $this->payload( 'scheduled' ) ), Result::ok( $this->payload() ) );
+		$repo = $this->repo();
+		$repo->get( 42 );
+		$this->assertSame( 120, $this->ttl_of( $this->pub( 42 ) ) );
+
+		$repo->purge( 42 );
+		$this->assertNull( $this->transient( $this->pub( 42 ) ) );
+		$this->assertSame( Event_View::LIVE, $this->repo()->get( 42 )->state() );
+	}
+
+	public function test_a_payload_carrying_the_marker_key_is_refused_and_never_cached(): void {
+		foreach ( array( 'draft', 'gone', 'unavailable', 'x' ) as $state ) {
+			$this->transients = array();
+			$this->calls      = array();
+			$this->writes     = array();
+			$poisoned         = $this->payload() + array( '__state' => $state );
+			$this->answer( 'site_event', Result::ok( $poisoned ) );
+
+			$view = $this->repo()->get( 42 );
+
+			$this->assertSame( Event_View::UNAVAILABLE, $view->state(), $state );
+			$this->assertFalse( $view->has_content(), $state );
+			$this->assertNull( $this->transient( $this->pub( 42 ) ), $state );
+			$this->assertArrayNotHasKey( $this->lastgood( 42 ), $this->options, $state );
+			$this->assertSame( 1, $this->transient( Event_Repository::BACKOFF ), 'a refused payload counts as a failure: ' . $state );
+		}
+	}
+
+	public function test_a_public_payload_carrying_the_marker_key_is_refused_too(): void {
+		$this->settings( array() );
+		$this->answer( 'public_event', Result::ok( $this->payload() + array( '__state' => 'draft' ) ) );
+
+		$view = $this->repo()->get( 42, 'sommet-tech-abidjan-2026' );
+
+		$this->assertSame( Event_View::UNAVAILABLE, $view->state() );
+		$this->assertNull( $this->transient( $this->pub( 42 ) ) );
+		$this->assertArrayNotHasKey( $this->lastgood( 42 ), $this->options );
+	}
+
+	public function test_resolving_a_slug_through_the_public_route_refuses_a_payload_carrying_the_marker_key(): void {
+		$this->settings( array() );
+		$this->answer( 'public_event', Result::ok( $this->payload() + array( '__state' => 'draft' ) ) );
+
+		$this->assertNull( $this->repo()->resolve_id( 'sommet-tech-abidjan-2026' ) );
+
+		$this->assertNull( $this->transient( $this->pub( 42 ) ) );
+		$this->assertArrayNotHasKey( $this->lastgood( 42 ), $this->options );
+		$this->assertArrayNotHasKey( Event_Repository::SLUGS_OPTION, $this->options );
+	}
+
+	public function test_only_a_single_key_marker_with_a_known_name_is_read_as_a_marker(): void {
+		// A payload (with extra keys) that carries `__state` is not a draft marker: it is refused, so the page is fetched.
+		$this->transients[ $this->pub( 42 ) ] = array( $this->payload() + array( '__state' => 'draft' ), $this->now + 900 );
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+
+		$view = $this->repo()->get( 42 );
+
+		$this->assertSame( Event_View::LIVE, $view->state() );
+		$this->assertCount( 1, $this->calls );
+
+		// Nor is an unknown marker name, or a marker with a second key.
+		foreach ( array( array( '__state' => 'bogus' ), array( '__state' => 'gone', 'extra' => 1 ), array( '__state' => array( 'draft' ) ) ) as $junk ) {
+			$this->transients                     = array();
+			$this->calls                          = array();
+			$this->transients[ $this->pub( 42 ) ] = array( $junk, $this->now + 900 );
+			$this->answer( 'site_event', Result::ok( $this->payload() ) );
+
+			$this->assertSame( Event_View::LIVE, $this->repo()->get( 42 )->state(), json_encode( $junk ) );
+			$this->assertCount( 1, $this->calls, json_encode( $junk ) );
+		}
+	}
+
+	public function test_a_last_good_copy_carrying_the_marker_key_is_not_served(): void {
+		$this->seed_last_good( 42, $this->payload() + array( '__state' => 'draft' ) );
+		$this->answer( 'site_event', $this->fail_result( Result::UNAVAILABLE ) );
+
+		$this->assertFalse( $this->repo()->get( 42 )->has_content() );
 	}
 
 	// ---- failures ----------------------------------------------------------------
@@ -401,6 +500,35 @@ class EventRepositoryTest extends TestCase {
 		$view = $this->repo()->get( 42 );
 
 		$this->assertSame( Event_View::UNAVAILABLE, $view->state() );
+	}
+
+	public function test_get_that_throws_still_serves_the_last_good_copy_as_stale(): void {
+		$good = $this->payload( 'paused' );
+		$this->seed_last_good( 42, $good );
+		$this->queue['site_event'] = array( new \RuntimeException( 'boom' ) );
+
+		$view = $this->repo()->get( 42 );
+
+		$this->assertTrue( $view->is_stale() );
+		$this->assertSame( Event_View::PAUSED, $view->state() );
+		$this->assertSame( $good['event'], $view->event() );
+	}
+
+	public function test_get_that_throws_while_reading_the_last_good_copy_is_still_unavailable(): void {
+		$this->queue['site_event'] = array( new \RuntimeException( 'boom' ) );
+		Functions\when( 'get_option' )->alias(
+			function ( $name, $default = false ) {
+				if ( 0 === strpos( $name, 'odavent_events_lastgood_' ) ) {
+					throw new \RuntimeException( 'options table gone' );
+				}
+				return array_key_exists( $name, $this->options ) ? $this->options[ $name ] : $default;
+			}
+		);
+
+		$view = $this->repo()->get( 42 );
+
+		$this->assertSame( Event_View::UNAVAILABLE, $view->state() );
+		$this->assertFalse( $view->has_content() );
 	}
 
 	public function test_not_found_purges_every_cache_and_returns_gone(): void {
@@ -571,7 +699,7 @@ class EventRepositoryTest extends TestCase {
 		$this->assertSame( array(), $this->calls );
 	}
 
-	public function test_list_for_editors_bypasses_the_breaker_and_does_not_clear_it(): void {
+	public function test_list_for_editors_bypasses_the_breaker_and_a_live_answer_clears_it(): void {
 		$this->transients[ Event_Repository::BACKOFF ] = array( 1, $this->now + 60 );
 		$list = $this->fixture( 'events-list' );
 		$this->answer( 'list_events', Result::ok( $list ) );
@@ -580,7 +708,62 @@ class EventRepositoryTest extends TestCase {
 
 		$this->assertTrue( $result->ok );
 		$this->assertSame( $list, $result->data );
+		$this->assertNull( $this->transient( Event_Repository::BACKOFF ), 'Odavent answered, so the breaker is over' );
+	}
+
+	public function test_list_for_editors_success_re_enables_a_disabled_connection(): void {
+		$this->transients[ Options::CONN_DISABLED_FLAG ] = array( 1, $this->now + 3600 );
+		$this->answer( 'list_events', Result::ok( $this->fixture( 'events-list' ) ) );
+
+		$this->repo()->list_for_editors();
+
+		$this->assertNull( $this->transient( Options::CONN_DISABLED_FLAG ), 'an upgraded plan works again' );
+	}
+
+	public function test_list_for_editors_failure_does_not_set_the_breaker_nor_re_enable(): void {
+		$this->transients[ Options::CONN_DISABLED_FLAG ] = array( 1, $this->now + 3600 );
+		$this->answer( 'list_events', $this->fail_result( Result::UNAVAILABLE, 503 ) );
+
+		$this->repo()->list_for_editors();
+
+		$this->assertNull( $this->transient( Event_Repository::BACKOFF ) );
+		$this->assertSame( 1, $this->transient( Options::CONN_DISABLED_FLAG ) );
+	}
+
+	public function test_a_cached_editor_list_does_not_touch_the_breaker_or_the_flag(): void {
+		$this->transients[ Event_Repository::LIST_TRANSIENT ] = array( $this->fixture( 'events-list' ), $this->now + 300 );
+		$this->transients[ Event_Repository::BACKOFF ]        = array( 1, $this->now + 60 );
+
+		$this->assertTrue( $this->repo()->list_for_editors()->ok );
+
 		$this->assertSame( 1, $this->transient( Event_Repository::BACKOFF ) );
+	}
+
+	public function test_resolve_id_list_success_clears_a_breaker_set_meanwhile(): void {
+		$client = Mockery::mock( Client::class );
+		$client->shouldReceive( 'list_events' )->once()->andReturnUsing(
+			function () {
+				// A concurrent request trips the breaker while this call is in flight.
+				$this->transients[ Event_Repository::BACKOFF ] = array( 1, $this->now + 60 );
+				return Result::ok( $this->fixture( 'events-list' ) );
+			}
+		);
+
+		$id = ( new Event_Repository( $client, new Options() ) )->resolve_id( 'sommet-tech-abidjan-2026' );
+
+		$this->assertSame( 42, $id );
+		$this->assertNull( $this->transient( Event_Repository::BACKOFF ) );
+	}
+
+	public function test_is_backing_off_reflects_the_breaker(): void {
+		$repo = $this->repo();
+		$this->assertFalse( $repo->is_backing_off() );
+
+		$this->transients[ Event_Repository::BACKOFF ] = array( 1, $this->now + 60 );
+		$this->assertTrue( $repo->is_backing_off() );
+
+		$this->now += 61;
+		$this->assertFalse( $repo->is_backing_off() );
 	}
 
 	// ---- draft privacy ---------------------------------------------------------
@@ -617,6 +800,83 @@ class EventRepositoryTest extends TestCase {
 		$written = $this->everything_written();
 		$this->assertStringNotContainsString( 'Small Meetup', $written );
 		$this->assertStringNotContainsString( 'small-meetup', $written );
+	}
+
+	public function test_a_draft_also_drops_the_public_transients_of_the_other_locales(): void {
+		foreach ( array( 'fr', 'default' ) as $loc ) {
+			$this->transients[ $this->pub( 7, $loc ) ] = array( $this->payload( 'published', 'payload-v1-minimal' ), $this->now + 900 );
+			$this->seed_last_good( 7, $this->payload( 'published', 'payload-v1-minimal' ), $loc );
+		}
+		$this->transients[ $this->pub( 8, 'fr' ) ] = array( $this->payload(), $this->now + 900 );
+		$this->answer( 'site_event', Result::ok( $this->fixture( 'payload-v1-minimal' ) ) );
+
+		$this->repo()->get( 7 );
+
+		foreach ( array( 'fr', 'default' ) as $loc ) {
+			$this->assertNull( $this->transient( $this->pub( 7, $loc ) ), "the {$loc} copy must not keep serving until its TTL" );
+			$this->assertArrayNotHasKey( $this->lastgood( 7, $loc ), $this->options );
+		}
+		$this->assertSame( array( '__state' => 'draft' ), $this->transient( $this->pub( 7, 'en' ) ) );
+		$this->assertNotNull( $this->transient( $this->pub( 8, 'fr' ) ), 'other events are untouched' );
+
+		// And the other-locale visitor now fetches instead of reading the old published page.
+		$this->wp_locale = 'fr_FR';
+		$this->answer( 'site_event', Result::ok( $this->fixture( 'payload-v1-minimal' ) ) );
+		$this->assertSame( Event_View::DRAFT, $this->repo()->get( 7 )->state() );
+	}
+
+	public function test_a_visitor_then_an_editor_reading_the_same_draft_make_one_http_call(): void {
+		$payload = $this->fixture( 'payload-v1-minimal' );
+		$this->answer( 'site_event', Result::ok( $payload ), Result::ok( $payload ) );
+		$repo = $this->repo();
+
+		$visitor = $repo->get( 7 );
+		$editor  = $repo->get( 7, '', true );
+
+		$this->assertCount( 1, $this->calls, 'the visitor read already fetched this draft' );
+		$this->assertSame( Event_View::DRAFT, $visitor->state() );
+		$this->assertFalse( $visitor->has_content(), 'the visitor view never holds the draft' );
+		$this->assertTrue( $editor->is_preview() );
+		$this->assertSame( 'Small Meetup', $editor->event()['name'] );
+		$this->assertSame( $payload, $this->transient( $this->pvw( 7 ) ) );
+
+		// The visitor memo was not replaced by the editor's content.
+		$again = $repo->get( 7 );
+		$this->assertSame( $visitor, $again );
+		$this->assertFalse( $again->has_content() );
+		$this->assertSame( array( '__state' => 'draft' ), $this->transient( $this->pub( 7 ) ) );
+	}
+
+	public function test_an_editor_then_a_visitor_reading_the_same_draft_make_one_http_call_and_leak_nothing(): void {
+		$payload = $this->fixture( 'payload-v1-minimal' );
+		$this->answer( 'site_event', Result::ok( $payload ), Result::ok( $payload ) );
+		$repo = $this->repo();
+
+		$editor  = $repo->get( 7, '', true );
+		$visitor = $repo->get( 7 );
+
+		$this->assertCount( 1, $this->calls );
+		$this->assertTrue( $editor->has_content() );
+		$this->assertFalse( $visitor->has_content() );
+		$this->assertFalse( $visitor->is_preview() );
+		$this->assertSame( array(), $visitor->event() );
+		foreach ( $this->writes as $write ) {
+			if ( $this->pvw( 7 ) !== $write[1] ) {
+				$this->assertStringNotContainsString( 'Small Meetup', (string) json_encode( $write[2] ), 'content written to ' . $write[1] );
+			}
+		}
+	}
+
+	public function test_a_purge_forgets_the_draft_held_for_the_editor(): void {
+		$payload = $this->fixture( 'payload-v1-minimal' );
+		$this->answer( 'site_event', Result::ok( $payload ), Result::ok( $payload ) );
+		$repo = $this->repo();
+		$repo->get( 7 );
+		$repo->purge( 7 );
+
+		$repo->get( 7, '', true );
+
+		$this->assertCount( 2, $this->calls, 'a purge must not leave the old draft behind for an editor' );
 	}
 
 	public function test_draft_marker_saves_the_next_visitor_call(): void {
@@ -849,6 +1109,116 @@ class EventRepositoryTest extends TestCase {
 		$this->assertCount( 3, $this->http_calls( 'site_event' ) );
 	}
 
+	/**
+	 * A $wpdb double that remembers the prepared statement and returns the given option names for it.
+	 *
+	 * @param string[] $names Rows the LIKE query finds.
+	 */
+	private function install_wpdb( array $names ): object {
+		$wpdb = new class( $names ) {
+			public $options = 'wp_options';
+			public $queries = array();
+			private $names;
+
+			public function __construct( array $names ) {
+				$this->names = $names;
+			}
+
+			public function esc_like( $text ) {
+				return addcslashes( $text, '_%\\' );
+			}
+
+			public function prepare( $query, ...$args ) {
+				$this->queries[] = array( $query, $args );
+				return $query;
+			}
+
+			public function get_col( $query ) {
+				return $this->names;
+			}
+		};
+		$GLOBALS['wpdb'] = $wpdb;
+
+		return $wpdb;
+	}
+
+	protected function tearDown(): void {
+		unset( $GLOBALS['wpdb'] );
+		parent::tearDown();
+	}
+
+	public function test_purge_all_sweeps_entries_the_index_lost(): void {
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+		$repo = $this->repo();
+		$repo->get( 42 );
+
+		// Event 99 was cached by a request whose index update was lost.
+		$this->options[ $this->lastgood( 99 ) ]                       = $this->payload();
+		$this->options[ $this->lastgood( 99, 'fr' ) ]                 = $this->payload();
+		$this->transients[ $this->pub( 99 ) ]                         = array( $this->payload(), 0 );
+		$this->transients[ $this->pvw( 99, 'fr' ) ]                   = array( $this->payload(), 0 );
+		$this->options['_transient_timeout_odavent_events_ev_orphan'] = $this->now + 5;
+		$this->options['unrelated_option']                            = 'keep me';
+		$wpdb = $this->install_wpdb(
+			array(
+				$this->lastgood( 99 ),
+				$this->lastgood( 99, 'fr' ),
+				'_transient_' . $this->pub( 99 ),
+				'_transient_' . $this->pvw( 99, 'fr' ),
+				'_transient_timeout_odavent_events_ev_orphan',
+			)
+		);
+
+		$repo->purge_all();
+
+		$this->assertArrayNotHasKey( $this->lastgood( 99 ), $this->options );
+		$this->assertArrayNotHasKey( $this->lastgood( 99, 'fr' ), $this->options );
+		$this->assertNull( $this->transient( $this->pub( 99 ) ) );
+		$this->assertNull( $this->transient( $this->pvw( 99, 'fr' ) ) );
+		$this->assertArrayNotHasKey( '_transient_timeout_odavent_events_ev_orphan', $this->options );
+		$this->assertSame( 'keep me', $this->options['unrelated_option'] );
+
+		// One prepared statement; underscores and percent signs in the prefixes are escaped as LIKE wildcards.
+		$this->assertCount( 1, $wpdb->queries );
+		list( $sql, $args ) = $wpdb->queries[0];
+		$this->assertStringContainsString( 'wp_options', $sql );
+		$this->assertSame(
+			array(
+				'odavent\\_events\\_lastgood\\_%',
+				'\\_transient\\_odavent\\_events\\_ev\\_%',
+				'\\_transient\\_timeout\\_odavent\\_events\\_ev\\_%',
+			),
+			$args
+		);
+	}
+
+	public function test_purge_all_without_a_database_object_still_works(): void {
+		$this->answer( 'site_event', Result::ok( $this->payload() ) );
+		$repo = $this->repo();
+		$repo->get( 42 );
+		unset( $GLOBALS['wpdb'] );
+
+		$repo->purge_all();
+
+		$this->assertSame( array( Options::OPTION ), array_keys( $this->options ) );
+	}
+
+	public function test_purge_all_does_not_rewrite_the_index_or_the_slug_map_per_event(): void {
+		$this->answer( 'site_event', Result::ok( $this->payload() ), Result::ok( $this->payload( 'published', 'payload-v1-minimal' ) ) );
+		$repo = $this->repo();
+		$repo->get( 42 );
+		$this->options[ Event_Repository::INDEX_OPTION ] = array( 42, 7, 8, 9 );
+		$this->writes                                    = array();
+
+		$repo->purge_all();
+
+		foreach ( $this->writes as $write ) {
+			$this->assertNotSame( 'update_option', $write[0], 'update_option on ' . $write[1] );
+		}
+		$this->assertArrayNotHasKey( Event_Repository::INDEX_OPTION, $this->options );
+		$this->assertArrayNotHasKey( Event_Repository::SLUGS_OPTION, $this->options );
+	}
+
 	public function test_tracking_option_is_not_autoloaded(): void {
 		$this->answer( 'site_event', Result::ok( $this->payload() ) );
 		$this->repo()->get( 42 );
@@ -870,10 +1240,20 @@ class EventRepositoryTest extends TestCase {
 		$this->assertSame( 42, $repo->resolve_id( 'sommet-tech-abidjan-2026' ) );
 		$this->assertSame( 12, $repo->resolve_id( 'meetup-fintech-2025' ) );
 		$this->assertNull( $repo->resolve_id( 'not-in-the-list' ) );
-		$this->assertSame( 43, $this->repo()->resolve_id( 'atelier-ia-2026' ) );
+		$this->assertNull( $this->repo()->resolve_id( 'atelier-ia-2026' ), 'a draft slug is indistinguishable from an unknown one' );
 
 		$this->assertSame( array( array( 'list_events' ) ), $this->calls );
 		$this->assertSame( 300, $this->ttl_of( Event_Repository::LIST_TRANSIENT ) );
+	}
+
+	public function test_the_editor_list_still_carries_drafts(): void {
+		$list = $this->fixture( 'events-list' );
+		$this->answer( 'list_events', Result::ok( $list ) );
+
+		$result = $this->repo()->list_for_editors();
+
+		$this->assertSame( $list, $result->data );
+		$this->assertContains( 'draft', array_column( $result->data, 'status' ) );
 	}
 
 	public function test_resolve_id_of_an_empty_slug_is_null_without_http(): void {

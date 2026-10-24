@@ -52,6 +52,37 @@ class LocaleTest extends TestCase {
 		$this->assertNull( Locale::current() );
 	}
 
+	public function filtered_values(): array {
+		return array(
+			'fr_FR'          => array( 'fr_FR', 'fr' ),
+			'FR'             => array( 'FR', 'fr' ),
+			'fr-CA'          => array( 'fr-CA', 'fr' ),
+			'padded en'      => array( ' en ', 'en' ),
+			'EN_gb'          => array( 'EN_gb', 'en' ),
+			'newline'        => array( "fr\n", 'fr' ),
+			'de'             => array( 'de', null ),
+			'junk'           => array( 'fr; DROP', null ),
+			'traversal'      => array( '../fr', null ),
+			'french'         => array( 'french', null ),
+			'trailing score' => array( 'fr_', null ),
+			'empty'          => array( '', null ),
+			'array'          => array( array( 'fr' ), null ),
+			'int'            => array( 42, null ),
+			'null'           => array( null, null ),
+		);
+	}
+
+	/**
+	 * @dataProvider filtered_values
+	 * @param mixed $filtered What the odavent_events_locale filter returns.
+	 */
+	public function test_a_filtered_value_is_normalized_before_the_supported_check( $filtered, ?string $expected ): void {
+		Functions\when( 'determine_locale' )->justReturn( 'de_DE' );
+		Filters\expectApplied( 'odavent_events_locale' )->once()->andReturn( $filtered );
+
+		$this->assertSame( $expected, Locale::current() );
+	}
+
 	public function test_cache_key_part(): void {
 		Functions\when( 'determine_locale' )->justReturn( 'fr_FR' );
 		$this->assertSame( 'fr', Locale::key_part() );

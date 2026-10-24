@@ -19,8 +19,9 @@ final class Locale {
 	 * The locale to request from Odavent, or null for the organization's default language.
 	 *
 	 * `fr_*` -> `fr`, `en_*` -> `en`, anything else -> null. Multilingual plugins (WPML, Polylang)
-	 * can return the page language through the `odavent_events_locale` filter; a value outside
-	 * SUPPORTED counts as null, so the cache keys stay within a known, purgeable set.
+	 * can return the page language through the `odavent_events_locale` filter; the value is normalised
+	 * (`fr_FR`, `FR`, `fr-CA`, ` en ` -> `fr`/`en`) and one outside SUPPORTED counts as null, so the cache
+	 * keys stay within a known, purgeable set.
 	 */
 	public static function current(): ?string {
 		$wp_locale = '';
@@ -33,7 +34,26 @@ final class Locale {
 
 		$locale = apply_filters( 'odavent_events_locale', self::map( $wp_locale ), $wp_locale );
 
-		return is_string( $locale ) && in_array( $locale, self::SUPPORTED, true ) ? $locale : null;
+		return self::normalize( $locale );
+	}
+
+	/**
+	 * A locale as returned by a filter, brought to a supported code or null: ` FR `, `fr-CA` and `fr_FR` all
+	 * become `fr`; anything that is not a locale-shaped string (or not supported) is null.
+	 *
+	 * @param mixed $value Filtered value.
+	 */
+	private static function normalize( $value ): ?string {
+		if ( ! is_string( $value ) ) {
+			return null;
+		}
+
+		$value = strtolower( str_replace( '-', '_', trim( $value ) ) );
+		if ( 1 !== preg_match( '/^[a-z]{2}(_[a-z0-9]{2,8})*$/D', $value ) ) {
+			return null;
+		}
+
+		return self::map( $value );
 	}
 
 	/**
