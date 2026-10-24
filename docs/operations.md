@@ -125,7 +125,7 @@ for this Odavent block...".
   Odavent's public event pages by slug, so **published events keep showing, with their Register links**.
   Blocks that were never given an event slug keep showing their last good copy (as stale, without Register
   links). Draft previews, the event picker and live refresh stop until the key is fixed in Settings > Odavent
-  Events (or `wp-config.php`); a successful *Test connection* re-enables the key at once.
+  Events (or `wp-config.php`); saving a new key or address, or a successful *Test connection*, re-enables the key at once.
 * **Plan no longer includes the plugin** (Odavent answers `403`): the plugin stops using the key for
   an hour at a time and reads published events from Odavent's public event pages by slug instead. **Published
   events keep showing**, refreshed when the cache lifetime ends; draft previews, the event picker in the

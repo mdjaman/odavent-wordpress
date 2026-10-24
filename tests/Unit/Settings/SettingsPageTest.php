@@ -386,26 +386,52 @@ class SettingsPageTest extends TestCase {
 		$this->assertSame( $other, $out['site_key'] );
 	}
 
-	public function test_changing_the_key_or_the_address_drops_the_cached_events_list(): void {
+	/**
+	 * Everything a connection leaves behind that must not outlive it. A method, not a constant: the plugin's
+	 * classes are only autoloadable once setUp() has loaded the plugin.
+	 *
+	 * @return string[]
+	 */
+	private function connection_state(): array {
+		return array(
+			Event_Repository::LIST_TRANSIENT,
+			Event_Repository::INVALID_KEY_NOTICE,
+			Event_Repository::CONTRACT_NOTICE,
+			Event_Repository::BACKOFF,
+			Options::CONN_DISABLED_FLAG,
+		);
+	}
+
+	private function seed_connection_state(): void {
+		foreach ( $this->connection_state() as $name ) {
+			$this->transients[ $name ] = array( 'old connection' );
+		}
+	}
+
+	public function test_changing_the_key_or_the_address_drops_the_old_connection_state(): void {
 		foreach ( array(
 			array( 'site_key' => 'odv_wp_NEWKEY1234567890' ),
 			array( 'base_url' => 'https://events.example.com' ),
 		) as $input ) {
-			$this->transients[ Event_Repository::LIST_TRANSIENT ] = array( 'old key events' );
+			$this->seed_connection_state();
 
 			$this->page()->sanitize( $input );
 
-			$this->assertArrayNotHasKey( Event_Repository::LIST_TRANSIENT, $this->transients, json_encode( $input ) );
+			foreach ( $this->connection_state() as $name ) {
+				$this->assertArrayNotHasKey( $name, $this->transients, $name . ' after ' . json_encode( $input ) );
+			}
 		}
 	}
 
-	public function test_saving_unchanged_connection_settings_keeps_the_cached_events_list(): void {
-		$this->transients[ Event_Repository::LIST_TRANSIENT ] = array( 'kept' );
+	public function test_saving_unchanged_connection_settings_keeps_the_connection_state(): void {
+		$this->seed_connection_state();
 
 		$this->page()->sanitize( array( 'site_key' => self::KEY, 'base_url' => 'https://odavent.com', 'cache_ttl' => '1200' ) );
 		$this->page()->sanitize( array( 'site_key' => '', 'base_url' => 'ftp://rejected' ) );
 
-		$this->assertSame( array( 'kept' ), $this->transients[ Event_Repository::LIST_TRANSIENT ] );
+		foreach ( $this->connection_state() as $name ) {
+			$this->assertSame( array( 'old connection' ), $this->transients[ $name ], $name );
+		}
 	}
 
 	public function test_sanitize_tolerates_a_non_array_input(): void {

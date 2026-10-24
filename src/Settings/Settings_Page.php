@@ -124,9 +124,15 @@ class Settings_Page {
 
 		$out = $this->options->sanitize( $input, $current, $report );
 
-		// Another key or address means another organization's events: drop the editor's cached list.
+		// Another key or address means another connection: drop the editor's cached list (another organization's
+		// events) and what the old connection left behind (rejected-key and contract notices, the breaker, the
+		// key routes disabled after a 401/403), so the new key is tried on the next page view.
 		if ( $out['site_key'] !== $current['site_key'] || $out['base_url'] !== $current['base_url'] ) {
 			delete_transient( Event_Repository::LIST_TRANSIENT );
+			delete_transient( Event_Repository::INVALID_KEY_NOTICE );
+			delete_transient( Event_Repository::CONTRACT_NOTICE );
+			delete_transient( Event_Repository::BACKOFF );
+			$this->options->set_connection_disabled( false );
 		}
 
 		return $out;
