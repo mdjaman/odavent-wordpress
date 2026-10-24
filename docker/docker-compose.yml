@@ -7,10 +7,13 @@
 # container too). The plugin may use the http stub URL because WP_ENVIRONMENT_TYPE is `local`, and
 # WordPress' own loopback requests (cron, site health) reach the site URL.
 #
+# Ports: WordPress on 127.0.0.1:8089 (fixed: the site URL, Apache's port and the tests use it), MariaDB on
+# 127.0.0.1:${DB_PORT:-8091}. Both are bound to loopback only.
+#
 # Images: WP_IMAGE (WordPress + Apache + PHP) and WPCLI_IMAGE (WP-CLI on the same PHP version, set by
 # bin/dev-up from WP_IMAGE).
 
-name: ${COMPOSE_PROJECT_NAME:-odavent-wp-dev}
+name: odavent-wp-dev
 
 x-wp-env: &wp-env
   WORDPRESS_DB_HOST: db
@@ -27,7 +30,9 @@ x-wp-env: &wp-env
 
 x-wp-volumes: &wp-volumes
   - wp:/var/www/html
-  - ..:/var/www/html/wp-content/plugins/odavent-events
+  # Read-only: nothing in the stack writes there, and the dev admin's "Update now" (the stub offers 9.9.9) or
+  # "Delete" must not act on the working tree.
+  - ..:/var/www/html/wp-content/plugins/odavent-events:ro
   - ./mu-plugins:/var/www/html/wp-content/mu-plugins:ro
 
 services:
@@ -56,7 +61,8 @@ services:
     environment: *wp-env
     volumes: *wp-volumes
     ports:
-      - "${WP_PORT:-8089}:8089"
+      # Loopback only: admin/admin plus the plugin/theme editors would be code execution for anyone on the network.
+      - "127.0.0.1:8089:8089"
     # Apache listens on 8089 inside the container as well, so the site URL works from inside.
     command:
       - bash

@@ -3,14 +3,14 @@
 # Environment:
 #   WP_IMAGE      WordPress image (default wordpress:7.1-php8.3-apache; the minimum is wordpress:6.1-php7.4-apache)
 #   WPCLI_IMAGE   WP-CLI image (default: derived from WP_IMAGE's PHP version)
-#   WP_PORT       host port of WordPress (default 8089; the site URL is http://localhost:$WP_PORT)
 #   DB_PORT       host port of MariaDB, bound to 127.0.0.1 (default 8091)
-#   COMPOSE_PROJECT_NAME  default odavent-wp-dev
+#
+# WordPress is always http://localhost:8089 (bound to 127.0.0.1). The Compose project is always odavent-wp-dev:
+# COMPOSE_PROJECT_NAME from the environment is ignored, so `bin/dev-down --volumes` can never hit another project.
 
 ODV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-odavent-wp-dev}"
+export COMPOSE_PROJECT_NAME="odavent-wp-dev"
 export WP_IMAGE="${WP_IMAGE:-wordpress:7.1-php8.3-apache}"
-export WP_PORT="${WP_PORT:-8089}"
 export DB_PORT="${DB_PORT:-8091}"
 
 if [ -z "${WPCLI_IMAGE:-}" ]; then
@@ -23,7 +23,7 @@ if [ -z "${WPCLI_IMAGE:-}" ]; then
 fi
 export WPCLI_IMAGE
 
-ODV_SITE="http://localhost:${WP_PORT}"
+ODV_SITE="http://localhost:8089"
 ODV_STUB_KEY="odv_wp_stubkey_for_dev_0123456789"
 ODV_PLUGIN_DIR="/var/www/html/wp-content/plugins/odavent-events"
 

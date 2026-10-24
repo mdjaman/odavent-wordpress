@@ -35,8 +35,8 @@ Other helpers: `bin/wp ...` runs WP-CLI in the stack (`bin/wp option get odavent
 
 | Service | What |
 |---|---|
-| `db` | MariaDB 10.11, published on `127.0.0.1:8091` |
-| `wordpress` | the official image (`WP_IMAGE`), published on `8089`. The repository is bind-mounted as `wp-content/plugins/odavent-events`; `WP_DEBUG` + `WP_DEBUG_LOG` on, `WP_ENVIRONMENT_TYPE=local`, automatic updates off |
+| `db` | MariaDB 10.11, published on `127.0.0.1:8091` (`DB_PORT` to change it) |
+| `wordpress` | the official image (`WP_IMAGE`), published on `127.0.0.1:8089` only (admin/admin must never be reachable from the network). The repository is bind-mounted **read-only** as `wp-content/plugins/odavent-events`; `WP_DEBUG` + `WP_DEBUG_LOG` on, `WP_ENVIRONMENT_TYPE=local`, automatic updates off |
 | `stub` | `php -S 127.0.0.1:8081 docker/stub/index.php`, sharing the WordPress container's network |
 | `wpcli` | WP-CLI on the same PHP version, same network, user 33 (www-data) |
 
@@ -153,7 +153,8 @@ container: use the stub and `bin/sign-ping` to test pings).
 
 ## Troubleshooting
 
-* **Port in use**: `WP_PORT=8095 DB_PORT=8096 bin/dev-up` (and the same variables for the other commands).
+* **Port in use**: WordPress always uses `127.0.0.1:8089` (the site URL, Apache's port inside the container and
+  the tests depend on it): free that port. The database port can move: `DB_PORT=8096 bin/dev-up`.
 * **"the dev stack is not running"** from `bin/smoke.sh`/`bin/e2e`: run `bin/dev-up`, with the same `WP_IMAGE`.
 * **WordPress 7.x code on PHP 7.4, or a version you did not ask for**: the volume still holds another version;
   `bin/dev-down` then `bin/dev-up`.
