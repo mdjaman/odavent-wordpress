@@ -15,6 +15,11 @@ Every shortcode accepts these, on top of its own attributes below:
 
 With neither `event` nor `event_id`, the default event from Settings > Odavent Events is used.
 
+**A draft can only be previewed by its ID.** A slug is resolved only for published (or paused, cancelled,
+archived) events, so that no visitor can tell a draft from an unknown slug: `event="slug"` of a DRAFT event
+shows nothing, even to an editor. To preview a draft, use `event_id="123"` (the ID is the number in the
+event's address in the Odavent dashboard, `/manage/events/123`); the slug works once the event is published.
+
 ## Values
 
 - Booleans: `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off` (any case). An empty value (`show_bio=""`) counts as `false`. Anything else is ignored and the default applies.

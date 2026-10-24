@@ -142,4 +142,10 @@ class DocsTest extends TestCase {
 		$this->assertStringContainsString( '2FA', $security );
 		$this->assertStringNotContainsString( 'offered only to sites already running a pre-release.', $security, 'the pre-release branch is dead: Odavent never serves one' );
 	}
+
+	/** A draft resolves by ID only (resolve_id() skips drafts): the docs must say so where people pick events. */
+	public function test_the_docs_say_a_draft_is_previewed_by_id_not_by_slug(): void {
+		$this->assertStringContainsString( 'A draft can only be previewed by its ID.', $this->doc( 'docs/shortcodes.md' ) );
+		$this->assertStringContainsString( 'To preview a **draft** event, pick it in the list', $this->doc( 'README.md' ) );
+	}
 }

@@ -45,7 +45,9 @@ define( 'ODAVENT_SITE_KEY', 'odv_wp_...' );
 ## Blocks and shortcodes
 
 Add blocks from the **Odavent Events** category in the block editor. Pick an event in the block's settings
-(or leave it on the default event). Every block has a shortcode that renders the same thing, for the classic
+(or leave it on the default event). To preview a **draft** event, pick it in the list (that stores its ID):
+an event typed in by its slug (the block's "Event slug" field, or `event="slug"` in a shortcode) is found only
+once it is published. Every block has a shortcode that renders the same thing, for the classic
 editor, widgets and page builders. Full attribute lists are in [docs/shortcodes.md](docs/shortcodes.md).
 
 | Block | Shortcode | Shows |
