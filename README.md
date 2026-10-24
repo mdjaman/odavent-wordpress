@@ -144,7 +144,7 @@ update information to your sites (no bold, bullets or backticks on them):
 ```
 Requires at least: 6.1
 Requires PHP: 7.4
-Tested up to: 6.8
+Tested up to: 7.1
 ```
 
 They come from `readme.txt`. The update checker also requires the asset URL to be exactly
