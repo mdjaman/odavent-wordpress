@@ -19,7 +19,7 @@ function component( name ) {
 }
 
 /** Runs editor.js, renders every block's Edit (and the event picker in the given state); returns the controls. */
-function render( pickerState, blocks ) {
+function render( pickerState, blocks, attributes, setAttributes ) {
 	const registered = {};
 	const components = {};
 	[ 'Spinner', 'Notice', 'PanelBody', ...FORM_CONTROLS ].forEach( ( name ) => ( components[ name ] = component( name ) ) );
@@ -63,7 +63,7 @@ function render( pickerState, blocks ) {
 		walk( node.children );
 	};
 	Object.keys( registered ).forEach( ( name ) => {
-		walk( registered[ name ].edit( { attributes: { eventId: 0, eventSlug: 'x' }, setAttributes: () => {} } ) );
+		walk( registered[ name ].edit( { attributes: attributes || { eventId: 0, eventSlug: 'x' }, setAttributes: setAttributes || ( () => {} ) } ) );
 	} );
 	return found;
 }
@@ -103,5 +103,65 @@ controls.forEach( ( { name, props } ) => {
 
 // The shared defaults never leak between controls (each gets its own merged object).
 assert.notEqual( controls[ 0 ].props, controls[ 1 ].props );
+
+// The event page: `sections` is a comma list, shown as one toggle per section (meta.sectionChoices).
+const SECTIONS = [ 'header', 'countdown', 'register', 'tickets', 'speakers', 'agenda' ];
+const pageBlocks = [
+	{
+		name: 'odavent-events/event-page',
+		title: 'Event page',
+		attributes: {
+			eventId: { type: 'integer', default: 0 },
+			eventSlug: { type: 'string', default: '' },
+			sections: { type: 'string', default: '' },
+			showHeadings: { type: 'boolean', default: true },
+		},
+		labels: { sections: 'Sections', showHeadings: 'Show headings' },
+		sectionChoices: SECTIONS.map( ( value ) => ( { value, label: 'Label ' + value } ) ),
+		managed: [ 'eventId', 'eventSlug', 'className' ],
+	},
+];
+
+/** Renders the event page with the given `sections` value; returns its toggles and every setAttributes call. */
+function renderPage( sections ) {
+	const calls = [];
+	const found = render( { loading: false, events: [], error: '' }, pageBlocks, { eventId: 0, eventSlug: '', sections, showHeadings: true }, ( update ) => calls.push( JSON.parse( JSON.stringify( update ) ) ) ); // plain objects: the script ran in another vm realm
+	const toggles = found.filter( ( c ) => c.name === 'ToggleControl' && c.props.label.indexOf( 'Label ' ) === 0 );
+	return { toggles, calls, found };
+}
+
+// An empty value means every section: all toggles on, and no free-text field for `sections`.
+let page = renderPage( '' );
+assert.deepEqual( page.toggles.map( ( t ) => t.props.label ), SECTIONS.map( ( s ) => 'Label ' + s ), 'one toggle per section, in order' );
+assert.ok( page.toggles.every( ( t ) => t.props.checked === true ), 'empty means all on' );
+assert.equal( page.found.filter( ( c ) => c.name === 'TextControl' ).length, 0, 'no text field for the sections list' );
+assert.equal( page.found.filter( ( c ) => c.name === 'ToggleControl' && c.props.label === 'Show headings' ).length, 1, 'other attributes keep their controls' );
+
+// Turning one off writes the rest as a comma list in default order, whatever the order they were typed in.
+page.toggles[ 3 ].props.onChange( false );
+assert.deepEqual( page.calls, [ { sections: 'header,countdown,register,speakers,agenda' } ], 'test_sections_toggles_write_a_comma_list_in_default_order' );
+
+page = renderPage( 'agenda, header' );
+assert.deepEqual( page.toggles.map( ( t ) => t.props.checked ), [ true, false, false, false, false, true ], 'the typed list sets the toggles' );
+page.toggles[ 4 ].props.onChange( true ); // speakers on: default order, not click order
+assert.deepEqual( page.calls, [ { sections: 'header,speakers,agenda' } ] );
+
+// Turning the last missing section on writes an empty string, not the full list.
+page = renderPage( 'header,countdown,register,tickets,speakers' );
+page.toggles[ 5 ].props.onChange( true );
+assert.deepEqual( page.calls, [ { sections: '' } ], 'test_all_sections_on_writes_an_empty_string' );
+
+// The last section on cannot be turned off: an empty list would mean "every section".
+page = renderPage( 'agenda' );
+page.toggles[ 5 ].props.onChange( false );
+assert.deepEqual( page.calls, [], 'at least one section stays on' );
+
+// A list that names no known section reads as every section, like the server does.
+page = renderPage( 'bogus' );
+assert.ok( page.toggles.every( ( t ) => t.props.checked === true ), 'unknown names mean all on' );
+
+// Without sectionChoices (any other block) `sections` would stay an ordinary text field.
+const plain = render( { loading: false, events: [], error: '' }, [ { name: 'odavent-events/x', title: 'X', attributes: { sections: { type: 'string', default: '' } }, labels: { sections: 'Sections' }, managed: [] } ] );
+assert.equal( plain.filter( ( c ) => c.name === 'TextControl' ).length, 1, 'a block without sectionChoices keeps the text field' );
 
 console.log( 'editor.test.js ok' );

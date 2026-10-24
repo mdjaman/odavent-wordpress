@@ -273,6 +273,57 @@
 		}
 	}
 
+	/**
+	 * The event page's `sections` attribute (a comma list, empty = every section) as one toggle per section.
+	 * Mirrors Event_Page::parse_sections(): unknown names are ignored and a list naming no known section
+	 * means every section. Writes the list in the order of the choices, and '' when every section is on.
+	 */
+	function sectionToggles( choices, meta, props ) {
+		var asked = {};
+		String( props.attributes.sections || '' ).split( ',' ).forEach( function ( part ) {
+			asked[ part.replace( /^\s+|\s+$/g, '' ).toLowerCase() ] = true;
+		} );
+
+		var enabled = choices.filter( function ( choice ) {
+			return asked[ choice.value ] === true;
+		} ).map( function ( choice ) {
+			return choice.value;
+		} );
+		if ( ! enabled.length ) {
+			enabled = choices.map( function ( choice ) {
+				return choice.value;
+			} );
+		}
+
+		var toggles = choices.map( function ( choice ) {
+			var on = enabled.indexOf( choice.value ) !== -1;
+			return field( 'ToggleControl', {
+				key: 'section-' + choice.value,
+				label: choice.label,
+				checked: on,
+				onChange: function ( checked ) {
+					var next = choices.filter( function ( other ) {
+						return other.value === choice.value ? !! checked : enabled.indexOf( other.value ) !== -1;
+					} ).map( function ( other ) {
+						return other.value;
+					} );
+					// An empty list would mean "every section": the last one stays on.
+					if ( ! next.length ) {
+						return;
+					}
+					props.setAttributes( { sections: next.length === choices.length ? '' : next.join( ',' ) } );
+				}
+			} );
+		} );
+
+		return el(
+			Fragment,
+			{ key: 'sections' },
+			el( 'p', { className: 'components-base-control__label' }, ( meta.labels && meta.labels.sections ) || 'sections' ),
+			toggles
+		);
+	}
+
 	function makeEdit( meta ) {
 		var managed = Array.isArray( meta.managed ) ? meta.managed : [ 'eventId', 'eventSlug', 'className' ];
 
@@ -282,6 +333,10 @@
 
 			Object.keys( meta.attributes || {} ).forEach( function ( name ) {
 				if ( managed.indexOf( name ) === -1 ) {
+					if ( name === 'sections' && Array.isArray( meta.sectionChoices ) && meta.sectionChoices.length ) {
+						settings.push( sectionToggles( meta.sectionChoices, meta, props ) );
+						return;
+					}
 					var control = attributeControl( name, meta.attributes[ name ] || {}, meta, props );
 					if ( control ) {
 						settings.push( control );

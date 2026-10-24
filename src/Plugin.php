@@ -77,6 +77,7 @@ final class Plugin {
 				// The stylesheet handle first: block.json names it as editorStyle.
 				$this->assets()->register_styles();
 				$this->blocks()->register();
+				$this->blocks()->register_patterns();
 			}
 		);
 

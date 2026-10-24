@@ -91,6 +91,9 @@ class Block_Registry {
 	/** @var bool */
 	private $metadata_added = false;
 
+	/** @var bool */
+	private $patterns_registered = false;
+
 	/** @var array<string, array|null> Decoded block.json per path (read once per request). */
 	private $json_cache = array();
 
@@ -236,6 +239,43 @@ class Block_Registry {
 	}
 
 	/**
+	 * `init`: the "Odavent" pattern category and the "Full event page" pattern, which holds the individual
+	 * blocks in the order of the event page. A no-op where WordPress has no block patterns. Once.
+	 */
+	public function register_patterns(): void {
+		if ( $this->patterns_registered ) {
+			return;
+		}
+		$this->patterns_registered = true;
+
+		if ( function_exists( 'register_block_pattern_category' ) ) {
+			register_block_pattern_category( self::CATEGORY, array( 'label' => __( 'Odavent', 'odavent-events' ) ) );
+		}
+
+		if ( ! function_exists( 'register_block_pattern' ) ) {
+			return;
+		}
+
+		$lines = array();
+		foreach ( Event_Page::DEFAULT_SECTIONS as $section ) {
+			$slug = array_search( Event_Page::SECTION_RENDERERS[ $section ], self::RENDERERS, true );
+			if ( is_string( $slug ) ) {
+				$lines[] = '<!-- wp:' . self::NAMESPACE_PREFIX . $slug . ' /-->';
+			}
+		}
+
+		register_block_pattern(
+			self::NAMESPACE_PREFIX . 'full-event-page',
+			array(
+				'title'       => __( 'Full event page', 'odavent-events' ),
+				'description' => __( 'Every Odavent block in the order of an event page: header, countdown, registration, tickets, speakers, agenda, sponsors, venue and calendar.', 'odavent-events' ),
+				'categories'  => array( self::CATEGORY ),
+				'content'     => implode( "\n", $lines ),
+			)
+		);
+	}
+
+	/**
 	 * What editor.js needs to register each block: name, title, description, icon, attributes, supports
 	 * and a translated label per attribute.
 	 *
@@ -260,7 +300,7 @@ class Block_Registry {
 			$title       = is_object( $registered ) && isset( $registered->title ) && is_string( $registered->title ) && '' !== $registered->title ? $registered->title : ( isset( $json['title'] ) && is_string( $json['title'] ) ? $json['title'] : $json['name'] );
 			$description = is_object( $registered ) && isset( $registered->description ) && is_string( $registered->description ) ? $registered->description : ( isset( $json['description'] ) && is_string( $json['description'] ) ? $json['description'] : '' );
 
-			$meta[] = array(
+			$row = array(
 				'name'        => $json['name'],
 				'title'       => $title,
 				'description' => $description,
@@ -271,6 +311,20 @@ class Block_Registry {
 				'labels'      => $labels,
 				'managed'     => self::EDITOR_MANAGED,
 			);
+
+			// The event page lists its sections as toggles: one choice per section, in page order.
+			if ( self::NAMESPACE_PREFIX . 'event-page' === $json['name'] ) {
+				$choices = array();
+				foreach ( Event_Page::section_labels() as $section => $label ) {
+					$choices[] = array(
+						'value' => $section,
+						'label' => $label,
+					);
+				}
+				$row['sectionChoices'] = $choices;
+			}
+
+			$meta[] = $row;
 		}
 
 		return $meta;

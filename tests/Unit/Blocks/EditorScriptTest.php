@@ -59,6 +59,13 @@ class EditorScriptTest extends TestCase {
 		$this->assertStringContainsString( "'slug:'", $this->js );
 	}
 
+	public function test_the_sections_attribute_is_rendered_from_the_section_choices(): void {
+		// Behaviour is covered by tests/js/editor.test.js; this pins the contract with Block_Registry.
+		$this->assertStringContainsString( 'meta.sectionChoices', $this->js );
+		$this->assertStringContainsString( "name === 'sections'", $this->js );
+		$this->assertStringContainsString( "sections: next.length === choices.length ? '' : next.join( ',' )", $this->js );
+	}
+
 	public function test_lint_js_runs_in_ci(): void {
 		$root = dirname( __DIR__, 3 );
 		$this->assertFileExists( $root . '/bin/lint-js' );

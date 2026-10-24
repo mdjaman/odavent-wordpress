@@ -495,6 +495,98 @@ class BlockRegistryTest extends BlockTestCase {
 		rmdir( $dir );
 	}
 
+	public function test_editor_metadata_lists_section_choices_for_the_event_page_only(): void {
+		$meta = $this->registry( null )->editor_metadata();
+
+		$by_name = array();
+		foreach ( $meta as $row ) {
+			$by_name[ $row['name'] ] = $row;
+		}
+
+		$expected = array();
+		foreach ( \Odavent\Events\Blocks\Renderers\Event_Page::section_labels() as $slug => $label ) {
+			$expected[] = array( 'value' => $slug, 'label' => $label );
+		}
+		$this->assertSame( \Odavent\Events\Blocks\Renderers\Event_Page::DEFAULT_SECTIONS, array_column( $expected, 'value' ), 'Choices follow the default order.' );
+		$this->assertSame( $expected, $by_name['odavent-events/event-page']['sectionChoices'] );
+
+		foreach ( $by_name as $name => $row ) {
+			if ( 'odavent-events/event-page' !== $name ) {
+				$this->assertArrayNotHasKey( 'sectionChoices', $row, $name );
+			}
+		}
+	}
+
+	public function test_pattern_registers_once_and_contains_every_individual_block(): void {
+		$categories = array();
+		$patterns   = array();
+		Functions\when( 'register_block_pattern_category' )->alias(
+			function ( $name, $args ) use ( &$categories ) {
+				$categories[] = array( $name, $args );
+				return true;
+			}
+		);
+		Functions\when( 'register_block_pattern' )->alias(
+			function ( $name, $args ) use ( &$patterns ) {
+				$patterns[] = array( $name, $args );
+				return true;
+			}
+		);
+
+		$registry = $this->registry( null );
+		$registry->register_patterns();
+		$registry->register_patterns();
+
+		$this->assertCount( 1, $categories );
+		$this->assertSame( 'odavent-events', $categories[0][0] );
+		$this->assertSame( 'Odavent', $categories[0][1]['label'] );
+
+		$this->assertCount( 1, $patterns );
+		$this->assertSame( 'odavent-events/full-event-page', $patterns[0][0] );
+		$this->assertSame( 'Full event page', $patterns[0][1]['title'] );
+		$this->assertSame( array( 'odavent-events' ), $patterns[0][1]['categories'] );
+
+		$expected = implode(
+			"\n",
+			array(
+				'<!-- wp:odavent-events/event-header /-->',
+				'<!-- wp:odavent-events/countdown /-->',
+				'<!-- wp:odavent-events/register-button /-->',
+				'<!-- wp:odavent-events/tickets /-->',
+				'<!-- wp:odavent-events/find-registration /-->',
+				'<!-- wp:odavent-events/speakers /-->',
+				'<!-- wp:odavent-events/agenda /-->',
+				'<!-- wp:odavent-events/sponsors /-->',
+				'<!-- wp:odavent-events/venue /-->',
+				'<!-- wp:odavent-events/add-to-calendar /-->',
+			)
+		);
+		$this->assertSame( $expected, $patterns[0][1]['content'] );
+
+		// Every name in the pattern is a block this plugin ships.
+		$names = array();
+		foreach ( glob( ODAVENT_EVENTS_DIR . 'blocks/*/block.json' ) as $file ) {
+			$names[] = json_decode( (string) file_get_contents( $file ), true )['name'];
+		}
+		preg_match_all( '#wp:(odavent-events/[a-z-]+) /-->#', $patterns[0][1]['content'], $found );
+		foreach ( $found[1] as $name ) {
+			$this->assertContains( $name, $names );
+		}
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_no_pattern_function_means_no_error(): void {
+		$this->assertFalse( function_exists( 'register_block_pattern' ) );
+		$this->assertFalse( function_exists( 'register_block_pattern_category' ) );
+
+		$this->registry( null )->register_patterns();
+
+		$this->addToAssertionCount( 1 );
+	}
+
 	public function test_the_block_category_is_added_once(): void {
 		$registry   = $this->registry( null );
 		$categories = $registry->add_category( array( array( 'slug' => 'text', 'title' => 'Text' ) ) );
