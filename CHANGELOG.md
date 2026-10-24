@@ -21,6 +21,7 @@ GitHub release (see "Releasing" in the README).
 
 - The sponsors block headed partners that are both sponsor and exhibitor with the raw word "Both"; the heading now reads "Sponsors and exhibitors" (translated).
 - On a combined event page the ended, paused or cancelled notice and the stale-data notice appear once, instead of being repeated by the header, Register and Tickets parts.
+- Deleting the plugin also removes the widgets' settings (`widget_odavent_events_*` options, which WordPress creates for every registered widget even when none is placed).
 
 ## [0.1.0] - 2026-10-23
 

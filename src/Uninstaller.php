@@ -53,6 +53,8 @@ final class Uninstaller {
 			// Single-site installs keep site transients (the update check) in the options table.
 			'_site_transient_odavent_events_',
 			'_site_transient_timeout_odavent_events_',
+			// The widgets' settings: WordPress saves widget_<id_base> for every registered widget, placed or not.
+			'widget_odavent_events_',
 		);
 
 		foreach ( $patterns as $prefix ) {
