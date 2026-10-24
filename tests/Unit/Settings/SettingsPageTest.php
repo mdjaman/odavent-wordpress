@@ -152,6 +152,7 @@ class SettingsPageTest extends TestCase {
 
 		$this->client = Mockery::mock( Client::class );
 		$this->repo   = Mockery::mock( Event_Repository::class );
+		$this->repo->shouldReceive( 'is_backing_off' )->andReturn( false )->byDefault();
 	}
 
 	// ---- helpers -----------------------------------------------------------------
@@ -255,6 +256,7 @@ class SettingsPageTest extends TestCase {
 	}
 
 	public function test_ensure_exists_is_hooked_on_admin_init_before_the_settings_api(): void {
+		$this->options = array();
 		$this->page()->register();
 
 		$ensure = null;
@@ -363,6 +365,48 @@ class SettingsPageTest extends TestCase {
 		$this->assertSame( array( 'odavent_events_base_url', 'odavent_events_site_key' ), $codes );
 	}
 
+	public function test_a_hand_made_post_cannot_store_a_key_while_the_constant_owns_it(): void {
+		$options           = new OptionsWithConstant();
+		$options->constant = self::CONSTANT;
+		$other             = 'odv_wp_HANDCRAFTED123456789';
+
+		$out = $this->page( $options )->sanitize( array( 'site_key' => $other, 'cache_ttl' => '1200' ) );
+
+		$this->assertSame( self::KEY, $out['site_key'], 'the stored key is untouched' );
+		$this->assertSame( 1200, $out['cache_ttl'], 'the other fields still save' );
+		$this->assertStringNotContainsString( $other, json_encode( $out ) );
+	}
+
+	public function test_the_key_is_still_saved_when_no_constant_is_defined(): void {
+		$other = 'odv_wp_NEWKEY1234567890';
+
+		$out = $this->page()->sanitize( array( 'site_key' => $other ) );
+
+		$this->assertSame( $other, $out['site_key'] );
+	}
+
+	public function test_changing_the_key_or_the_address_drops_the_cached_events_list(): void {
+		foreach ( array(
+			array( 'site_key' => 'odv_wp_NEWKEY1234567890' ),
+			array( 'base_url' => 'https://events.example.com' ),
+		) as $input ) {
+			$this->transients[ Event_Repository::LIST_TRANSIENT ] = array( 'old key events' );
+
+			$this->page()->sanitize( $input );
+
+			$this->assertArrayNotHasKey( Event_Repository::LIST_TRANSIENT, $this->transients, json_encode( $input ) );
+		}
+	}
+
+	public function test_saving_unchanged_connection_settings_keeps_the_cached_events_list(): void {
+		$this->transients[ Event_Repository::LIST_TRANSIENT ] = array( 'kept' );
+
+		$this->page()->sanitize( array( 'site_key' => self::KEY, 'base_url' => 'https://odavent.com', 'cache_ttl' => '1200' ) );
+		$this->page()->sanitize( array( 'site_key' => '', 'base_url' => 'ftp://rejected' ) );
+
+		$this->assertSame( array( 'kept' ), $this->transients[ Event_Repository::LIST_TRANSIENT ] );
+	}
+
 	public function test_sanitize_tolerates_a_non_array_input(): void {
 		$out = $this->page()->sanitize( 'garbage' );
 
@@ -433,6 +477,44 @@ class SettingsPageTest extends TestCase {
 		$this->assertArrayNotHasKey( Event_Repository::CONTRACT_NOTICE, $this->transients );
 		$this->assertArrayNotHasKey( Options::CONN_DISABLED_FLAG, $this->transients, 'a working key lifts the disabled flag' );
 		$this->assertSame( 1, $page->redirects );
+	}
+
+	public function test_test_connection_without_any_key_asks_for_one_and_makes_no_call(): void {
+		Functions\when( 'check_admin_referer' )->justReturn( 1 );
+		$this->options[ Options::OPTION ] = array();
+		$this->client->shouldReceive( 'list_events' )->never();
+
+		$page = $this->page();
+		$page->handle_test_connection();
+
+		$this->assertSame( 'error', $this->flash()['type'] );
+		$this->assertSame( 'Enter a site key first.', $this->flash()['message'] );
+		$this->assertNotSame( 'The site key was rejected.', $this->flash()['message'] );
+		$this->assertSame( 1, $page->redirects );
+	}
+
+	public function test_test_connection_with_a_malformed_constant_says_so(): void {
+		Functions\when( 'check_admin_referer' )->justReturn( 1 );
+		$options           = new OptionsWithConstant();
+		$options->constant = 'not-a-key';
+		$this->client->shouldReceive( 'list_events' )->never();
+
+		$this->page( $options )->handle_test_connection();
+
+		$this->assertStringContainsString( 'ODAVENT_SITE_KEY', $this->flash()['message'] );
+		$this->assertStringContainsString( 'not a valid site key', $this->flash()['message'] );
+	}
+
+	public function test_a_malformed_constant_gets_a_hint_on_the_page(): void {
+		$options           = new OptionsWithConstant();
+		$options->constant = 'not-a-key';
+		$this->client->shouldReceive( 'list_events' )->never();
+
+		$html = $this->render( $this->page( $options ) );
+
+		$this->assertStringContainsString( 'ODAVENT_SITE_KEY in wp-config.php is not a valid site key', $html );
+		$this->assertStringNotContainsString( 'not-a-key', $html );
+		$this->assertStringNotContainsString( 'A key is stored', $html );
 	}
 
 	public function test_invalid_key_message(): void {
@@ -557,6 +639,26 @@ class SettingsPageTest extends TestCase {
 
 		$this->assertStringNotContainsString( '<select', $html );
 		$this->assertStringNotContainsString( 'A key is stored', $html );
+	}
+
+	public function test_the_page_waits_at_most_three_seconds_for_the_events_list(): void {
+		$this->client->shouldReceive( 'list_events' )->once()->with( 3 )->andReturn( $this->events_result() );
+
+		$this->render( $this->page() );
+		$this->assertSame( 3, Settings_Page::LIST_TIMEOUT );
+	}
+
+	public function test_the_page_skips_the_events_list_while_odavent_is_backing_off(): void {
+		$this->repo = Mockery::mock( Event_Repository::class );
+		$this->repo->shouldReceive( 'is_backing_off' )->andReturn( true );
+		$this->options[ Options::OPTION ]['default_event_id'] = 42;
+		$this->client->shouldReceive( 'list_events' )->never();
+
+		$html = $this->render( $this->page() );
+
+		$this->assertStringNotContainsString( '<select', $html );
+		$this->assertMatchesRegularExpression( '/<input[^>]*type="number"[^>]*name="odavent_events_settings\[default_event_id\]"[^>]*value="42"/', $html );
+		$this->assertStringContainsString( 'name="odavent_events_settings[cache_ttl]"', $html, 'the page still renders the other fields' );
 	}
 
 	public function test_the_list_is_fetched_once_per_render(): void {

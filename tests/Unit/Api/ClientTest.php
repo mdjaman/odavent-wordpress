@@ -434,6 +434,26 @@ class ClientTest extends TestCase {
 		$this->assertSame( Client::MAX_BODY_BYTES + 1, $args['limit_response_size'] );
 	}
 
+	public function test_list_events_takes_a_shorter_timeout_but_never_a_longer_one(): void {
+		$this->respond( $this->http( 200, $this->envelope( array() ) ) );
+		$client = $this->client();
+
+		$client->list_events();
+		$this->assertSame( 8, $this->args()['timeout'] );
+
+		$client->list_events( 3 );
+		$this->assertSame( 3, $this->args()['timeout'] );
+
+		$client->list_events( 60 );
+		$this->assertSame( 8, $this->args()['timeout'], 'capped at the default' );
+
+		$client->list_events( 0 );
+		$this->assertSame( 1, $this->args()['timeout'], 'at least one second' );
+
+		$client->site_event( 1 );
+		$this->assertSame( 8, $this->args()['timeout'], 'other calls keep the default' );
+	}
+
 	public function test_every_method_uses_the_safe_args(): void {
 		$this->respond( $this->http( 200, $this->envelope( array() ) ) );
 		$client = $this->client();

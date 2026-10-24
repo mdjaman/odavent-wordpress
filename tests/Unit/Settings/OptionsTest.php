@@ -294,6 +294,7 @@ echo class_exists( "Odavent\\\\Events\\\\Settings\\\\Options" ) ? "nested-ok" : 
 	/* ---- ensure_exists ---- */
 
 	public function test_ensure_exists_creates_the_option_without_autoload(): void {
+		Functions\when( 'get_option' )->justReturn( false );
 		Functions\expect( 'add_option' )
 			->once()
 			->with( 'odavent_events_settings', array(), '', false );
@@ -306,7 +307,7 @@ echo class_exists( "Odavent\\\\Events\\\\Settings\\\\Options" ) ? "nested-ok" : 
 	public function test_ensure_exists_never_overwrites_an_existing_option(): void {
 		// add_option() is WordPress's create-if-missing; the only write ensure_exists() may use.
 		$this->stored( array( 'site_key' => self::KEY ) );
-		Functions\expect( 'add_option' )->once();
+		Functions\expect( 'add_option' )->never();
 		Functions\expect( 'update_option' )->never();
 		Functions\expect( 'delete_option' )->never();
 
@@ -494,6 +495,50 @@ echo class_exists( "Odavent\\\\Events\\\\Settings\\\\Options" ) ? "nested-ok" : 
 		$options           = new OptionsWithConstant();
 		$options->constant = 'odv_wp_CONSTANTKEY0987654321';
 		$this->assertTrue( $options->is_key_from_constant() );
+	}
+
+	public function test_ensure_exists_does_no_write_when_the_option_exists_even_if_empty(): void {
+		foreach ( array( array(), array( 'site_key' => self::KEY ), '', 0 ) as $stored ) {
+			Functions\when( 'get_option' )->justReturn( $stored );
+			Functions\expect( 'add_option' )->never();
+			Functions\expect( 'update_option' )->never();
+
+			( new Options() )->ensure_exists();
+		}
+		$this->addToAssertionCount( 1 );
+	}
+
+	public function test_a_sanitize_that_throws_does_not_leave_errors_silenced(): void {
+		$this->stored( array() );
+		$calls = 0;
+		Functions\when( 'add_settings_error' )->alias(
+			function () use ( &$calls ) {
+				++$calls;
+			}
+		);
+		$options = new Options();
+
+		// A silent pass dies half way (here: while building the message).
+		Functions\when( '__' )->alias(
+			static function () {
+				throw new \RuntimeException( 'translation failed' );
+			}
+		);
+		try {
+			$options->sanitize( array( 'base_url' => 'ftp://nope' ), array(), false );
+			$this->fail( 'the exception must propagate' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertSame( 'translation failed', $e->getMessage() );
+		}
+
+		// The flag itself is back on (a later add_error() outside sanitize() would otherwise be swallowed).
+		$flag = new \ReflectionProperty( Options::class, 'report_errors' );
+		$flag->setAccessible( true );
+		$this->assertTrue( $flag->getValue( $options ) );
+
+		Functions\when( '__' )->returnArg( 1 );
+		$options->sanitize( array( 'base_url' => 'ftp://nope' ), array() );
+		$this->assertSame( 1, $calls, 'the next pass reports its errors again' );
 	}
 
 	public function test_sanitize_can_run_silently_and_reports_again_afterwards(): void {

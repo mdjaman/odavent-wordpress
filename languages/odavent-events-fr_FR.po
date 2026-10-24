@@ -389,6 +389,10 @@ msgid_plural "Connected: %d events found."
 msgstr[0] "Connecté : %d événement trouvé."
 msgstr[1] "Connecté : %d événements trouvés."
 
+#: src/Settings/Settings_Page.php:142
+msgid "Enter a site key first."
+msgstr "Saisissez d’abord une clé de site."
+
 #: src/Settings/Settings_Page.php:136
 msgid "The site key was rejected."
 msgstr "La clé du site a été refusée."
@@ -445,6 +449,10 @@ msgstr "Votre offre Odavent n’inclut plus l’extension WordPress ; les évén
 #: src/Settings/Settings_Page.php:291
 msgid "Defined in wp-config.php"
 msgstr "Défini dans wp-config.php"
+
+#: src/Settings/Settings_Page.php:293
+msgid "ODAVENT_SITE_KEY in wp-config.php is not a valid site key (it starts with odv_wp_), so it is ignored."
+msgstr "ODAVENT_SITE_KEY dans wp-config.php n’est pas une clé de site valide (elle commence par odv_wp_) ; elle est donc ignorée."
 
 #: src/Settings/Settings_Page.php:288
 msgid "A key is stored"

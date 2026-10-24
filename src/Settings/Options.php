@@ -58,6 +58,11 @@ class Options {
 	 * add_option() does nothing when the option already exists.
 	 */
 	public function ensure_exists(): void {
+		// Runs on every admin request: one cached read in the common case, no write attempt.
+		if ( false !== get_option( self::OPTION, false ) ) {
+			return;
+		}
+
 		add_option( self::OPTION, array(), '', false );
 	}
 
@@ -156,6 +161,18 @@ class Options {
 	public function sanitize( array $input, array $current, bool $report_errors = true ): array {
 		$this->report_errors = $report_errors;
 
+		try {
+			return $this->sanitize_input( $input, $current );
+		} finally {
+			$this->report_errors = true;
+		}
+	}
+
+	/**
+	 * @param array $input   Raw submitted values.
+	 * @param array $current Currently stored settings.
+	 */
+	private function sanitize_input( array $input, array $current ): array {
 		$current = array_merge( self::defaults(), array_intersect_key( $current, self::defaults() ) );
 		$out     = $current;
 
@@ -189,8 +206,6 @@ class Options {
 
 		// Checkbox: absent means unchecked.
 		$out['load_css'] = ! empty( $input['load_css'] ) && '0' !== $input['load_css'] && 'false' !== $input['load_css'];
-
-		$this->report_errors = true;
 
 		return $out;
 	}

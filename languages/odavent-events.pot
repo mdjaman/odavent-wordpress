@@ -9,14 +9,14 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-23T23:21:21+00:00\n"
+"POT-Creation-Date: 2026-10-24T02:42:56+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: odavent-events\n"
 
 #. Plugin Name of the plugin
 #: odavent-events.php
-#: src/Settings/Settings_Page.php:193
+#: src/Settings/Settings_Page.php:220
 msgid "Odavent Events"
 msgstr ""
 
@@ -34,24 +34,24 @@ msgstr ""
 #. Author of the plugin
 #: odavent-events.php
 #: src/Blocks/Block_Registry.php:229
-#: src/Settings/Settings_Page.php:57
-#: src/Settings/Settings_Page.php:58
+#: src/Settings/Settings_Page.php:59
+#: src/Settings/Settings_Page.php:60
 msgid "Odavent"
 msgstr ""
 
-#: src/Api/Client.php:155
+#: src/Api/Client.php:164
 msgid "Odavent did not accept the site key."
 msgstr ""
 
-#: src/Api/Client.php:157
+#: src/Api/Client.php:166
 msgid "The Odavent plan for this site does not include the WordPress plugin."
 msgstr ""
 
-#: src/Api/Client.php:159
+#: src/Api/Client.php:168
 msgid "That event was not found on Odavent."
 msgstr ""
 
-#: src/Api/Client.php:161
+#: src/Api/Client.php:170
 msgid "Odavent is temporarily unavailable."
 msgstr ""
 
@@ -84,13 +84,13 @@ msgid "Link text"
 msgstr ""
 
 #: src/Blocks/Block_Registry.php:515
-#: assets/js/editor.js:159
-#: assets/js/editor.js:267
+#: assets/js/editor.js:190
+#: assets/js/editor.js:298
 msgid "Event"
 msgstr ""
 
 #: src/Blocks/Block_Registry.php:516
-#: assets/js/editor.js:149
+#: assets/js/editor.js:180
 msgid "Event slug"
 msgstr ""
 
@@ -338,137 +338,144 @@ msgstr ""
 msgid "Odavent could not be reached. Try again in a moment."
 msgstr ""
 
-#: src/Settings/Options.php:165
+#: src/Settings/Options.php:182
 msgid "The Odavent address must start with https:// (http://localhost is accepted on local development sites only)."
 msgstr ""
 
-#: src/Settings/Options.php:177
+#: src/Settings/Options.php:194
 msgid "That does not look like an Odavent site key. It starts with odv_wp_ followed by letters, digits, dashes or underscores."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:73
-#: assets/js/editor.js:268
+#: src/Settings/Settings_Page.php:75
+#: assets/js/editor.js:299
 msgid "Settings"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:89
+#: src/Settings/Settings_Page.php:94
 msgid "Connection"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:90
+#: src/Settings/Settings_Page.php:95
 msgid "Odavent URL"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:91
+#: src/Settings/Settings_Page.php:96
 msgid "Site key"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:92
+#: src/Settings/Settings_Page.php:97
 msgid "Default event"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:94
+#: src/Settings/Settings_Page.php:99
 msgid "Display and cache"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:95
+#: src/Settings/Settings_Page.php:100
 msgid "Cache lifetime"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:96
+#: src/Settings/Settings_Page.php:101
 msgid "Default styles"
 msgstr ""
 
+#: src/Settings/Settings_Page.php:142
+msgid "Enter a site key first."
+msgstr ""
+
 #. translators: %d: number of events.
-#: src/Settings/Settings_Page.php:131
+#: src/Settings/Settings_Page.php:158
 #, php-format
 msgid "Connected: %d event found."
 msgid_plural "Connected: %d events found."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Settings/Settings_Page.php:136
+#: src/Settings/Settings_Page.php:163
 msgid "The site key was rejected."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:141
+#: src/Settings/Settings_Page.php:168
 msgid "Could not reach Odavent. Check the URL and try again."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:151
+#: src/Settings/Settings_Page.php:178
 msgid "Cache cleared."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:161
+#: src/Settings/Settings_Page.php:188
 msgid "You do not have permission to do this."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:204
+#: src/Settings/Settings_Page.php:232
 msgid "Tools"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:205
+#: src/Settings/Settings_Page.php:233
 msgid "Test the connection with the saved settings, or clear everything this plugin has cached."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:206
+#: src/Settings/Settings_Page.php:234
 msgid "Test connection"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:207
+#: src/Settings/Settings_Page.php:235
 msgid "Clear cache"
 msgstr ""
 
 #. translators: %d: number of minutes.
-#: src/Settings/Settings_Page.php:236
+#: src/Settings/Settings_Page.php:264
 #, php-format
 msgid "Live updates need pretty permalinks; pages refresh every %d minute instead."
 msgid_plural "Live updates need pretty permalinks; pages refresh every %d minutes instead."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Settings/Settings_Page.php:252
+#: src/Settings/Settings_Page.php:280
 msgid "Your Odavent site key was rejected; check it below."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:256
+#: src/Settings/Settings_Page.php:284
 msgid "Odavent has a newer data format than this plugin supports; update the Odavent plugin."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:265
+#: src/Settings/Settings_Page.php:293
+msgid "ODAVENT_SITE_KEY in wp-config.php is not a valid site key (it starts with odv_wp_), so it is ignored."
+msgstr ""
+
+#: src/Settings/Settings_Page.php:297
 msgid "Your Odavent plan no longer includes the WordPress plugin; published events keep showing."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:288
-#: src/Settings/Settings_Page.php:291
+#: src/Settings/Settings_Page.php:320
 msgid "Defined in wp-config.php"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:288
+#: src/Settings/Settings_Page.php:320
 msgid "A key is stored"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:295
+#: src/Settings/Settings_Page.php:327
 msgid "Leave blank to keep the stored key. Find your site key in your Odavent organization settings."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:310
+#: src/Settings/Settings_Page.php:342
 msgid "Could not load your events from Odavent, so enter the event ID. 0 means none."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:315
+#: src/Settings/Settings_Page.php:347
 msgid "None"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:328
+#: src/Settings/Settings_Page.php:360
 msgid "Used by blocks and shortcodes that do not name an event."
 msgstr ""
 
-#: src/Settings/Settings_Page.php:339
+#: src/Settings/Settings_Page.php:371
 msgid "seconds (60 to 86400)"
 msgstr ""
 
-#: src/Settings/Settings_Page.php:347
+#: src/Settings/Settings_Page.php:379
 msgid "Load the default styles for Odavent blocks"
 msgstr ""
 
@@ -510,53 +517,53 @@ msgstr ""
 msgid "View on map"
 msgstr ""
 
-#: assets/js/editor.js:29
+#: assets/js/editor.js:60
 msgid "Draft"
 msgstr ""
 
-#: assets/js/editor.js:30
+#: assets/js/editor.js:61
 msgid "Published"
 msgstr ""
 
-#: assets/js/editor.js:31
+#: assets/js/editor.js:62
 msgid "Paused"
 msgstr ""
 
-#: assets/js/editor.js:32
+#: assets/js/editor.js:63
 msgid "Cancelled"
 msgstr ""
 
-#: assets/js/editor.js:33
+#: assets/js/editor.js:64
 msgid "Archived"
 msgstr ""
 
-#: assets/js/editor.js:85
+#: assets/js/editor.js:116
 msgid "The events could not be loaded."
 msgstr ""
 
-#: assets/js/editor.js:101
+#: assets/js/editor.js:132
 msgid "Default event (from the settings)"
 msgstr ""
 
 #. translators: 1: event name, 2: event status.
-#: assets/js/editor.js:114
+#: assets/js/editor.js:145
 #, js-format
 msgid "%1$s (%2$s)"
 msgstr ""
 
 #. translators: %d: event id.
-#: assets/js/editor.js:127
+#: assets/js/editor.js:158
 #, js-format
 msgid "Event #%d"
 msgstr ""
 
 #. translators: %s: event slug.
-#: assets/js/editor.js:138
+#: assets/js/editor.js:169
 #, js-format
 msgid "Event: %s"
 msgstr ""
 
-#: assets/js/editor.js:150
+#: assets/js/editor.js:181
 msgid "The last part of the event address on Odavent."
 msgstr ""
 

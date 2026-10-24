@@ -29,9 +29,11 @@ class Client {
 
 	/**
 	 * Every event of the key's organization, any status (key route).
+	 *
+	 * @param int $timeout Seconds to wait, at most TIMEOUT (the settings page uses a shorter wait).
 	 */
-	public function list_events(): Result {
-		return $this->key_request( '/site/events' );
+	public function list_events( int $timeout = self::TIMEOUT ): Result {
+		return $this->key_request( '/site/events', $timeout );
 	}
 
 	/**
@@ -67,19 +69,20 @@ class Client {
 		return $this->request( '/plugin-update', '' );
 	}
 
-	private function key_request( string $path ): Result {
+	private function key_request( string $path, int $timeout = self::TIMEOUT ): Result {
 		if ( ! $this->options->has_key() ) {
 			return Result::fail( Result::INVALID_KEY, 0, $this->message( Result::INVALID_KEY ) );
 		}
 
-		return $this->request( $path, $this->options->site_key() );
+		return $this->request( $path, $this->options->site_key(), $timeout );
 	}
 
 	/**
-	 * @param string $path Path below /api/v1/wordpress, with any query string.
-	 * @param string $key  Site key for the Authorization header, '' for a public route.
+	 * @param string $path    Path below /api/v1/wordpress, with any query string.
+	 * @param string $key     Site key for the Authorization header, '' for a public route.
+	 * @param int    $timeout Seconds to wait; clamped to 1..TIMEOUT.
 	 */
-	private function request( string $path, string $key ): Result {
+	private function request( string $path, string $key, int $timeout = self::TIMEOUT ): Result {
 		$headers = array(
 			'Accept'     => 'application/json',
 			'User-Agent' => 'Odavent-WP/' . ( defined( 'ODAVENT_EVENTS_VERSION' ) ? ODAVENT_EVENTS_VERSION : '0' ),
@@ -91,7 +94,7 @@ class Client {
 		$response = wp_remote_get(
 			$this->options->base_url() . self::API_PATH . $path,
 			array(
-				'timeout'             => self::TIMEOUT,
+				'timeout'             => max( 1, min( self::TIMEOUT, $timeout ) ),
 				'redirection'         => 0,
 				'sslverify'           => true,
 				'limit_response_size' => self::MAX_BODY_BYTES + 1,

@@ -20,6 +20,8 @@ class Settings_Page {
 	const ACTION_CLEAR  = 'odavent_events_clear_cache';
 	const FLASH_PREFIX  = 'odavent_events_notice_';
 	const FLASH_TTL     = 60;
+	/** Seconds the settings page waits for the events list: it must stay usable when Odavent is slow. */
+	const LIST_TIMEOUT  = 3;
 
 	/** @var Options */
 	private $options;
@@ -112,13 +114,35 @@ class Settings_Page {
 		$report          = ! $this->sanitized;
 		$this->sanitized = true;
 
-		return $this->options->sanitize( is_array( $input ) ? $input : array(), $this->options->get(), $report );
+		$input   = is_array( $input ) ? $input : array();
+		$current = $this->options->get();
+
+		// The wp-config.php constant owns the key: its field is disabled, so a submitted key is a hand-made POST.
+		if ( $this->options->is_key_from_constant() ) {
+			unset( $input['site_key'] );
+		}
+
+		$out = $this->options->sanitize( $input, $current, $report );
+
+		// Another key or address means another organization's events: drop the editor's cached list.
+		if ( $out['site_key'] !== $current['site_key'] || $out['base_url'] !== $current['base_url'] ) {
+			delete_transient( Event_Repository::LIST_TRANSIENT );
+		}
+
+		return $out;
 	}
 
 	// ---- admin-post handlers ------------------------------------------------------------------
 
 	public function handle_test_connection(): void {
 		$this->authorize( self::ACTION_TEST );
+
+		if ( ! $this->options->has_key() ) {
+			// No call: there is nothing to test, and "rejected" would blame a key that was never sent.
+			$this->flash( 'error', $this->options->is_key_from_constant() ? $this->malformed_constant_text() : __( 'Enter a site key first.', 'odavent-events' ) );
+			$this->redirect_back();
+			return;
+		}
 
 		$result = $this->client->list_events();
 
@@ -265,6 +289,10 @@ class Settings_Page {
 		echo '<div class="notice notice-' . esc_attr( $type ) . '"><p>' . esc_html( $message ) . '</p></div>';
 	}
 
+	private function malformed_constant_text(): string {
+		return __( 'ODAVENT_SITE_KEY in wp-config.php is not a valid site key (it starts with odv_wp_), so it is ignored.', 'odavent-events' );
+	}
+
 	private function plan_required_text(): string {
 		return __( 'Your Odavent plan no longer includes the WordPress plugin; published events keep showing.', 'odavent-events' );
 	}
@@ -292,7 +320,7 @@ class Settings_Page {
 			echo esc_html( $from_constant ? __( 'Defined in wp-config.php', 'odavent-events' ) : __( 'A key is stored', 'odavent-events' ) );
 			echo '</p>';
 		} elseif ( $from_constant ) {
-			echo '<p class="description">' . esc_html__( 'Defined in wp-config.php', 'odavent-events' ) . '</p>';
+			echo '<p class="description">' . esc_html( $this->malformed_constant_text() ) . '</p>';
 		}
 
 		if ( ! $from_constant ) {
@@ -357,12 +385,13 @@ class Settings_Page {
 	 * there is no usable key (no call is made) so the page never waits on Odavent for nothing.
 	 */
 	private function events_result(): ?Result {
-		if ( ! $this->options->has_key() || $this->options->is_connection_disabled() ) {
+		// Nothing to ask with, or Odavent is known to be failing right now: do not wait on it for a dropdown.
+		if ( ! $this->options->has_key() || $this->options->is_connection_disabled() || $this->repo->is_backing_off() ) {
 			return null;
 		}
 
 		if ( null === $this->events ) {
-			$this->events = $this->client->list_events();
+			$this->events = $this->client->list_events( self::LIST_TIMEOUT );
 		}
 
 		return $this->events;
