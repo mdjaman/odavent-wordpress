@@ -200,8 +200,9 @@ apply_filters( 'odavent_events_purge_all_on_widget', bool $purge, int $event_id 
 
 A widget is not post content and can show on any page, so while a sidebar holds Odavent content (one of
 the plugin's classic widgets, or an Odavent block or shortcode in a block, Text or Custom HTML widget) the plugin purges the whole-site page cache when a signed refresh arrives for `$event_id`
-(WP Rocket `rocket_clean_domain()`, else W3 Total Cache `w3tc_flush_all()`, else WP Super Cache
-`wp_cache_clear_cache()`, plus the `litespeed_purge_all` action and
+(WP Rocket `rocket_clean_domain()`, else W3 Total Cache `w3tc_flush_posts()` (its page cache only, not
+its object, database, minify or CDN caches), else WP Super Cache `wp_cache_clear_cache()` (this site only on
+a multisite network), plus the `litespeed_purge_all` action and
 [`odavent_events_purge_all`](#odavent_events_purge_all)). Default: `true`. Return `false` when the
 widgets sit in an area your cache never stores, or when you would rather purge by hand.
 
@@ -329,5 +330,6 @@ add_action( 'odavent_events_refreshed', function ( int $event_id, string $slug )
 For completeness, when an event changes the plugin calls these if they exist: `rocket_clean_post()`
 (WP Rocket), `w3tc_flush_post()` (W3 Total Cache), `wp_cache_post_change()` (WP Super Cache), and the
 `litespeed_purge_post` action (LiteSpeed Cache), each with the post ID, after `clean_post_cache()`. While an
-Odavent widget is active it also calls the first of `rocket_clean_domain()`, `w3tc_flush_all()` and
-`wp_cache_clear_cache()` that exists, and fires the `litespeed_purge_all` action.
+Odavent widget is active it also calls the first of `rocket_clean_domain()`, `w3tc_flush_posts()` and
+`wp_cache_clear_cache()` that exists (without arguments, except `wp_cache_clear_cache( get_current_blog_id() )`
+on a multisite network), and fires the `litespeed_purge_all` action.

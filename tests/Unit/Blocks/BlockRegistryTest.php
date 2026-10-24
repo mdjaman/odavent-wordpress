@@ -704,11 +704,7 @@ class BlockRegistryTest extends BlockTestCase {
 	// ---- widgets are not post content ------------------------------------------------------------
 
 	private function widget_active(): void {
-		Functions\when( 'is_active_widget' )->alias(
-			static function ( $callback, $widget_id, $id_base, $skip_inactive ) {
-				return false === $callback && false === $widget_id && true === $skip_inactive && 'odavent_events_speakers' === $id_base ? 'sidebar-1' : false;
-			}
-		);
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array( 'sidebar-1' => array( 'search-2', 'odavent_events_speakers-3' ) ) );
 	}
 
 	public function test_a_widget_makes_a_non_singular_page_count_as_odavent_content(): void {

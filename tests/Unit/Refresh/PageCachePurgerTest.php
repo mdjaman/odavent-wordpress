@@ -59,7 +59,6 @@ class PageCachePurgerTest extends TestCase {
 				'talk' => 'talk',
 			)
 		);
-		Functions\when( 'is_active_widget' )->justReturn( false );
 		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array() );
 		Functions\when( 'get_option' )->justReturn( array() );
 		Functions\when( 'clean_post_cache' )->alias(
@@ -169,13 +168,9 @@ class PageCachePurgerTest extends TestCase {
 
 	// ---- widgets are not post content: an active one needs the whole site purged ----------------
 
-	/** Which widget id bases the stub answers true for: all when true, none when false. */
+	/** An Odavent classic widget in a sidebar, or none. */
 	private function widgets_active( bool $active ): void {
-		Functions\when( 'is_active_widget' )->alias(
-			function ( $callback, $widget_id, $id_base, $skip_inactive ) use ( $active ) {
-				return $active && false === $callback && false === $widget_id && true === $skip_inactive && 0 === strpos( (string) $id_base, 'odavent_events_' ) ? 'sidebar-1' : false;
-			}
-		);
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array( 'sidebar-1' => $active ? array( 'search-2', 'odavent_events_countdown-2' ) : array( 'search-2' ) ) );
 	}
 
 	/**
@@ -194,7 +189,9 @@ class PageCachePurgerTest extends TestCase {
 	}
 
 	/**
-	 * Only the first plugin function that exists runs: W3TC's and WP Super Cache's are not called after WP Rocket's.
+	 * Only the first plugin function that exists runs: WP Super Cache's is not called after W3 Total Cache's.
+	 * W3 Total Cache flushes its page cache only (w3tc_flush_posts), never its object, database, minify or
+	 * CDN caches (w3tc_flush_all).
 	 *
 	 * @runInSeparateProcess
 	 * @preserveGlobalState disabled
@@ -203,10 +200,48 @@ class PageCachePurgerTest extends TestCase {
 		$this->widgets_active( true );
 		Functions\when( 'rocket_clean_post' )->justReturn( null );
 		$this->assertFalse( function_exists( 'rocket_clean_domain' ) );
-		Functions\expect( 'w3tc_flush_all' )->once();
+		Functions\expect( 'w3tc_flush_all' )->never();
+		Functions\expect( 'w3tc_flush_posts' )->once()->withNoArgs();
 		Functions\expect( 'wp_cache_clear_cache' )->never();
 
 		( new Page_Cache_Purger() )->purge_event( 7 );
+	}
+
+	/**
+	 * WP Super Cache on a multisite network: this site's cache only. With no argument wp_cache_clear_cache()
+	 * prunes every site of the network.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_wp_super_cache_clears_only_this_site_of_a_network(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		$this->assertFalse( function_exists( 'rocket_clean_domain' ) );
+		$this->assertFalse( function_exists( 'w3tc_flush_posts' ) );
+		Functions\when( 'is_multisite' )->justReturn( true );
+		Functions\when( 'get_current_blog_id' )->justReturn( 3 );
+		Functions\expect( 'wp_cache_clear_cache' )->once()->with( 3 );
+		Actions\expectDone( 'odavent_events_purge_all' )->once();
+
+		( new Page_Cache_Purger() )->purge_event( 7 );
+	}
+
+	/**
+	 * WP Super Cache on a single site: no argument (a blog id there would reach get_blog_option(), a
+	 * multisite-only function).
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_wp_super_cache_on_a_single_site_is_called_without_a_blog_id(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'is_multisite' )->justReturn( false );
+		Functions\when( 'get_current_blog_id' )->justReturn( 1 );
+		Functions\expect( 'wp_cache_clear_cache' )->once()->withNoArgs();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
 	}
 
 	public function test_the_filter_can_turn_the_whole_site_purge_off(): void {
@@ -293,8 +328,8 @@ class PageCachePurgerTest extends TestCase {
 		Functions\when( 'rocket_clean_post' )->justReturn( null );
 		Functions\when( 'w3tc_flush_post' )->justReturn( null );
 		Functions\when( 'wp_cache_post_change' )->justReturn( null );
-		Functions\expect( 'rocket_clean_domain' )->once();
-		Functions\expect( 'w3tc_flush_all' )->never();
+		Functions\expect( 'rocket_clean_domain' )->once()->withNoArgs();
+		Functions\expect( 'w3tc_flush_posts' )->never();
 		Functions\expect( 'wp_cache_clear_cache' )->never();
 
 		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );

@@ -55,7 +55,9 @@ A widget is not part of a post's content and can appear on every page. So when a
 Odavent (the event changed) and **an Odavent widget is active**, the plugin cannot know which pages show it
 and purges the **whole-site** page cache as well as the posts that contain Odavent blocks (WP Rocket,
 W3 Total Cache, WP Super Cache and LiteSpeed Cache are purged by the plugin itself, anything else through the
-[`odavent_events_purge_all`](hooks.md#odavent_events_purge_all) action).
+[`odavent_events_purge_all`](hooks.md#odavent_events_purge_all) action). Only page caches are emptied: W3
+Total Cache's object, database, minify and CDN caches are left alone, and on a multisite network WP Super
+Cache empties this site's pages only.
 
 "An Odavent widget is active" means any of:
 

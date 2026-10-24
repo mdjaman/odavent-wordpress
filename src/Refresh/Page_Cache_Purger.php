@@ -22,8 +22,14 @@ class Page_Cache_Purger {
 	/** Page-cache plugin functions taking a post id, called when present. */
 	const CACHE_FUNCTIONS = array( 'rocket_clean_post', 'w3tc_flush_post', 'wp_cache_post_change' );
 
-	/** Page-cache plugin functions that purge the whole site, no arguments: the first one that exists runs. */
-	const SITE_CACHE_FUNCTIONS = array( 'rocket_clean_domain', 'w3tc_flush_all', 'wp_cache_clear_cache' );
+	/**
+	 * Page-cache plugin functions that purge the whole site's pages: the first one that exists runs. W3 Total
+	 * Cache's w3tc_flush_posts() empties its page cache only (w3tc_flush_all() would also empty its object,
+	 * database, minify and CDN caches). All are called without arguments except WP Super Cache's
+	 * wp_cache_clear_cache() on a multisite network, which gets this site's id: without one it empties every
+	 * site of the network.
+	 */
+	const SITE_CACHE_FUNCTIONS = array( 'rocket_clean_domain', 'w3tc_flush_posts', 'wp_cache_clear_cache' );
 
 	/** @var int[]|null Post ids found in this request. */
 	private $post_ids = null;
@@ -88,7 +94,13 @@ class Page_Cache_Purger {
 
 		foreach ( self::SITE_CACHE_FUNCTIONS as $function ) {
 			if ( function_exists( $function ) ) {
-				call_user_func( $function );
+				if ( 'wp_cache_clear_cache' === $function && is_multisite() ) {
+					// On a single site it stays argument-less: a blog id there reaches get_blog_option(),
+					// which only exists on multisite.
+					call_user_func( $function, get_current_blog_id() );
+				} else {
+					call_user_func( $function );
+				}
 				break;
 			}
 		}

@@ -74,34 +74,47 @@ final class Widgets {
 		'custom_html' => array( 'widget_custom_html', 'content' ),
 	);
 
+	/** @var bool|null Remembered answer of any_active() for this request. */
+	private static $active = null;
+
 	/**
 	 * Whether Odavent content sits in a widget area: one of our classic widgets, or an Odavent block or
 	 * shortcode inside a block widget, a Text widget or a Custom HTML widget. A widget is not post content,
 	 * so the page cache purge, the preview no-cache headers and the early stylesheet ask this separately.
-	 * Inactive widgets do not count.
+	 * Inactive and orphaned widgets do not count. Worked out once per request, from one read of the
+	 * sidebars (the `sidebars_widgets` filter runs once).
 	 */
 	public static function any_active(): bool {
-		foreach ( self::id_bases() as $id_base ) {
-			if ( is_active_widget( false, false, $id_base, true ) ) {
-				return true;
-			}
+		if ( null === self::$active ) {
+			self::$active = self::find_active();
 		}
 
-		return self::content_in_widget_areas();
+		return self::$active;
 	}
 
 	/**
-	 * A plain string search of the (autoloaded) widget options for an Odavent block comment or shortcode,
-	 * restricted to the widgets placed in an active sidebar. Cheap and database-free on the front end; a
-	 * false positive (the text only mentions `[odavent_`) just costs an extra purge or no-cache, so this
-	 * stays simple. Malformed options and instances are ignored, never fatal.
+	 * Forgets the remembered any_active() answer.
+	 *
+	 * @internal For tests, which run many requests in one process.
 	 */
-	private static function content_in_widget_areas(): bool {
+	public static function reset(): void {
+		self::$active = null;
+	}
+
+	/**
+	 * One pass over the active sidebars: a classic Odavent widget answers at once; otherwise a plain string
+	 * search of the (autoloaded) options of the free-text widgets placed there, for an Odavent block comment
+	 * or shortcode. Cheap and database-free on the front end; a false positive (the text only mentions
+	 * `[odavent_`) just costs an extra purge or no-cache, so this stays simple. Malformed options and
+	 * instances are ignored, never fatal.
+	 */
+	private static function find_active(): bool {
 		$areas = wp_get_sidebars_widgets();
 		if ( ! is_array( $areas ) ) {
 			return false;
 		}
 
+		$ours   = array_flip( self::id_bases() );
 		$placed = array();
 		foreach ( $areas as $sidebar => $ids ) {
 			$sidebar = (string) $sidebar;
@@ -109,7 +122,14 @@ final class Widgets {
 				continue;
 			}
 			foreach ( $ids as $id ) {
-				if ( is_string( $id ) && 1 === preg_match( '/^([a-z_]+)-([0-9]+)$/D', $id, $m ) && isset( self::CONTENT_WIDGETS[ $m[1] ] ) ) {
+				if ( ! is_string( $id ) ) {
+					continue;
+				}
+				// The id base as WordPress reads it (_get_widget_id_base()): the id without its "-number".
+				if ( 0 === strpos( $id, self::ID_PREFIX ) && isset( $ours[ (string) preg_replace( '/-[0-9]+$/', '', $id ) ] ) ) {
+					return true;
+				}
+				if ( 1 === preg_match( '/^([a-z_]+)-([0-9]+)$/D', $id, $m ) && isset( self::CONTENT_WIDGETS[ $m[1] ] ) ) {
 					$placed[ $m[1] ][] = (int) $m[2];
 				}
 			}

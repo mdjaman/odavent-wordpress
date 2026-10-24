@@ -634,7 +634,7 @@ class WidgetsTest extends BlockTestCase {
 				'instance missing'      => array( 'sidebars' => array( 'sidebar-1' => array( 'block-3' ) ), 'block' => array( 9 => array( 'content' => '[odavent_x]' ) ) ),
 			) as $label => $case
 		) {
-			$this->sidebars( array( 'sidebar-1' => array() ) );
+			Widgets::reset();
 			Functions\when( 'wp_get_sidebars_widgets' )->justReturn( $case['sidebars'] );
 			WpStubs::$options['widget_block'] = $case['block'];
 
@@ -642,14 +642,60 @@ class WidgetsTest extends BlockTestCase {
 		}
 	}
 
-	public function test_the_classic_widget_check_wins_without_reading_the_content_options(): void {
-		Functions\when( 'is_active_widget' )->alias(
-			static function ( $callback, $widget_id, $id_base ) {
-				return 'odavent_events_speakers' === $id_base ? 'sidebar-1' : false;
-			}
-		);
-		Functions\expect( 'wp_get_sidebars_widgets' )->never();
+	public function test_a_classic_odavent_widget_counts_without_reading_the_content_options(): void {
+		$this->sidebars( array( 'sidebar-1' => array( 'search-2', 'odavent_events_speakers-4', 'block-3' ) ) );
+		Functions\expect( 'get_option' )->never();
 
 		$this->assertTrue( Widgets::any_active() );
+	}
+
+	public function test_every_block_has_a_classic_widget_that_counts_as_active(): void {
+		foreach ( Widgets::id_bases() as $id_base ) {
+			Widgets::reset();
+			$this->sidebars( array( 'footer-2' => array( $id_base . '-7' ) ) );
+			$this->assertTrue( Widgets::any_active(), $id_base );
+		}
+
+		Widgets::reset();
+		$this->sidebars( array( 'sidebar-1' => array( 'odavent_events_not_a_block-2', 'odavent_events-2', 'xodavent_events_speakers-2' ) ) );
+		$this->assertFalse( Widgets::any_active(), 'only the id bases of real blocks' );
+	}
+
+	public function test_a_classic_odavent_widget_in_an_inactive_or_orphaned_area_is_ignored(): void {
+		$this->sidebars(
+			array(
+				'wp_inactive_widgets' => array( 'odavent_events_speakers-2' ),
+				'orphaned_widgets_1'  => array( 'odavent_events_countdown-3' ),
+				'sidebar-1'           => array( 'search-2' ),
+			)
+		);
+
+		$this->assertFalse( Widgets::any_active() );
+	}
+
+	public function test_the_answer_is_worked_out_once_per_request(): void {
+		$asked = 0;
+		Functions\when( 'wp_get_sidebars_widgets' )->alias(
+			static function () use ( &$asked ) {
+				++$asked;
+				return array( 'sidebar-1' => array( 'block-3' ) );
+			}
+		);
+		WpStubs::$options['widget_block'] = array( 3 => array( 'content' => '<!-- wp:odavent-events/countdown /-->' ) );
+
+		$this->assertTrue( Widgets::any_active() );
+		WpStubs::$options['widget_block'] = array();
+		$this->assertTrue( Widgets::any_active(), 'remembered, not asked again' );
+		$this->assertTrue( Widgets::any_active() );
+		$this->assertSame( 1, $asked, 'one read of the sidebars per request' );
+	}
+
+	public function test_reset_forgets_the_remembered_answer(): void {
+		$this->sidebars( array( 'sidebar-1' => array( 'odavent_events_tickets-2' ) ) );
+		$this->assertTrue( Widgets::any_active() );
+
+		$this->sidebars( array( 'sidebar-1' => array() ) );
+		Widgets::reset();
+		$this->assertFalse( Widgets::any_active() );
 	}
 }
