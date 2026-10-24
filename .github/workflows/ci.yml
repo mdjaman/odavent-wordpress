@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -42,3 +46,89 @@ jobs:
 
       - name: JS tests (plain node)
         run: bin/test-js
+
+  # The smoke and browser tests need Docker and take minutes, so on pull requests they run only when
+  # runtime code or the dev environment changed. Push to main and manual runs always run them.
+  changes:
+    name: Runtime files changed?
+    runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.diff.outputs.runtime }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "runtime=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Eq '^(src|blocks|assets|templates|docker|bin)/'; then
+            echo "runtime=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "runtime=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # End-to-end on a real WordPress against the stub Odavent API (bin/dev-up + bin/smoke.sh, see
+  # docs/development.md). Non-blocking for the first release while its runtime and stability are measured.
+  smoke:
+    name: Smoke (WordPress ${{ matrix.wp.label }})
+    needs: changes
+    if: needs.changes.outputs.runtime == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        wp:
+          - { label: latest, image: 'wordpress:php8.3-apache' }
+          - { label: '6.1-php7.4', image: 'wordpress:6.1-php7.4-apache' }
+    env:
+      WP_IMAGE: ${{ matrix.wp.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start WordPress, the stub Odavent API and WP-CLI
+        run: bin/dev-up
+      - name: Smoke test
+        run: bin/smoke.sh
+      - name: Logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker/docker-compose.yml logs --tail 200
+          bin/wp eval 'echo @file_get_contents( WP_CONTENT_DIR . "/debug.log" );' || true
+      - name: Stop
+        if: always()
+        run: bin/dev-down
+
+  e2e:
+    name: Browser e2e (WordPress ${{ matrix.wp.label }})
+    needs: changes
+    if: needs.changes.outputs.runtime == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        wp:
+          - { label: latest, image: 'wordpress:php8.3-apache' }
+          - { label: '6.1-php7.4', image: 'wordpress:6.1-php7.4-apache' }
+    env:
+      WP_IMAGE: ${{ matrix.wp.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start WordPress, the stub Odavent API and WP-CLI
+        run: bin/dev-up
+      - name: Playwright
+        run: bin/e2e
+      - name: Keep screenshots and traces (workflow artifact, not a release)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.wp.label }}
+          path: tests/e2e/artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Stop
+        if: always()
+        run: bin/dev-down
