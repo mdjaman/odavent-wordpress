@@ -64,13 +64,13 @@ const LOCAL = /^https?:\/\/(localhost:8089|127\.0\.0\.1(:\d+)?)(\/|$)/;
  */
 async function preparePage( page ) {
 	const errors = collectErrors( page );
-	// wp-admin's avatars come from Gravatar: answered locally too, so no test needs the network.
-	await page.route( /^https:\/\/(odavent\.com\/storage|secure\.gravatar\.com\/avatar)\//, ( route ) =>
+	// wp-admin's avatars come from Gravatar (secure.gravatar.com, or 0-2.gravatar.com on 6.1): answered locally too, so no test needs the network.
+	await page.route( /^https?:\/\/(odavent\.com\/storage|(secure|[0-9])\.gravatar\.com\/avatar)\//, ( route ) =>
 		route.fulfill( { status: 200, contentType: 'image/svg+xml', body: PLACEHOLDER_SVG } )
 	);
 	page.on( 'request', ( request ) => {
 		const url = request.url();
-		if ( ! LOCAL.test( url ) && ! /^(data|blob|about):/.test( url ) && ! /^https:\/\/(odavent\.com\/storage|secure\.gravatar\.com\/avatar)\//.test( url ) ) {
+		if ( ! LOCAL.test( url ) && ! /^(data|blob|about):/.test( url ) && ! /^https?:\/\/(odavent\.com\/storage|(secure|[0-9])\.gravatar\.com\/avatar)\//.test( url ) ) {
 			errors.external.push( url );
 		}
 	} );
@@ -84,7 +84,7 @@ const KNOWN_CORE_NOISE = [
 	/^Download the React DevTools for a better development experience/,
 	// jQuery Migrate's banner on wp-admin pages (core loads it; WordPress 6.1).
 	/^JQMIGRATE: Migrate is installed, version \d/,
-	// WordPress 6.9/7.x editor: core's own global-styles inline style copied into the iframed canvas.
+	// WordPress 7.1 editor: core's own global-styles inline style copied into the iframed canvas.
 	/^global-styles-css-custom-properties-inline-css was added to the iframe incorrectly\. Please use block\.json or enqueue_block_assets to add styles to the iframe\./,
 ];
 
