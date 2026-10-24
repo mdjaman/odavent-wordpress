@@ -88,14 +88,26 @@ stub_requests() { stub_get /__log | grep -c . || true; }
 # PHP warnings/notices/fatals in a debug.log since a byte offset. Prints them; succeeds when there are none.
 LOG_PATH="/var/www/html/wp-content/debug.log"
 log_size() { wp_exec sh -c "if [ -f '$1' ]; then wc -c < '$1'; else echo 0; fi" | tr -d ' \r'; }
-log_clean_since() { # log_clean_since <path> <offset>
+log_clean_since() { # log_clean_since <path> <offset>; a missing log FAILS (logging must have been proven by log_canary)
 	local lines
+	if ! wp_exec test -f "$1"; then
+		printf '     log: %s does not exist: is WP_DEBUG_LOG on?\n' "$1" >&2
+		return 1
+	fi
 	lines=$(wp_exec sh -c "[ -f '$1' ] && tail -c +$(( $2 + 1 )) '$1' || true" | grep -E 'PHP (Warning|Notice|Deprecated|Fatal|Parse|Recoverable)|Odavent Events:' || true)
 	if [ -n "$lines" ]; then
 		printf '%s\n' "$lines" | head -20 | sed 's/^/     log: /' >&2
 		return 1
 	fi
 	return 0
+}
+
+# Proves the log works: a unique line written through PHP's error_log() in WordPress must reach the file.
+# Without this, every "no PHP warnings" check would pass on a site whose logging is silently broken.
+log_canary() { # log_canary <wp-cli function: wp_cli|wp_pkg> <path>
+	local tag="odv-canary-$$-$RANDOM$RANDOM"
+	"$1" eval "error_log( '$tag' );" >/dev/null 2>&1
+	wp_exec grep -q "$tag" "$2"
 }
 
 COOKIES="$TMP/cookies"
@@ -118,6 +130,7 @@ ping() { # ping <site url> <out file> [signature header value]: echoes the HTTP 
 started=$(date +%s)
 log "Smoke test on $ODV_SITE ($(wp_cli core version), PHP $(wp_exec php -r 'echo PHP_VERSION;'))"
 
+check "0 setup: PHP errors reach debug.log (canary written through error_log() is found)" log_canary wp_cli "$LOG_PATH"
 check "0 setup: debug.log has no PHP warnings after install and activation" log_clean_since "$LOG_PATH" 0
 LOG_START=$(log_size "$LOG_PATH")
 reset_all
@@ -497,19 +510,27 @@ if want 13 || want 12; then
 		label=$(html links <"$TMP/fr.html" | jq -r '[.[] | select(.class == "odv-register__button")][0].text // ""')
 		check "13 [zip, fr_FR] the Register button reads S'inscrire (got '$label')" \
 			bash -c "case \"\$1\" in \"S'inscrire\"|\"S’inscrire\") exit 0;; *) exit 1;; esac" _ "$label"
-		check "13 [zip, fr_FR] the notice is translated" contains fr.html "Odavent"
+		check "13 [zip, fr_FR] the secure-payment notice is in French (from the shipped .mo)" \
+			contains fr.html "L’inscription et le paiement sont gérés en toute sécurité par Odavent."
 		check "13 [zip, fr_FR] event content is requested in French (?locale=fr)" contains fr.html "(fr)"
+		check "13 PHP errors reach the packaged site's debug.log (canary)" log_canary wp_pkg "$PKG_PATH/wp-content/debug.log"
 		check "13 no PHP warnings in the packaged site's debug.log" log_clean_since "$PKG_PATH/wp-content/debug.log" 0
 
 		# ---- 12. uninstall, the way the Plugins screen does it (deactivate, then delete_plugins()) -------
 		wp_pkg transient set odavent_events_probe 1 3600 >/dev/null
 		wp_pkg eval 'set_site_transient( "odavent_events_update", array( "failed" => true ), 3600 );' >/dev/null
-		before=$(wp_pkg option list --search='*odavent_events*' --format=count)
+		before=$(wp_pkg option list --search='*odavent_events*' --format=count) || before=error
+		check "12 precondition: the plugin's options and transients exist before uninstalling ($before)" \
+			bash -c "[ '$before' != error ] && [ '$before' -gt 0 ]"
 		wp_pkg plugin deactivate odavent-events >/dev/null
 		wp_pkg eval 'require_once ABSPATH . "wp-admin/includes/plugin.php"; require_once ABSPATH . "wp-admin/includes/file.php"; $r = delete_plugins( array( "odavent-events/odavent-events.php" ) ); echo true === $r ? "deleted" : "failed";' >"$TMP/delete.txt"
 		check "12 delete_plugins() removed the plugin ($(cat "$TMP/delete.txt"))" grep -qx deleted "$TMP/delete.txt"
-		left=$(wp_pkg option list --search='*odavent_events*' --fields=option_name --format=csv | tail -n +2 | tr '\n' ' ')
-		check "12 uninstall leaves no odavent_events options or transients (had $before, left: '${left}')" [ -z "$left" ]
+		if left=$(wp_pkg option list --search='*odavent_events*' --fields=option_name --format=csv); then
+			left=$(printf '%s\n' "$left" | tail -n +2 | tr '\n' ' ' | sed 's/ *$//')
+			check "12 uninstall leaves no odavent_events options or transients (had $before, left: '${left}')" [ -z "$left" ]
+		else
+			fail "12 uninstall leaves no odavent_events options or transients" "wp option list failed"
+		fi
 		check "12 the dev tree is untouched" test -f "$ODV_ROOT/odavent-events.php"
 	fi
 	check "13 no PHP warnings in the dev site's debug.log meanwhile" log_clean_since "$LOG_PATH" "$off"
