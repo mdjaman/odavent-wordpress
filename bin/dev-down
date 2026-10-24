@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Stops the dev stack and removes its containers and volumes (only the odavent-wp-dev project's).
+# Usage: bin/dev-down
+set -euo pipefail
+# shellcheck source=lib/dev.sh
+. "$(dirname "$0")/lib/dev.sh"
+
+dc down --volumes --remove-orphans --timeout 5

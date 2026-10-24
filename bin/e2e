@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Browser tests (Playwright) against the dev stack started by bin/dev-up.
+# Runs mcr.microsoft.com/playwright (same version as tests/e2e/package.json) in the network namespace of the
+# WordPress container, installs @playwright/test inside the container (nothing is installed in the repo), and
+# writes screenshots and results to tests/e2e/artifacts/ (git-ignored).
+#
+# Usage: bin/e2e [playwright test arguments]     e.g. bin/e2e specs/frontend.spec.js
+set -euo pipefail
+# shellcheck source=lib/dev.sh
+. "$(dirname "$0")/lib/dev.sh"
+
+version=$(sed -n 's/.*"@playwright\/test": *"\([0-9.]*\)".*/\1/p' "$ODV_ROOT/tests/e2e/package.json")
+image="mcr.microsoft.com/playwright:v${version}-noble"
+container=$(dc ps -q wordpress)
+if [ -z "$container" ]; then
+	log "The dev stack is not running: run bin/dev-up first."
+	exit 1
+fi
+
+mkdir -p "$ODV_ROOT/tests/e2e/artifacts"
+log "Playwright $version on $ODV_SITE (WordPress $(wp_cli core version))"
+
+# node_modules is an anonymous volume: installed per run, removed with the container (--rm).
+docker run --rm --init --ipc=host \
+	--network "container:$container" \
+	-e BASE_URL="$ODV_SITE" -e CI="${CI:-}" \
+	-v "$ODV_ROOT/tests/e2e:/e2e" -v /e2e/node_modules \
+	-w /e2e "$image" \
+	sh -c 'npm install --no-audit --no-fund --package-lock=false --loglevel=error >/dev/null && npx playwright test "$@"' sh "$@"

@@ -1,0 +1,12 @@
+{
+  "name": "odavent-events-e2e",
+  "private": true,
+  "description": "Browser tests of the plugin on the dev stack. Installed and run inside the Playwright image by bin/e2e; nothing here is shipped.",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

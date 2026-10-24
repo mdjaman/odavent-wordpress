@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# WP-CLI against the dev stack started by bin/dev-up. Usage: bin/wp option get odavent_events_settings
+set -euo pipefail
+# shellcheck source=lib/dev.sh
+. "$(dirname "$0")/lib/dev.sh"
+
+wp_cli "$@"
