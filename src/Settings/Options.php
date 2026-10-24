@@ -31,6 +31,7 @@ class Options {
 			'cache_ttl'        => 900,
 			'default_event_id' => 0,
 			'load_css'         => true,
+			'appearance'       => Appearance::DEFAULTS,
 		);
 	}
 
@@ -47,7 +48,10 @@ class Options {
 			return $defaults;
 		}
 
-		return array_merge( $defaults, array_intersect_key( $stored, $defaults ) );
+		$settings               = array_merge( $defaults, array_intersect_key( $stored, $defaults ) );
+		$settings['appearance'] = Appearance::sanitize( $settings['appearance'] );
+
+		return $settings;
 	}
 
 	/**
@@ -149,6 +153,13 @@ class Options {
 	}
 
 	/**
+	 * The validated Appearance values (every key present, '' meaning "not changed").
+	 */
+	public function appearance(): array {
+		return Appearance::sanitize( $this->get()['appearance'] );
+	}
+
+	/**
 	 * Validates submitted settings and returns the full sanitized array.
 	 *
 	 * Invalid base URLs and keys are rejected (the current value is kept) with a settings error.
@@ -173,8 +184,9 @@ class Options {
 	 * @param array $current Currently stored settings.
 	 */
 	private function sanitize_input( array $input, array $current ): array {
-		$current = array_merge( self::defaults(), array_intersect_key( $current, self::defaults() ) );
-		$out     = $current;
+		$current               = array_merge( self::defaults(), array_intersect_key( $current, self::defaults() ) );
+		$current['appearance'] = Appearance::sanitize( $current['appearance'] );
+		$out                   = $current;
 
 		if ( array_key_exists( 'base_url', $input ) ) {
 			$url = $this->normalize_base_url( $input['base_url'] );
@@ -202,6 +214,11 @@ class Options {
 
 		if ( array_key_exists( 'default_event_id', $input ) && is_numeric( $input['default_event_id'] ) ) {
 			$out['default_event_id'] = max( 0, (int) $input['default_event_id'] );
+		}
+
+		// Absent (or not a list) keeps what is stored; a submitted list is validated field by field.
+		if ( isset( $input['appearance'] ) && is_array( $input['appearance'] ) ) {
+			$out['appearance'] = Appearance::sanitize( $input['appearance'] );
 		}
 
 		// Checkbox: absent means unchecked.

@@ -8,6 +8,7 @@ Put the code in a small must-use plugin or your child theme's `functions.php`.
 | Hook | Type | Purpose |
 |---|---|---|
 | [`odavent_events_allowed_html`](#odavent_events_allowed_html) | filter | Tags and attributes kept in organizer-written text. |
+| [`odavent_events_appearance_css`](#odavent_events_appearance_css) | filter | The CSS generated from the Appearance settings. |
 | [`odavent_events_locale`](#odavent_events_locale) | filter | Language requested from Odavent. |
 | [`odavent_events_now`](#odavent_events_now) | filter | The current time used by the countdown. |
 | [`odavent_events_page_has_content`](#odavent_events_page_has_content) | filter | Whether a page uses Odavent content (early stylesheet, no page cache for editors). |
@@ -47,6 +48,29 @@ add_filter( 'odavent_events_allowed_html', function ( array $allowed ): array {
 
 	return $allowed;
 } );
+```
+
+### `odavent_events_appearance_css`
+
+```php
+apply_filters( 'odavent_events_appearance_css', string $css, array $appearance ): string
+```
+
+The final CSS generated from the Appearance settings, added after the plugin's stylesheet (so it only exists
+while "Load default styles" is on). `$appearance` holds the validated values (`accent`, `contrast`, `text`,
+`border`, `radius`, `spacing`, `button_style`; an empty string means the organizer did not change it).
+The filter is not applied while nothing is changed (`$css` would be empty). A return value that is not a
+string is ignored. You are responsible for anything you add: the plugin only guarantees its own output
+contains hex colours, integers with `px` or `rem`, and fixed keywords.
+
+The settings write custom properties on `:root`, so CSS of your own that is declared closer (on a wrapper)
+or later still wins; the plugin never uses `!important` here.
+
+```php
+add_filter( 'odavent_events_appearance_css', function ( string $css, array $appearance ): string {
+	// Keep the chosen accent, but square off the buttons on this site.
+	return $css . '.odv-register .odv-register__button{border-radius:0}';
+}, 10, 2 );
 ```
 
 ### `odavent_events_locale`

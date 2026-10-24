@@ -124,6 +124,7 @@ abstract class BlockTestCase extends RenderTestCase {
 		$options = Mockery::mock( Options::class );
 		$options->shouldReceive( 'default_event_id' )->andReturn( $default_event );
 		$options->shouldReceive( 'load_css' )->andReturn( $load_css );
+		$options->shouldReceive( 'appearance' )->andReturn( \Odavent\Events\Settings\Appearance::DEFAULTS );
 
 		return $options;
 	}
