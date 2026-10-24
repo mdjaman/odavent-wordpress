@@ -78,7 +78,8 @@ test( 'countdown to a start one hour ahead ticks and never shows NaN', async ( {
 } );
 
 test( 'a paused event: the countdown hides itself once the start has passed', async ( { page, baseURL } ) => {
-	await stub( { status: { 1: 'paused' }, starts_in: { 1: 6 } } );
+	// 15 s ahead: enough for the ping, the page load and the 'visible before the start' checks on a slow runner.
+	await stub( { status: { 1: 'paused' }, starts_in: { 1: 15 } } );
 	await refresh( baseURL, 1 );
 	const errors = await preparePage( page );
 	await page.goto( '/all-blocks-1/' );
@@ -88,7 +89,7 @@ test( 'a paused event: the countdown hides itself once the start has passed', as
 	await expect( countdown ).toBeVisible();
 	await expect( page.locator( '.odv-notice' ).first() ).toContainText( 'Registration is temporarily closed.' );
 
-	await expect( countdown ).toHaveAttribute( 'hidden', '', { timeout: 12000 } );
+	await expect( countdown ).toHaveAttribute( 'hidden', '', { timeout: 25000 } );
 	await expect( countdown ).toBeHidden();
 	await expect( countdown ).not.toContainText( 'Live now' );
 	await page.waitForTimeout( 2000 );
