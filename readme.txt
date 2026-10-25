@@ -88,15 +88,10 @@ No. Registration, payment and the attendee list stay on Odavent.
 
 == Changelog ==
 
-= Unreleased =
-* New: the Event page block, shortcode and widget, and the "Full event page" block pattern.
-* New: classic widgets for every block.
-* New: Appearance settings (colours, corner radius, spacing, button style) with a live preview.
-* New: a picture that cannot load no longer shows a broken-image icon.
-* Fixed: partners that are both sponsor and exhibitor were headed "Both"; the heading is now "Sponsors and exhibitors". Notices are no longer repeated on combined pages.
-
 = 0.1.0 =
-* First release: ten blocks and shortcodes (event header, register button, tickets, find my registration, speakers, agenda, sponsors, countdown, venue, add to calendar).
+* First release: ten blocks, shortcodes and widgets (event header, register button, tickets, find my registration, speakers, agenda, sponsors, countdown, venue, add to calendar) plus an Event page that shows the whole event page from one piece, with a "Full event page" block pattern.
+* Appearance settings (colours, corner radius, spacing, button style) with a live preview and a contrast warning.
 * Live refresh from Odavent, page-cache purging, draft previews in the block editor and a settings page with connection test.
+* A picture that cannot load no longer shows a broken-image icon.
 * English and French translations.
 * Updates through the normal WordPress update screen.
