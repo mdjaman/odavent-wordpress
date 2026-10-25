@@ -5,6 +5,7 @@ use Odavent\Events\Blocks\Renderers\Add_To_Calendar;
 use Odavent\Events\Blocks\Renderers\Agenda;
 use Odavent\Events\Blocks\Renderers\Countdown;
 use Odavent\Events\Blocks\Renderers\Event_Header;
+use Odavent\Events\Blocks\Renderers\Event_Page;
 use Odavent\Events\Blocks\Renderers\Find_Registration;
 use Odavent\Events\Blocks\Renderers\Register_Button;
 use Odavent\Events\Blocks\Renderers\Speakers;
@@ -15,6 +16,7 @@ use Odavent\Events\Data\Event_Repository;
 use Odavent\Events\Data\Event_View;
 use Odavent\Events\Render\Assets;
 use Odavent\Events\Settings\Options;
+use Odavent\Events\Widgets\Widgets;
 
 /**
  * The Odavent blocks: registration with WordPress, the editor script, and the single render path that
@@ -22,8 +24,8 @@ use Odavent\Events\Settings\Options;
  *
  * render_block() decides everything around a block: which event (attribute id, then slug, then the
  * default event), whether there is anything to show (visitors get nothing for a deleted, unreachable or
- * draft event; editors get a notice), the lifecycle notice above the header and Register blocks, the
- * stylesheet, and that no error ever reaches the page.
+ * draft event; editors get a notice), the lifecycle notice above the header, Register and event page
+ * blocks, the stylesheet and scripts, and that no error ever reaches the page.
  */
 class Block_Registry {
 
@@ -32,8 +34,8 @@ class Block_Registry {
 	const EDITOR_HANDLE    = 'odavent-events-editor';
 	const EDITOR_DEPS      = array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-server-side-render', 'wp-api-fetch', 'wp-i18n' );
 
-	/** Blocks that carry the lifecycle notice (ended, paused, cancelled, draft preview). */
-	const NOTICE_BLOCKS = array( 'event-header', 'register-button' );
+	/** Blocks that carry the lifecycle notice (ended, paused, cancelled, draft preview); the event page once, above all its sections. */
+	const NOTICE_BLOCKS = array( 'event-header', 'register-button', 'event-page' );
 
 	/** Attributes the editor handles itself (event picker, core class name field). */
 	const EDITOR_MANAGED = array( 'eventId', 'eventSlug', 'className', 'lock', 'metadata' );
@@ -54,18 +56,20 @@ class Block_Registry {
 		'countdown'         => Countdown::class,
 		'venue'             => Venue::class,
 		'add-to-calendar'   => Add_To_Calendar::class,
+		'event-page'        => Event_Page::class,
 	);
 
 	/**
-	 * Browser scripts a block needs, by block slug => [script handle, marker that must be in the HTML].
-	 * The script is enqueued only when the rendered block contains the marker (the agenda needs its script
-	 * only when it shows filter buttons).
+	 * Browser scripts, by the block slug that introduced them => [script handle, marker that must be in the
+	 * HTML]. A script is enqueued when any rendered block contains its marker (the agenda needs its script
+	 * only when it shows filter buttons; an event page needs the scripts of the sections it shows).
 	 *
 	 * @var array<string, array{0: string, 1: string}>
 	 */
 	private const SCRIPTS = array(
 		'countdown' => array( 'countdown', 'odv-countdown' ),
 		'agenda'    => array( 'agenda-filter', 'odv-agenda__filters' ),
+		'images'    => array( 'image-fallback', 'data-odv-img' ),
 	);
 
 	/** @var Event_Repository */
@@ -88,6 +92,9 @@ class Block_Registry {
 
 	/** @var bool */
 	private $metadata_added = false;
+
+	/** @var bool */
+	private $patterns_registered = false;
 
 	/** @var array<string, array|null> Decoded block.json per path (read once per request). */
 	private $json_cache = array();
@@ -115,6 +122,15 @@ class Block_Registry {
 	}
 
 	/**
+	 * The block slugs, without an instance (widget id bases are derived from them).
+	 *
+	 * @return string[]
+	 */
+	public static function slugs(): array {
+		return array_keys( self::RENDERERS );
+	}
+
+	/**
 	 * The attribute schema of a block (name => definition with `type` and `default`) from its block.json,
 	 * so shortcodes and docs derive from the same file the editor uses. Empty for an unknown slug.
 	 *
@@ -137,6 +153,35 @@ class Block_Registry {
 		}
 
 		return $clean;
+	}
+
+	/**
+	 * The block's title for people: the registered block type's (WordPress translated it from block.json),
+	 * else the block.json title translated the way WordPress does it (`block title` context), else the slug.
+	 *
+	 * @param string $slug Block slug.
+	 */
+	public function block_title( string $slug ): string {
+		return $this->block_text( $slug, 'title', 'block title', $slug );
+	}
+
+	/**
+	 * The block's description, found the same way as block_title(); '' when it has none.
+	 *
+	 * @param string $slug Block slug.
+	 */
+	public function block_description( string $slug ): string {
+		return $this->block_text( $slug, 'description', 'block description', '' );
+	}
+
+	/**
+	 * The translated label the editor shows for one attribute of a block (widgets reuse it).
+	 *
+	 * @param string $slug      Block slug.
+	 * @param string $attribute Attribute name.
+	 */
+	public function attribute_label( string $slug, string $attribute ): string {
+		return self::label( $attribute, $slug );
 	}
 
 	/**
@@ -234,6 +279,43 @@ class Block_Registry {
 	}
 
 	/**
+	 * `init`: the "Odavent" pattern category and the "Full event page" pattern, which holds the individual
+	 * blocks in the order of the event page. A no-op where WordPress has no block patterns. Once.
+	 */
+	public function register_patterns(): void {
+		if ( $this->patterns_registered ) {
+			return;
+		}
+		$this->patterns_registered = true;
+
+		if ( function_exists( 'register_block_pattern_category' ) ) {
+			register_block_pattern_category( self::CATEGORY, array( 'label' => __( 'Odavent', 'odavent-events' ) ) );
+		}
+
+		if ( ! function_exists( 'register_block_pattern' ) ) {
+			return;
+		}
+
+		$lines = array();
+		foreach ( Event_Page::DEFAULT_SECTIONS as $section ) {
+			$slug = array_search( Event_Page::SECTION_RENDERERS[ $section ], self::RENDERERS, true );
+			if ( is_string( $slug ) ) {
+				$lines[] = '<!-- wp:' . self::NAMESPACE_PREFIX . $slug . ' /-->';
+			}
+		}
+
+		register_block_pattern(
+			self::NAMESPACE_PREFIX . 'full-event-page',
+			array(
+				'title'       => __( 'Full event page', 'odavent-events' ),
+				'description' => __( 'Every Odavent block in the order of an event page: header, countdown, registration, tickets, find my registration, speakers, agenda, sponsors, venue and calendar.', 'odavent-events' ),
+				'categories'  => array( self::CATEGORY ),
+				'content'     => implode( "\n", $lines ),
+			)
+		);
+	}
+
+	/**
 	 * What editor.js needs to register each block: name, title, description, icon, attributes, supports
 	 * and a translated label per attribute.
 	 *
@@ -254,11 +336,11 @@ class Block_Registry {
 			}
 
 			// Title and description from the registered block type: WordPress translated them from block.json.
-			$registered  = class_exists( 'WP_Block_Type_Registry' ) ? \WP_Block_Type_Registry::get_instance()->get_registered( $json['name'] ) : null;
-			$title       = is_object( $registered ) && isset( $registered->title ) && is_string( $registered->title ) && '' !== $registered->title ? $registered->title : ( isset( $json['title'] ) && is_string( $json['title'] ) ? $json['title'] : $json['name'] );
-			$description = is_object( $registered ) && isset( $registered->description ) && is_string( $registered->description ) ? $registered->description : ( isset( $json['description'] ) && is_string( $json['description'] ) ? $json['description'] : '' );
+			$slug        = substr( $json['name'], strlen( self::NAMESPACE_PREFIX ) );
+			$title       = $this->block_text( $slug, 'title', 'block title', $json['name'], $file );
+			$description = $this->block_text( $slug, 'description', 'block description', '', $file );
 
-			$meta[] = array(
+			$row = array(
 				'name'        => $json['name'],
 				'title'       => $title,
 				'description' => $description,
@@ -269,6 +351,20 @@ class Block_Registry {
 				'labels'      => $labels,
 				'managed'     => self::EDITOR_MANAGED,
 			);
+
+			// The event page lists its sections as toggles: one choice per section, in page order.
+			if ( self::NAMESPACE_PREFIX . 'event-page' === $json['name'] ) {
+				$choices = array();
+				foreach ( Event_Page::section_labels() as $section => $label ) {
+					$choices[] = array(
+						'value' => $section,
+						'label' => $label,
+					);
+				}
+				$row['sectionChoices'] = $choices;
+			}
+
+			$meta[] = $row;
 		}
 
 		return $meta;
@@ -303,6 +399,11 @@ class Block_Registry {
 				return $this->editor_notice( $editor, self::empty_kind( $view ), self::empty_message( $view ) );
 			}
 
+			// Only the event page sets these for its sections: a block comment cannot.
+			foreach ( Event_Page::INTERNAL_ATTRIBUTES as $internal ) {
+				unset( $attributes[ $internal ] );
+			}
+
 			$html = $renderer->render( $view, $attributes );
 			if ( in_array( $slug, self::NOTICE_BLOCKS, true ) ) {
 				$html = Lifecycle::notice_html( $view ) . $html;
@@ -310,8 +411,10 @@ class Block_Registry {
 
 			if ( '' !== $html ) {
 				$this->assets->enqueue_styles();
-				if ( isset( self::SCRIPTS[ $slug ] ) && false !== strpos( $html, self::SCRIPTS[ $slug ][1] ) ) {
-					$this->assets->enqueue_script( self::SCRIPTS[ $slug ][0] );
+				foreach ( self::SCRIPTS as $script ) {
+					if ( false !== strpos( $html, $script[1] ) ) {
+						$this->assets->enqueue_script( $script[0] );
+					}
 				}
 			}
 
@@ -431,10 +534,13 @@ class Block_Registry {
 	}
 
 	/**
-	 * Whether the current singular post contains an Odavent block or shortcode. A cheap string check.
+	 * Whether the current page shows Odavent content: the current singular post contains an Odavent block or
+	 * shortcode (a cheap string check), or a widget area in an active sidebar holds Odavent content (one of our
+	 * classic widgets, or an Odavent block/shortcode inside a block, Text or Custom HTML widget; a widget is not
+	 * post content and may show on any page, singular or not; see Widgets::any_active()).
 	 *
-	 * Filter `odavent_events_page_has_content` (bool $has, object|null $post) to cover content the check
-	 * cannot see (synced patterns, template parts, widgets).
+	 * NOT detected: blocks in a block theme's templates and template parts, synced patterns, custom fields.
+	 * Filter `odavent_events_page_has_content` (bool $has, object|null $post) to cover those.
 	 */
 	public static function page_has_odavent_content(): bool {
 		$post = null;
@@ -445,6 +551,8 @@ class Block_Registry {
 			$content = is_object( $post ) && isset( $post->post_content ) && is_string( $post->post_content ) ? $post->post_content : '';
 			$has     = false !== strpos( $content, '<!-- wp:' . self::NAMESPACE_PREFIX ) || false !== strpos( $content, '[odavent_' );
 		}
+
+		$has = $has || Widgets::any_active();
 
 		return (bool) apply_filters( 'odavent_events_page_has_content', $has, $post );
 	}
@@ -492,6 +600,34 @@ class Block_Registry {
 		return is_string( $name ) && 0 === strpos( $name, self::NAMESPACE_PREFIX ) ? $name : '';
 	}
 
+	/**
+	 * A text field of a block (title, description) for people: the registered block type's value, else the
+	 * block.json value translated with its i18n context (before the blocks register, e.g. on widgets_init),
+	 * else $fallback.
+	 *
+	 * @param string      $slug     Block slug.
+	 * @param string      $field    `title` or `description`.
+	 * @param string      $context  Gettext context WordPress uses for that block.json field.
+	 * @param string      $fallback Value when neither has one.
+	 * @param string|null $file     block.json path (default: the slug's).
+	 */
+	private function block_text( string $slug, string $field, string $context, string $fallback, ?string $file = null ): string {
+		$registered = class_exists( 'WP_Block_Type_Registry' ) ? \WP_Block_Type_Registry::get_instance()->get_registered( self::NAMESPACE_PREFIX . $slug ) : null;
+		if ( is_object( $registered ) && isset( $registered->{$field} ) && is_string( $registered->{$field} ) && ( '' !== $registered->{$field} || 'description' === $field ) ) {
+			return $registered->{$field};
+		}
+
+		$json = $this->read_json( null !== $file ? $file : $this->blocks_dir . '/' . $slug . '/block.json' );
+		$text = is_array( $json ) && isset( $json[ $field ] ) && is_string( $json[ $field ] ) ? $json[ $field ] : '';
+		if ( '' === $text ) {
+			return $fallback;
+		}
+
+		$translated = function_exists( 'translate_with_gettext_context' ) ? translate_with_gettext_context( $text, $context, 'odavent-events' ) : $text;
+
+		return is_string( $translated ) && '' !== $translated ? $translated : $text;
+	}
+
 	private function read_json( string $file ): ?array {
 		if ( ! array_key_exists( $file, $this->json_cache ) ) {
 			$raw  = is_readable( $file ) ? file_get_contents( $file ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
@@ -537,6 +673,11 @@ class Block_Registry {
 			'showGoogle'       => __( 'Google Calendar link', 'odavent-events' ),
 			'showOutlook'      => __( 'Outlook link', 'odavent-events' ),
 			'showIcs'          => __( 'Calendar file (.ics) link', 'odavent-events' ),
+			'sections'         => __( 'Sections to show', 'odavent-events' ),
+			'showHeadings'     => __( 'Show section headings', 'odavent-events' ),
+			'speakersColumns'  => __( 'Speaker columns', 'odavent-events' ),
+			'sponsorsColumns'  => __( 'Sponsor columns', 'odavent-events' ),
+			'showSpeakerBio'   => __( 'Show speaker biographies', 'odavent-events' ),
 		);
 
 		foreach ( array( $block . '.' . $attribute, $attribute ) as $key ) {

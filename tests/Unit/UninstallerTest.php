@@ -93,6 +93,10 @@ class UninstallerTest extends TestCase {
 					'_transient_timeout_odavent_events_ev_42_en',
 					'_site_transient_odavent_events_update',
 					'_site_transient_timeout_odavent_events_update',
+					// WordPress itself saves widget_<id_base> when a widget registers (WP_Widget::get_settings()).
+					'widget_odavent_events_speakers',
+					'widget_odavent_events_add_to_calendar',
+					'widget_text',
 					'other_plugin_option',
 				),
 			)
@@ -100,12 +104,13 @@ class UninstallerTest extends TestCase {
 
 		\Odavent\Events\Uninstaller::run();
 
-		$this->assertCount( 5, $queries );
+		$this->assertCount( 6, $queries );
 		$this->assertStringContainsString( 'SELECT option_name FROM wp_options WHERE option_name LIKE %s [odavent\_events\_lastgood\_%]', $queries[0] );
 		$this->assertStringContainsString( '[\_transient\_odavent\_events\_%]', $queries[1] );
 		$this->assertStringContainsString( '[\_transient\_timeout\_odavent\_events\_%]', $queries[2] );
 		$this->assertStringContainsString( '[\_site\_transient\_odavent\_events\_%]', $queries[3] );
 		$this->assertStringContainsString( '[\_site\_transient\_timeout\_odavent\_events\_%]', $queries[4] );
+		$this->assertStringContainsString( '[widget\_odavent\_events\_%]', $queries[5] );
 
 		foreach ( array(
 			'delete_option:odavent_events_settings',
@@ -121,10 +126,13 @@ class UninstallerTest extends TestCase {
 			'delete_option:_transient_timeout_odavent_events_ev_42_en',
 			'delete_option:_site_transient_odavent_events_update',
 			'delete_option:_site_transient_timeout_odavent_events_update',
+			'delete_option:widget_odavent_events_speakers',
+			'delete_option:widget_odavent_events_add_to_calendar',
 		) as $call ) {
 			$this->assertContains( $call, $this->calls );
 		}
 		$this->assertNotContains( 'delete_option:other_plugin_option', $this->calls );
+		$this->assertNotContains( 'delete_option:widget_text', $this->calls, 'another widget\'s settings are not ours' );
 		$this->assertNotContains( 'delete_transient:timeout_odavent_events_ev_42_en', $this->calls, 'a timeout row is not a transient' );
 	}
 
@@ -140,23 +148,24 @@ class UninstallerTest extends TestCase {
 		$this->fake_wpdb(
 			$queries,
 			array(
-				'wp_options'  => array( 'odavent_events_lastgood_7_fr' ),
+				'wp_options'  => array( 'odavent_events_lastgood_7_fr', 'widget_odavent_events_venue' ),
 				'wp_sitemeta' => array( '_site_transient_odavent_events_update', '_site_transient_timeout_odavent_events_update', 'site_admins' ),
 			)
 		);
 
 		\Odavent\Events\Uninstaller::run();
 
-		// Five per site, plus the two network-wide site-transient lookups in sitemeta.
-		$this->assertCount( 12, $queries );
+		// Six per site, plus the two network-wide site-transient lookups in sitemeta.
+		$this->assertCount( 14, $queries );
 
-		$network = array_slice( $queries, 10 );
+		$network = array_slice( $queries, 12 );
 		$this->assertStringContainsString( 'SELECT meta_key FROM wp_sitemeta WHERE meta_key LIKE %s [\_site\_transient\_odavent\_events\_%]', $network[0] );
 		$this->assertStringContainsString( 'SELECT meta_key FROM wp_sitemeta WHERE meta_key LIKE %s [\_site\_transient\_timeout\_odavent\_events\_%]', $network[1] );
 
 		$counts = array_count_values( $this->calls );
 		$this->assertSame( 2, $counts['delete_option:odavent_events_settings'] );
 		$this->assertSame( 2, $counts['delete_option:odavent_events_lastgood_7_fr'] );
+		$this->assertSame( 2, $counts['delete_option:widget_odavent_events_venue'] );
 		$this->assertSame( 1, $counts['delete_site_option:_site_transient_odavent_events_update'] );
 		$this->assertSame( 1, $counts['delete_site_option:_site_transient_timeout_odavent_events_update'] );
 		$this->assertArrayNotHasKey( 'delete_site_option:site_admins', $counts );
@@ -201,7 +210,7 @@ echo implode( "|", $log );'
 		unlink( $script );
 
 		$this->assertSame(
-			'delete_option:odavent_events_settings|delete_transient:odavent_events_list|delete_transient:odavent_events_backoff|delete_transient:odavent_events_invalid_key_notice|delete_transient:odavent_events_contract_notice|delete_transient:odavent_events_conn_disabled|delete_site_transient:odavent_events_update|select:odavent_events_lastgood_%|delete_option:odavent_events_lastgood_1_en|select:_transient_odavent_events_%|select:_transient_timeout_odavent_events_%|select:_site_transient_odavent_events_%|select:_site_transient_timeout_odavent_events_%',
+			'delete_option:odavent_events_settings|delete_transient:odavent_events_list|delete_transient:odavent_events_backoff|delete_transient:odavent_events_invalid_key_notice|delete_transient:odavent_events_contract_notice|delete_transient:odavent_events_conn_disabled|delete_site_transient:odavent_events_update|select:odavent_events_lastgood_%|delete_option:odavent_events_lastgood_1_en|select:_transient_odavent_events_%|select:_transient_timeout_odavent_events_%|select:_site_transient_odavent_events_%|select:_site_transient_timeout_odavent_events_%|select:widget_odavent_events_%',
 			trim( (string) $output )
 		);
 	}

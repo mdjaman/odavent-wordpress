@@ -103,7 +103,7 @@ class DocsTest extends TestCase {
 
 	public function test_the_other_docs_exist_and_the_readme_links_them(): void {
 		$readme = $this->doc( 'README.md' );
-		foreach ( array( 'docs/shortcodes.md', 'docs/theming.md', 'docs/hooks.md', 'docs/security.md', 'docs/operations.md' ) as $file ) {
+		foreach ( array( 'docs/shortcodes.md', 'docs/widgets.md', 'docs/theming.md', 'docs/hooks.md', 'docs/security.md', 'docs/operations.md' ) as $file ) {
 			$this->doc( $file );
 			$this->assertStringContainsString( $file, $readme, "README.md does not link {$file}" );
 		}
@@ -147,5 +147,86 @@ class DocsTest extends TestCase {
 	public function test_the_docs_say_a_draft_is_previewed_by_id_not_by_slug(): void {
 		$this->assertStringContainsString( 'A draft can only be previewed by its ID.', $this->doc( 'docs/shortcodes.md' ) );
 		$this->assertStringContainsString( 'To preview a **draft** event, pick it in the list', $this->doc( 'README.md' ) );
+	}
+
+	public function test_the_widgets_doc_lists_every_widget_and_the_things_a_webmaster_must_know(): void {
+		$docs = $this->doc( 'docs/widgets.md' );
+
+		// One widget per block: odavent_events_ + the block name with dashes turned into underscores (Widgets::id_base()).
+		$bases = array();
+		foreach ( glob( $this->root . '/blocks/*/block.json' ) ?: array() as $file ) {
+			$bases[] = 'odavent_events_' . str_replace( '-', '_', basename( dirname( $file ) ) );
+		}
+		$this->assertContains( 'odavent_events_event_page', $bases );
+		$this->assertContains( 'odavent_events_add_to_calendar', $bases );
+		$this->assertGreaterThanOrEqual( 11, count( $bases ) );
+		foreach ( $bases as $base ) {
+			$this->assertStringContainsString( '`' . $base . '`', $docs, "docs/widgets.md lacks the widget {$base}" );
+		}
+
+		// The Event page widget takes the section names as a comma list: every name is spelled out.
+		$this->assertSame( 1, preg_match( "/const DEFAULT_SECTIONS = array\\(([^)]*)\\)/", (string) file_get_contents( $this->root . '/src/Blocks/Renderers/Event_Page.php' ), $m ) );
+		preg_match_all( "/'([a-z-]+)'/", $m[1], $names );
+		$this->assertCount( 10, $names[1] );
+		foreach ( $names[1] as $section ) {
+			$this->assertStringContainsString( '`' . $section . '`', $docs, "docs/widgets.md lacks the section {$section}" );
+		}
+
+		foreach ( array( 'Legacy Widget', 'block theme', 'odavent_events_purge_all_on_widget', 'whole-site' ) as $fact ) {
+			$this->assertStringContainsString( $fact, $docs, "docs/widgets.md: {$fact}" );
+		}
+	}
+
+	public function test_the_theming_guide_covers_the_event_page_the_appearance_screen_and_the_precedence_rules(): void {
+		$docs = $this->doc( 'docs/theming.md' );
+
+		foreach ( array(
+			'`event-page`',
+			'.odv-event-page__heading',
+			'Settings > Odavent Events > Appearance',
+			'defaults',
+			'specificity',
+			'odv-speakers-42-2',
+			'above `.odv-event-page`',
+			'inside it',
+			'data-odv-img',
+		) as $fact ) {
+			$this->assertStringContainsString( $fact, $docs, "docs/theming.md: {$fact}" );
+		}
+	}
+
+	public function test_the_appearance_filter_doc_describes_what_the_css_really_contains(): void {
+		$docs = $this->doc( 'docs/hooks.md' );
+
+		$this->assertStringContainsString( 'fixed `rem` gaps and a `px` radius', $docs );
+		$this->assertStringNotContainsString( 'integers with `px` or `rem`', $docs );
+	}
+
+	public function test_the_readme_has_an_organizer_quick_start_and_a_webmaster_part(): void {
+		$readme = $this->doc( 'README.md' );
+
+		$this->assertMatchesRegularExpression( '/^## For organizers$/m', $readme );
+		$this->assertMatchesRegularExpression( '/^## For webmasters$/m', $readme );
+		preg_match( '/^## For organizers\n(.*?)(?=^## )/ms', $readme, $m );
+		$this->assertStringNotContainsString( '```', $m[1] ?? '', 'the organizer part has no code' );
+		foreach ( array( 'Event page', 'Full event page', 'Appearance', 'widget' ) as $fact ) {
+			$this->assertStringContainsString( $fact, $m[1] ?? '', "For organizers: {$fact}" );
+		}
+		$this->assertStringContainsString( '`[odavent_event_page]`', $readme, 'the blocks table lists the event page' );
+	}
+
+	public function test_the_changelog_and_the_wordpress_readme_announce_the_unreleased_work(): void {
+		$changelog = $this->doc( 'CHANGELOG.md' );
+		$this->assertMatchesRegularExpression( '/^## \[Unreleased\]$/m', $changelog );
+		$this->assertLessThan( strpos( $changelog, '## [0.1.0]' ), strpos( $changelog, '## [Unreleased]' ), 'Unreleased comes first' );
+		preg_match( '/^## \[Unreleased\]\n(.*?)(?=^## \[)/ms', $changelog, $m );
+		$this->assertMatchesRegularExpression( '/^### Added$/m', $m[1] ?? '' );
+		$this->assertMatchesRegularExpression( '/^### Fixed$/m', $m[1] ?? '' );
+		$this->assertStringContainsString( 'Both', $m[1] ?? '' );
+
+		$readme = $this->doc( 'readme.txt' );
+		$this->assertStringContainsString( 'Event page', $readme );
+		$this->assertStringContainsString( 'Appearance', $readme );
+		$this->assertStringContainsString( 'widgets', $readme );
 	}
 }

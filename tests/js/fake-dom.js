@@ -54,6 +54,17 @@ El.prototype.querySelectorAll = function ( selector ) {
 El.prototype.querySelector = function ( selector ) {
 	return this.querySelectorAll( selector )[ 0 ] || null;
 };
+El.prototype.removeChild = function ( child ) {
+	this.children = this.children.filter( ( c ) => c !== child );
+	child.parentNode = null;
+	return child;
+};
+El.prototype.replaceChild = function ( next, old ) {
+	this.children = this.children.map( ( c ) => ( c === old ? next : c ) );
+	next.parentNode = this;
+	old.parentNode = null;
+	return old;
+};
 El.prototype.addEventListener = function ( type, fn ) {
 	this.listeners[ type ] = fn;
 };
@@ -64,14 +75,19 @@ El.prototype.addEventListener = function ( type, fn ) {
  * @param {string} file  Script file name.
  * @param {El[]}   roots Elements querySelectorAll() returns.
  * @param {{t:number}} clock Mutable clock (milliseconds) behind Date.now().
- * @return {{timers: Array}} The setInterval callbacks (null once cleared).
+ * @return {{timers: Array, doc: object}} The setInterval callbacks (null once cleared) and the fake document.
  */
 function run( file, roots, clock ) {
 	const timers = [];
 	const doc = {
 		readyState: 'complete',
 		querySelectorAll: () => roots,
-		addEventListener() {},
+		createElement: ( tag ) => new El( '', { _tag: String( tag ).toUpperCase() } ),
+		// Last listener per type, with whether it was registered for the capture phase.
+		listeners: {},
+		addEventListener( type, fn, capture ) {
+			doc.listeners[ type ] = { fn, capture: capture === true };
+		},
 	};
 	const sandbox = {
 		document: doc,
@@ -88,7 +104,7 @@ function run( file, roots, clock ) {
 		String,
 	};
 	vm.runInNewContext( fs.readFileSync( path.join( __dirname, '..', '..', 'assets', 'js', file ), 'utf8' ), sandbox );
-	return { timers };
+	return { timers, doc };
 }
 
 module.exports = { El, run };

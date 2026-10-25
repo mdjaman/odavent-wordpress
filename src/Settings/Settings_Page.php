@@ -4,6 +4,7 @@ namespace Odavent\Events\Settings;
 use Odavent\Events\Api\Client;
 use Odavent\Events\Api\Result;
 use Odavent\Events\Data\Event_Repository;
+use Odavent\Events\Render\Assets;
 
 /**
  * Settings > Odavent: connection settings, a connection test and a cache purge.
@@ -22,6 +23,10 @@ class Settings_Page {
 	const FLASH_TTL     = 60;
 	/** Seconds the settings page waits for the events list: it must stay usable when Odavent is slow. */
 	const LIST_TIMEOUT  = 3;
+	/** Below this text-on-accent contrast ratio (WCAG AA for normal text) saving shows a warning. */
+	const MIN_CONTRAST  = 4.5;
+	const APPEARANCE_ID = 'odavent_events_appearance';
+	const ADMIN_HANDLE  = 'odavent-events-admin-appearance';
 
 	/** @var Options */
 	private $options;
@@ -38,6 +43,9 @@ class Settings_Page {
 	/** @var bool Whether sanitize() already ran in this request. */
 	private $sanitized = false;
 
+	/** @var string|false|null The page's hook suffix from add_options_page() (false when it was not added). */
+	private $hook_suffix = null;
+
 	public function __construct( Options $options, Client $client, Event_Repository $repo ) {
 		$this->options = $options;
 		$this->client  = $client;
@@ -51,11 +59,12 @@ class Settings_Page {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_post_' . self::ACTION_TEST, array( $this, 'handle_test_connection' ) );
 		add_action( 'admin_post_' . self::ACTION_CLEAR, array( $this, 'handle_clear_cache' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( ODAVENT_EVENTS_FILE ), array( $this, 'action_links' ) );
 	}
 
 	public function add_menu(): void {
-		add_options_page(
+		$this->hook_suffix = add_options_page(
 			__( 'Odavent Events', 'odavent-events' ),
 			__( 'Odavent Events', 'odavent-events' ),
 			self::CAPABILITY,
@@ -99,6 +108,39 @@ class Settings_Page {
 		add_settings_section( 'odavent_events_display', __( 'Display and cache', 'odavent-events' ), '__return_false', self::SLUG );
 		add_settings_field( 'odavent_events_cache_ttl', __( 'Cache lifetime', 'odavent-events' ), array( $this, 'render_cache_ttl' ), self::SLUG, 'odavent_events_display', array( 'label_for' => 'odavent_events_cache_ttl' ) );
 		add_settings_field( 'odavent_events_load_css', __( 'Default styles', 'odavent-events' ), array( $this, 'render_load_css' ), self::SLUG, 'odavent_events_display', array( 'label_for' => 'odavent_events_load_css' ) );
+
+		$section = self::APPEARANCE_ID;
+		add_settings_section( $section, __( 'Appearance', 'odavent-events' ), array( $this, 'render_appearance_section' ), self::SLUG );
+		add_settings_field( $section . '_accent', __( 'Accent colour', 'odavent-events' ), array( $this, 'render_accent' ), self::SLUG, $section, array( 'label_for' => $section . '_accent' ) );
+		add_settings_field( $section . '_contrast', __( 'Text on accent', 'odavent-events' ), array( $this, 'render_contrast' ), self::SLUG, $section, array( 'label_for' => $section . '_contrast_auto' ) );
+		add_settings_field( $section . '_text', __( 'Text colour', 'odavent-events' ), array( $this, 'render_text_color' ), self::SLUG, $section, array( 'label_for' => $section . '_text' ) );
+		add_settings_field( $section . '_border', __( 'Border colour', 'odavent-events' ), array( $this, 'render_border' ), self::SLUG, $section, array( 'label_for' => $section . '_border' ) );
+		add_settings_field( $section . '_radius', __( 'Corner radius', 'odavent-events' ), array( $this, 'render_radius' ), self::SLUG, $section, array( 'label_for' => $section . '_radius' ) );
+		add_settings_field( $section . '_spacing', __( 'Spacing', 'odavent-events' ), array( $this, 'render_spacing' ), self::SLUG, $section, array( 'label_for' => $section . '_spacing' ) );
+		add_settings_field( $section . '_button_style', __( 'Button style', 'odavent-events' ), array( $this, 'render_button_style' ), self::SLUG, $section, array( 'label_for' => $section . '_button_style' ) );
+		add_settings_field( $section . '_preview', __( 'Preview', 'odavent-events' ), array( $this, 'render_preview' ), self::SLUG, $section );
+	}
+
+	/**
+	 * `admin_enqueue_scripts`: the colour picker, the preview script and the plugin stylesheet (so the preview
+	 * uses the real styles), on this settings page only. Nothing when "Load default styles" is off: the
+	 * Appearance fields are disabled and there is no preview.
+	 *
+	 * @param mixed $hook_suffix The current admin page.
+	 */
+	public function enqueue_assets( $hook_suffix ): void {
+		if ( ! is_string( $this->hook_suffix ) || '' === $this->hook_suffix || $hook_suffix !== $this->hook_suffix ) {
+			return;
+		}
+		if ( ! $this->options->load_css() ) {
+			return;
+		}
+
+		wp_enqueue_style( 'wp-color-picker' );
+		// Registered on `init` in wp-admin when "Load default styles" is on, with the saved Appearance CSS.
+		wp_enqueue_style( Assets::STYLE_HANDLE );
+		wp_enqueue_style( self::ADMIN_HANDLE, plugins_url( 'assets/css/admin-appearance.css', ODAVENT_EVENTS_FILE ), array( 'wp-color-picker', Assets::STYLE_HANDLE ), ODAVENT_EVENTS_VERSION );
+		wp_enqueue_script( self::ADMIN_HANDLE, plugins_url( 'assets/js/admin-appearance.js', ODAVENT_EVENTS_FILE ), array( 'jquery', 'wp-color-picker' ), ODAVENT_EVENTS_VERSION, true );
 	}
 
 	/**
@@ -122,7 +164,18 @@ class Settings_Page {
 			unset( $input['site_key'] );
 		}
 
+		// "Automatic" text on accent is stored as no colour; the manual picker is only hidden, so it still submits.
+		if ( isset( $input['appearance'] ) && is_array( $input['appearance'] ) && ! empty( $input['appearance']['contrast_auto'] ) ) {
+			$input['appearance']['contrast'] = '';
+		}
+
 		$out = $this->options->sanitize( $input, $current, $report );
+
+		// A warning, not a refusal: the organizer may know better (a large-text design, a brand colour).
+		// Only for Appearance values submitted with the styles on: disabled fields are not sent.
+		if ( $report && isset( $input['appearance'] ) && is_array( $input['appearance'] ) && $out['load_css'] ) {
+			$this->warn_low_contrast( $out['appearance'] );
+		}
 
 		// Another key or address means another connection: drop the editor's cached list (another organization's
 		// events) and what the old connection left behind (rejected-key and contract notices, the breaker, the
@@ -136,6 +189,85 @@ class Settings_Page {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Adds a settings warning when button text is hard to read: the text-on-accent pair (filled buttons, and
+	 * outline buttons on hover), and the accent as text on a white page (outline buttons). Without an accent of
+	 * the organizer's own the buttons keep the stylesheet's, which is judged too when a manual text colour or
+	 * outline buttons are set on top of it; with nothing set there is nothing to warn about.
+	 *
+	 * @param array $appearance Validated Appearance values.
+	 */
+	private function warn_low_contrast( array $appearance ): void {
+		$ratio = $this->appearance_ratio( $appearance );
+		if ( null !== $ratio && $ratio < self::MIN_CONTRAST ) {
+			add_settings_error(
+				Options::SETTINGS_ERROR_NAME,
+				self::APPEARANCE_ID . '_contrast',
+				sprintf(
+					/* translators: 1: contrast ratio such as 3.20, 2: the recommended minimum, 4.5. */
+					__( 'Your colours were saved, but the text on the accent colour has a contrast ratio of %1$s:1, below the recommended %2$s:1. Buttons may be hard to read; choose another text colour or turn on Automatic.', 'odavent-events' ),
+					number_format_i18n( $ratio, 2 ),
+					number_format_i18n( self::MIN_CONTRAST, 1 )
+				),
+				'warning'
+			);
+		}
+
+		$outline = $this->outline_ratio( $appearance );
+		if ( null !== $outline && $outline < self::MIN_CONTRAST ) {
+			add_settings_error(
+				Options::SETTINGS_ERROR_NAME,
+				self::APPEARANCE_ID . '_outline_contrast',
+				sprintf(
+					/* translators: 1: contrast ratio such as 3.20, 2: the recommended minimum, 4.5. */
+					__( 'Your colours were saved, but outline buttons use the accent colour as their text, and it has a contrast ratio of %1$s:1 on a white page, below the recommended %2$s:1. Choose a darker accent colour or the Filled button style.', 'odavent-events' ),
+					number_format_i18n( $outline, 2 ),
+					number_format_i18n( self::MIN_CONTRAST, 1 )
+				),
+				'warning'
+			);
+		}
+	}
+
+	/**
+	 * The accent the buttons use: the organizer's, or the stylesheet's when none is chosen.
+	 *
+	 * @param array $appearance Validated Appearance values.
+	 */
+	private function effective_accent( array $appearance ): string {
+		return '' !== $appearance['accent'] ? $appearance['accent'] : Appearance::DEFAULT_ACCENT;
+	}
+
+	/**
+	 * Contrast ratio of the effective accent and text-on-accent pair (automatic when no manual colour), or null
+	 * when neither colour is the organizer's (the stylesheet's own pair).
+	 *
+	 * @param array $appearance Validated Appearance values.
+	 */
+	private function appearance_ratio( array $appearance ): ?float {
+		if ( '' === $appearance['accent'] && '' === $appearance['contrast'] ) {
+			return null;
+		}
+
+		$accent   = $this->effective_accent( $appearance );
+		$contrast = '' !== $appearance['contrast'] ? $appearance['contrast'] : Appearance::auto_contrast( $accent );
+
+		return Appearance::contrast_ratio( $accent, $contrast );
+	}
+
+	/**
+	 * Contrast ratio of outline-button text (the effective accent) on a white page, or null for filled buttons.
+	 *
+	 * @param array $appearance Validated Appearance values.
+	 */
+	private function outline_ratio( array $appearance ): ?float {
+		if ( 'outline' !== $appearance['button_style'] ) {
+			return null;
+		}
+
+		return Appearance::contrast_ratio( $this->effective_accent( $appearance ), '#ffffff' );
 	}
 
 	// ---- admin-post handlers ------------------------------------------------------------------
@@ -387,6 +519,205 @@ class Settings_Page {
 			$this->options->load_css() ? ' checked' : '',
 			esc_html__( 'Load the default styles for Odavent blocks', 'odavent-events' )
 		);
+	}
+
+	// ---- appearance fields -------------------------------------------------------------------------------
+
+	public function render_appearance_section(): void {
+		if ( ! $this->options->load_css() ) {
+			echo '<p class="description">' . esc_html__( 'Turn on Default styles to use these settings.', 'odavent-events' ) . '</p>';
+			return;
+		}
+
+		echo '<p class="description">' . esc_html__( 'Colours and shapes of the Odavent blocks on your site. Empty fields keep the default styles; your theme\'s own CSS still wins.', 'odavent-events' ) . '</p>';
+	}
+
+	public function render_accent(): void {
+		$this->color_input( 'accent' );
+		$this->description( __( 'Buttons, links and highlights. Empty keeps the default indigo.', 'odavent-events' ) );
+	}
+
+	public function render_contrast(): void {
+		$automatic = '' === $this->options->appearance()['contrast'];
+
+		printf(
+			'<label><input type="checkbox" id="%1$s_contrast_auto" name="%2$s[appearance][contrast_auto]" value="1"%3$s%4$s> %5$s</label>',
+			esc_attr( self::APPEARANCE_ID ),
+			esc_attr( Options::OPTION ),
+			$automatic ? ' checked' : '',
+			$this->disabled_attr(),
+			esc_html__( 'Automatic (black or white, whichever reads better on the accent colour)', 'odavent-events' )
+		);
+		printf( '<div id="%s_contrast_manual"%s>', esc_attr( self::APPEARANCE_ID ), $automatic ? ' hidden' : '' );
+		$this->color_input( 'contrast' );
+		echo '</div>';
+	}
+
+	public function render_text_color(): void {
+		$this->color_input( 'text' );
+		$this->description( __( 'Empty uses your theme\'s text colour.', 'odavent-events' ) );
+	}
+
+	public function render_border(): void {
+		$this->color_input( 'border' );
+		$this->description( __( 'Card and divider lines. Empty keeps the default light grey.', 'odavent-events' ) );
+	}
+
+	public function render_radius(): void {
+		$radius = $this->options->appearance()['radius'];
+
+		printf(
+			'<input type="number" min="%1$d" max="%2$d" step="1" class="small-text" id="%3$s_radius" name="%4$s[appearance][radius]" value="%5$s"%6$s> ',
+			(int) Appearance::MIN_RADIUS,
+			(int) Appearance::MAX_RADIUS,
+			esc_attr( self::APPEARANCE_ID ),
+			esc_attr( Options::OPTION ),
+			'' === $radius ? '' : esc_attr( (string) (int) $radius ),
+			$this->disabled_attr()
+		);
+		echo esc_html__( 'pixels (0 to 24; empty keeps the default)', 'odavent-events' );
+	}
+
+	public function render_spacing(): void {
+		$this->select(
+			'spacing',
+			array(
+				''            => __( 'Unchanged', 'odavent-events' ),
+				'compact'     => __( 'Compact', 'odavent-events' ),
+				'comfortable' => __( 'Comfortable', 'odavent-events' ),
+				'roomy'       => __( 'Roomy', 'odavent-events' ),
+			)
+		);
+	}
+
+	public function render_button_style(): void {
+		$this->select(
+			'button_style',
+			array(
+				'filled'  => __( 'Filled', 'odavent-events' ),
+				'outline' => __( 'Outline', 'odavent-events' ),
+			)
+		);
+	}
+
+	/**
+	 * A button, a ticket card and a speaker card with the plugin's real classes, styled by its stylesheet and
+	 * updated by assets/js/admin-appearance.js. Nothing when "Load default styles" is off.
+	 */
+	public function render_preview(): void {
+		if ( ! $this->options->load_css() ) {
+			return;
+		}
+
+		$appearance = $this->options->appearance();
+		$ratio      = $this->appearance_ratio( $appearance );
+		$has_ratio  = null !== $ratio;
+		$outline    = $this->outline_ratio( $appearance );
+		/* translators: %s: contrast ratio such as 4.50. */
+		$label   = __( 'Text on accent contrast: %s:1', 'odavent-events' );
+		$decimal = isset( $GLOBALS['wp_locale'] ) && is_object( $GLOBALS['wp_locale'] ) && isset( $GLOBALS['wp_locale']->number_format['decimal_point'] )
+			? (string) $GLOBALS['wp_locale']->number_format['decimal_point']
+			: '.';
+		$gaps    = wp_json_encode( Appearance::GAPS );
+
+		printf(
+			'<div class="odv-appearance-preview odv-appearance-preview--%1$s" data-ratio-label="%2$s" data-decimal="%3$s" data-gaps="%4$s" data-default-accent="%5$s">',
+			'outline' === $appearance['button_style'] ? 'outline' : 'filled',
+			esc_attr( $label ),
+			esc_attr( $decimal ),
+			esc_attr( is_string( $gaps ) ? $gaps : '{}' ),
+			esc_attr( Appearance::DEFAULT_ACCENT )
+		);
+
+		echo '<div class="odv-register"><span class="odv-register__button">' . esc_html__( 'Register', 'odavent-events' ) . '</span>';
+		echo '<p class="odv-register__notice">' . esc_html__( 'Registration and payment are handled securely by Odavent.', 'odavent-events' ) . '</p></div>';
+
+		echo '<div class="odv-appearance-preview__cards">';
+		echo '<div class="odv-tickets"><ul class="odv-tickets__list"><li class="odv-tickets__item">';
+		echo '<h3 class="odv-tickets__name">' . esc_html__( 'Standard ticket', 'odavent-events' ) . '</h3>';
+		echo '<p class="odv-tickets__price">25 EUR</p>';
+		/* translators: %s: number of places left for a ticket. */
+		echo '<p class="odv-tickets__status">' . esc_html( sprintf( _n( '%s spot left', '%s spots left', 12, 'odavent-events' ), number_format_i18n( 12 ) ) ) . '</p>';
+		echo '<span class="odv-tickets__register">' . esc_html__( 'Register', 'odavent-events' ) . '</span>';
+		echo '</li></ul></div>';
+
+		echo '<div class="odv-speakers"><ul class="odv-speakers__list odv-speakers__list--single"><li class="odv-speakers__item">';
+		echo '<span class="odv-speakers__photo odv-speakers__photo--placeholder" aria-hidden="true">AK</span>';
+		// Sample content: a name is not translated.
+		echo '<h3 class="odv-speakers__name">Ama Kouassi</h3>';
+		echo '<p class="odv-speakers__role">' . esc_html__( 'Head of Product', 'odavent-events' ) . '</p>';
+		echo '</li></ul></div>';
+		echo '</div>';
+
+		printf(
+			'<p class="odv-appearance-preview__ratio"%s>%s</p>',
+			$has_ratio ? '' : ' hidden',
+			esc_html( $has_ratio ? sprintf( $label, number_format_i18n( $ratio, 2 ) ) : '' )
+		);
+		printf(
+			'<p class="odv-appearance-preview__warning"%s>%s</p>',
+			$has_ratio && $ratio < self::MIN_CONTRAST ? '' : ' hidden',
+			esc_html__( 'Below 4.5:1: button text may be hard to read.', 'odavent-events' )
+		);
+		printf(
+			'<p class="odv-appearance-preview__outline-warning"%s>%s</p>',
+			null !== $outline && $outline < self::MIN_CONTRAST ? '' : ' hidden',
+			esc_html__( 'Outline buttons use the accent colour as text: below 4.5:1 on a white page, it may be hard to read.', 'odavent-events' )
+		);
+		echo '</div>';
+	}
+
+	/**
+	 * A colour field for the WordPress colour picker (a plain text input without it).
+	 */
+	private function color_input( string $field ): void {
+		printf(
+			'<input type="text" class="odv-color-field" id="%1$s_%2$s" name="%3$s[appearance][%2$s]" value="%4$s" maxlength="7" placeholder="#rrggbb" autocomplete="off" spellcheck="false"%5$s>',
+			esc_attr( self::APPEARANCE_ID ),
+			esc_attr( $field ),
+			esc_attr( Options::OPTION ),
+			esc_attr( (string) $this->options->appearance()[ $field ] ),
+			$this->disabled_attr()
+		);
+	}
+
+	/**
+	 * @param string   $field   Appearance key.
+	 * @param string[] $choices Value => label.
+	 */
+	private function select( string $field, array $choices ): void {
+		$current = (string) $this->options->appearance()[ $field ];
+
+		printf(
+			'<select id="%1$s_%2$s" name="%3$s[appearance][%2$s]"%4$s>',
+			esc_attr( self::APPEARANCE_ID ),
+			esc_attr( $field ),
+			esc_attr( Options::OPTION ),
+			$this->disabled_attr()
+		);
+		foreach ( $choices as $value => $label ) {
+			printf(
+				'<option value="%s"%s>%s</option>',
+				esc_attr( (string) $value ),
+				(string) $value === $current ? ' selected' : '',
+				esc_html( $label )
+			);
+		}
+		echo '</select>';
+	}
+
+	private function description( string $text ): void {
+		if ( $this->options->load_css() ) {
+			echo '<p class="description">' . esc_html( $text ) . '</p>';
+		}
+	}
+
+	/**
+	 * " disabled" while "Load default styles" is off. Disabled controls are not submitted, so saving keeps the
+	 * stored Appearance (Options::sanitize() keeps what is stored when the key is absent).
+	 */
+	private function disabled_attr(): string {
+		return $this->options->load_css() ? '' : ' disabled';
 	}
 
 	/**

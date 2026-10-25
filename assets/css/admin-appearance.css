@@ -1,0 +1,52 @@
+/*
+ * Odavent Events: layout of the Appearance preview on Settings > Odavent Events (wp-admin only).
+ *
+ * The cards inside use the plugin's own stylesheet (odavent.css); this file only lays them out and repeats the
+ * button-style rule so the preview can switch between filled and outline before saving. The modifier class is
+ * one level more specific than the saved Appearance CSS, so the unsaved choice wins in the preview.
+ */
+
+.odv-appearance-preview {
+	display: grid;
+	gap: 1rem;
+	max-width: 48rem;
+	padding: 1rem 1.25rem;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	background: #fff;
+	color: #1d2327;
+}
+
+.odv-appearance-preview .odv-register,
+.odv-appearance-preview .odv-tickets,
+.odv-appearance-preview .odv-speakers { margin-block: 0; }
+
+.odv-appearance-preview__cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+	gap: 1rem;
+}
+
+.odv-appearance-preview .odv-tickets__list,
+.odv-appearance-preview .odv-speakers__list { grid-template-columns: minmax(0, 1fr); max-width: none; }
+
+.odv-appearance-preview .odv-tickets__name,
+.odv-appearance-preview .odv-speakers__name { font-size: 1em; }
+
+.odv-appearance-preview--filled .odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"]),
+.odv-appearance-preview--filled .odv-tickets .odv-tickets__register { background: var(--_accent); color: var(--_contrast); }
+
+.odv-appearance-preview--outline .odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"]),
+.odv-appearance-preview--outline .odv-tickets .odv-tickets__register { background: transparent; color: var(--_accent); }
+
+.odv-appearance-preview--outline .odv-register .odv-register__button:not(.odv-register__button--disabled):not([aria-disabled="true"]):hover,
+.odv-appearance-preview--outline .odv-tickets .odv-tickets__register:hover { background: var(--_accent); color: var(--_contrast); }
+
+.odv-appearance-preview__ratio,
+.odv-appearance-preview__warning,
+.odv-appearance-preview__outline-warning { margin: 0; }
+
+.odv-appearance-preview__warning,
+.odv-appearance-preview__outline-warning { color: #b32d2e; font-weight: 600; }
+
+.odv-appearance-preview [hidden] { display: none; }

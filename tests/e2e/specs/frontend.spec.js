@@ -1,4 +1,5 @@
-// Front end of /all-blocks-1/ (all ten blocks for event 1): agenda filter, countdown, screenshots.
+// Front end of /all-blocks-1/ (all ten blocks for event 1): agenda filter, countdown, screenshots; and of
+// /event-page-6/ (the event page block): broken images degrade (image-fallback.js).
 const { test, expect } = require( '@playwright/test' );
 const { stub, refresh, preparePage } = require( './helpers' );
 
@@ -96,6 +97,43 @@ test( 'a paused event: the countdown hides itself once the start has passed', as
 	await expect( countdown ).toBeHidden(); // and stays hidden
 
 	expect( errors.relevant ).toEqual( [] );
+} );
+
+test( 'event page: a 404 sponsor logo becomes the partner name, a 404 cover is removed', async ( { page } ) => {
+	// Event 6's cover and the logo of its "both" partner point at the stub, which answers 404 for them.
+	const broken = [ /^http:\/\/127\.0\.0\.1:8081\/storage\/missing\/cover-6\.webp$/, /^http:\/\/127\.0\.0\.1:8081\/storage\/missing\/partner-406\.png$/ ];
+	const errors = await preparePage( page, { expected404: broken } );
+	await page.setViewportSize( { width: 1280, height: 900 } );
+	await page.goto( '/event-page-6/' );
+
+	const eventPage = page.locator( '.odv-event-page' );
+	await expect( eventPage ).toBeVisible();
+	await expect( eventPage.locator( '.odv-header__cover' ) ).toHaveCount( 0 ); // removed, no broken-image icon
+	await expect( eventPage.locator( '.odv-header__logo' ) ).toBeVisible(); // a logo that loads stays
+
+	// The sponsor logos are lazy: they load (and the broken one fails) once the visitor scrolls to them.
+	const sponsors = eventPage.locator( '.odv-sponsors' );
+	await sponsors.scrollIntoViewIfNeeded();
+	await expect( sponsors.locator( '.odv-sponsors__group-title', { hasText: 'Sponsors and exhibitors' } ) ).toBeVisible();
+	const both = sponsors.locator( '.odv-sponsors__item', { hasText: 'Expo Partenaires CI' } );
+	await expect( both.locator( 'img' ) ).toHaveCount( 0 );
+	await expect( both.locator( '.odv-sponsors__name' ) ).toHaveText( 'Expo Partenaires CI' );
+	await expect( both.locator( 'a.odv-sponsors__link' ) ).toHaveAttribute( 'href', 'https://expo-partenaires.example' ); // the link stays
+	const orange = sponsors.locator( 'img.odv-sponsors__logo[alt="Orange Côte d\'Ivoire"]' );
+	await expect( orange ).toBeVisible();
+	await expect.poll( () => orange.evaluate( ( img ) => img.complete && img.naturalWidth > 0 ) ).toBe( true );
+	await expect( eventPage.locator( 'img[data-odv-img="photo"]' ) ).toHaveCount( 3 ); // speaker photos that load stay
+
+	// Both 404s really happened, and nothing else went wrong.
+	await expect.poll( () => errors.expected.length ).toBeGreaterThanOrEqual( 2 );
+	expect( [ ...new Set( errors.expected ) ].sort() ).toEqual( [
+		'http://127.0.0.1:8081/storage/missing/cover-6.webp',
+		'http://127.0.0.1:8081/storage/missing/partner-406.png',
+	] );
+	await page.screenshot( { path: `artifacts/event-page-6-wp${ process.env.WP_VERSION || 'x' }-1280.png`, fullPage: true } );
+	expect( errors.relevant ).toEqual( [] );
+	test.info().annotations.push( { type: 'console noise', description: JSON.stringify( errors.noise ) } );
+	test.info().annotations.push( { type: 'external requests', description: JSON.stringify( errors.external ) } );
 } );
 
 for ( const width of [ 390, 1280 ] ) {

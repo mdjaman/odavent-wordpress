@@ -151,6 +151,37 @@ class BlockRegistryTest extends BlockTestCase {
 		$this->assertSame( array(), $this->enqueued_styles );
 	}
 
+	public function test_agenda_and_countdown_scripts_are_enqueued_for_the_event_page(): void {
+		Filters\expectApplied( 'odavent_events_now' )->zeroOrMoreTimes()->andReturn( strtotime( '2026-11-01T00:00:00Z' ) );
+
+		$this->registry( $this->payload() )->render_block( 'odavent-events/event-page', array( 'eventId' => 42 ) );
+		$this->assertEqualsCanonicalizing( array( 'odavent-events-countdown', 'odavent-events-agenda-filter', 'odavent-events-image-fallback' ), $this->enqueued_scripts );
+
+		// Only the scripts whose markup is on the page.
+		$this->enqueued_scripts = array();
+		$this->registry( $this->payload() )->render_block( 'odavent-events/event-page', array( 'eventId' => 42, 'sections' => 'speakers,agenda' ) );
+		$this->assertEqualsCanonicalizing( array( 'odavent-events-agenda-filter', 'odavent-events-image-fallback' ), $this->enqueued_scripts );
+
+		$this->enqueued_scripts = array();
+		$this->registry( $this->payload() )->render_block( 'odavent-events/event-page', array( 'eventId' => 42, 'sections' => 'speakers,venue' ) );
+		$this->assertSame( array( 'odavent-events-image-fallback' ), $this->enqueued_scripts );
+
+		// No image on the page (the venue has none): no image script either.
+		$this->enqueued_scripts = array();
+		$this->registry( $this->payload() )->render_block( 'odavent-events/event-page', array( 'eventId' => 42, 'sections' => 'venue' ) );
+		$this->assertSame( array(), $this->enqueued_scripts );
+
+		// An ended event: no countdown on the page, so no countdown script.
+		$this->enqueued_scripts = array();
+		$this->registry( $this->payload( self::state_overrides()['ended closed'] ) )->render_block( 'odavent-events/event-page', array( 'eventId' => 42 ) );
+		$this->assertEqualsCanonicalizing( array( 'odavent-events-agenda-filter', 'odavent-events-image-fallback' ), $this->enqueued_scripts );
+	}
+
+	public function test_the_event_page_carries_the_lifecycle_notice(): void {
+		$this->assertContains( 'event-page', Block_Registry::NOTICE_BLOCKS );
+		$this->assertSame( 'Odavent\\Events\\Blocks\\Renderers\\Event_Page', $this->registry( null )->renderers()['event-page'] );
+	}
+
 	// ---- markup contract -------------------------------------------------------------------
 
 	public function test_every_block_root_is_a_section_with_the_event_id_and_no_id_attribute(): void {
@@ -469,6 +500,125 @@ class BlockRegistryTest extends BlockTestCase {
 		rmdir( $dir );
 	}
 
+	public function test_editor_metadata_lists_section_choices_for_the_event_page_only(): void {
+		$meta = $this->registry( null )->editor_metadata();
+
+		$by_name = array();
+		foreach ( $meta as $row ) {
+			$by_name[ $row['name'] ] = $row;
+		}
+
+		$expected = array();
+		foreach ( \Odavent\Events\Blocks\Renderers\Event_Page::section_labels() as $slug => $label ) {
+			$expected[] = array( 'value' => $slug, 'label' => $label );
+		}
+		$this->assertSame( \Odavent\Events\Blocks\Renderers\Event_Page::DEFAULT_SECTIONS, array_column( $expected, 'value' ), 'Choices follow the default order.' );
+		$this->assertSame( $expected, $by_name['odavent-events/event-page']['sectionChoices'] );
+
+		foreach ( $by_name as $name => $row ) {
+			if ( 'odavent-events/event-page' !== $name ) {
+				$this->assertArrayNotHasKey( 'sectionChoices', $row, $name );
+			}
+		}
+	}
+
+	public function test_the_sections_label_says_what_the_editor_shows(): void {
+		$labels = array();
+		foreach ( $this->registry( null )->editor_metadata() as $row ) {
+			$labels[ $row['name'] ] = $row['labels'];
+		}
+
+		// The editor shows one toggle per section, not a comma list.
+		$this->assertSame( 'Sections to show', $labels['odavent-events/event-page']['sections'] );
+	}
+
+	public function test_the_pattern_description_names_find_my_registration_too(): void {
+		$patterns = array();
+		Functions\when( 'register_block_pattern_category' )->justReturn( true );
+		Functions\when( 'register_block_pattern' )->alias(
+			function ( $name, $args ) use ( &$patterns ) {
+				$patterns[] = $args;
+				return true;
+			}
+		);
+
+		$this->registry( null )->register_patterns();
+
+		$this->assertCount( 1, $patterns );
+		$this->assertStringContainsString( 'find my registration', strtolower( $patterns[0]['description'] ) );
+		$this->assertStringContainsString( '<!-- wp:odavent-events/find-registration /-->', $patterns[0]['content'], 'the description matches the content' );
+	}
+
+	public function test_pattern_registers_once_and_contains_every_individual_block(): void {
+		$categories = array();
+		$patterns   = array();
+		Functions\when( 'register_block_pattern_category' )->alias(
+			function ( $name, $args ) use ( &$categories ) {
+				$categories[] = array( $name, $args );
+				return true;
+			}
+		);
+		Functions\when( 'register_block_pattern' )->alias(
+			function ( $name, $args ) use ( &$patterns ) {
+				$patterns[] = array( $name, $args );
+				return true;
+			}
+		);
+
+		$registry = $this->registry( null );
+		$registry->register_patterns();
+		$registry->register_patterns();
+
+		$this->assertCount( 1, $categories );
+		$this->assertSame( 'odavent-events', $categories[0][0] );
+		$this->assertSame( 'Odavent', $categories[0][1]['label'] );
+
+		$this->assertCount( 1, $patterns );
+		$this->assertSame( 'odavent-events/full-event-page', $patterns[0][0] );
+		$this->assertSame( 'Full event page', $patterns[0][1]['title'] );
+		$this->assertSame( array( 'odavent-events' ), $patterns[0][1]['categories'] );
+
+		$expected = implode(
+			"\n",
+			array(
+				'<!-- wp:odavent-events/event-header /-->',
+				'<!-- wp:odavent-events/countdown /-->',
+				'<!-- wp:odavent-events/register-button /-->',
+				'<!-- wp:odavent-events/tickets /-->',
+				'<!-- wp:odavent-events/find-registration /-->',
+				'<!-- wp:odavent-events/speakers /-->',
+				'<!-- wp:odavent-events/agenda /-->',
+				'<!-- wp:odavent-events/sponsors /-->',
+				'<!-- wp:odavent-events/venue /-->',
+				'<!-- wp:odavent-events/add-to-calendar /-->',
+			)
+		);
+		$this->assertSame( $expected, $patterns[0][1]['content'] );
+
+		// Every name in the pattern is a block this plugin ships.
+		$names = array();
+		foreach ( glob( ODAVENT_EVENTS_DIR . 'blocks/*/block.json' ) as $file ) {
+			$names[] = json_decode( (string) file_get_contents( $file ), true )['name'];
+		}
+		preg_match_all( '#wp:(odavent-events/[a-z-]+) /-->#', $patterns[0][1]['content'], $found );
+		foreach ( $found[1] as $name ) {
+			$this->assertContains( $name, $names );
+		}
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_no_pattern_function_means_no_error(): void {
+		$this->assertFalse( function_exists( 'register_block_pattern' ) );
+		$this->assertFalse( function_exists( 'register_block_pattern_category' ) );
+
+		$this->registry( null )->register_patterns();
+
+		$this->addToAssertionCount( 1 );
+	}
+
 	public function test_the_block_category_is_added_once(): void {
 		$registry   = $this->registry( null );
 		$categories = $registry->add_category( array( array( 'slug' => 'text', 'title' => 'Text' ) ) );
@@ -549,6 +699,73 @@ class BlockRegistryTest extends BlockTestCase {
 		$this->registry( null )->enqueue_early_styles();
 
 		$this->assertSame( array(), $this->enqueued_styles );
+	}
+
+	// ---- widgets are not post content ------------------------------------------------------------
+
+	private function widget_active(): void {
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array( 'sidebar-1' => array( 'search-2', 'odavent_events_speakers-3' ) ) );
+	}
+
+	public function test_a_widget_makes_a_non_singular_page_count_as_odavent_content(): void {
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>', false );
+		$this->assertTrue( Block_Registry::page_has_odavent_content() );
+
+		$this->registry( null )->enqueue_early_styles();
+		$this->assertSame( array( 'odavent-events' ), $this->enqueued_styles );
+	}
+
+	public function test_a_block_in_a_block_widget_area_counts_as_odavent_content_everywhere(): void {
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array( 'sidebar-1' => array( 'block-3' ) ) );
+		\Odavent\Events\Tests\Support\WpStubs::$options['widget_block'] = array( 3 => array( 'content' => '<!-- wp:odavent-events/countdown /-->' ) );
+		$this->on_post( '<p>Hello</p>', false );
+
+		$this->assertTrue( Block_Registry::page_has_odavent_content() );
+		$this->registry( null )->enqueue_early_styles();
+		$this->assertSame( array( 'odavent-events' ), $this->enqueued_styles );
+	}
+
+	public function test_a_widget_also_counts_on_a_singular_page_without_blocks(): void {
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>' );
+
+		$this->assertTrue( Block_Registry::page_has_odavent_content() );
+	}
+
+	public function test_the_filter_still_has_the_last_word_with_a_widget_active(): void {
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>', false );
+		Filters\expectApplied( 'odavent_events_page_has_content' )->once()->with( true, null )->andReturn( false );
+
+		$this->assertFalse( Block_Registry::page_has_odavent_content() );
+	}
+
+	/**
+	 * In a separate process: DONOTCACHEPAGE, once defined by another test, would stay defined.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_editor_on_a_page_with_a_widget_gets_no_cache_constant_before_theme(): void {
+		$this->editor = true;
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>', false );
+		Functions\expect( 'nocache_headers' )->once();
+		$this->assertFalse( defined( 'DONOTCACHEPAGE' ) );
+
+		$this->registry( null )->prevent_preview_caching();
+
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) );
+	}
+
+	public function test_a_visitor_on_a_page_with_a_widget_stays_cacheable(): void {
+		$this->editor = false;
+		$this->widget_active();
+		$this->on_post( '<p>Hello</p>', false );
+		Functions\expect( 'nocache_headers' )->never();
+
+		$this->registry( null )->prevent_preview_caching();
 	}
 
 	// ---- preview capability ---------------------------------------------------------------

@@ -11,12 +11,15 @@
  *   GET /api/v1/wordpress/site/events/{id}       Bearer key: one event, any status
  *   GET /api/v1/wordpress/events/{slug}          public: published events only
  *   GET /api/v1/wordpress/plugin-update          public: latest plugin release
+ *   GET /storage/missing/...                     404, like a media file deleted on Odavent (broken images)
  *
  * Envelope {success, message, data}; errors {success:false, message, errors:{code}}.
  *
  * Events (built from tests/fixtures, mounted at /fixtures):
  *   1 published, the full fixture        2 cancelled        3 draft
  *   4 not found                          5 the hostile fixture, published
+ *   6 published, the full fixture plus a partner of type "both" whose logo 404s, and a cover that 404s
+ *   7 the cancelled twin of 6 (same content, its own id and slug)
  *
  * Test controls (never part of the real API):
  *   POST /__control  JSON, merged into the state:
@@ -37,6 +40,9 @@ const STUB_KEY   = 'odv_wp_stubkey_for_dev_0123456789';
 const STATE_FILE = '/tmp/odavent-stub-state.json';
 const LOG_FILE   = '/tmp/odavent-stub-log.jsonl';
 const FIXTURES   = '/fixtures';
+// Images that 404, as when a media file was deleted on Odavent. The browser in the e2e tests shares the
+// stack's network, so it gets a real 404 from this stub.
+const BROKEN_IMAGES = 'http://127.0.0.1:8081/storage/missing';
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $uri    = $_SERVER['REQUEST_URI'] ?? '/';
@@ -161,7 +167,36 @@ function events( array $state ): array {
 	$five['event']['id']     = 5;
 	$five['event']['status'] = 'published';
 
-	$events = array( 1 => $one, 2 => $two, 3 => $three, 5 => $five );
+	// The event page and image-fallback fixture: a partner of type "both", a logo and a cover that 404.
+	$six                         = $full;
+	$six['event']['id']          = 6;
+	$six['event']['slug']        = 'salon-expo-abidjan-2026';
+	$six['event']['name']        = 'Salon Expo Abidjan 2026';
+	$six['event']['status']      = 'published';
+	$six['event']['cover_url']   = BROKEN_IMAGES . '/cover-6.webp';
+	$six['event']['register_url'] = 'https://odavent.com/events/salon-expo-abidjan-2026/register';
+	$six['event']['find_registration_url'] = 'https://odavent.com/events/salon-expo-abidjan-2026/find-registration';
+	$six['partners'][]           = array(
+		'id'          => 406,
+		'name'        => 'Expo Partenaires CI',
+		'type'        => 'both',
+		'tier'        => null,
+		'description' => null,
+		'logo_url'    => BROKEN_IMAGES . '/partner-406.png',
+		'website'     => 'https://expo-partenaires.example',
+		'is_featured' => false,
+		'click_url'   => null,
+	);
+
+	$seven                          = $six;
+	$seven['event']['id']           = 7;
+	$seven['event']['slug']         = 'salon-expo-abidjan-2026-cancelled';
+	$seven['event']['name']         = 'Salon Expo Abidjan 2026 (cancelled)';
+	$seven['event']['status']       = 'cancelled';
+	$seven['event']['register_url'] = 'https://odavent.com/events/salon-expo-abidjan-2026-cancelled/register';
+	$seven['event']['registration_open'] = true; // As for 2: the plugin must not offer Register anyway.
+
+	$events = array( 1 => $one, 2 => $two, 3 => $three, 5 => $five, 6 => $six, 7 => $seven );
 
 	foreach ( $events as $id => &$payload ) {
 		$key = (string) $id;
@@ -287,6 +322,15 @@ if ( '/__state' === $path ) {
 if ( '/__log' === $path ) {
 	header( 'Content-Type: text/plain' );
 	echo is_readable( LOG_FILE ) ? file_get_contents( LOG_FILE ) : '';
+	exit;
+}
+
+// ---- broken images -------------------------------------------------------------------------------
+
+if ( 0 === strpos( $path, '/storage/missing/' ) ) {
+	http_response_code( 404 );
+	header( 'Content-Type: text/plain' );
+	echo 'Not Found';
 	exit;
 }
 

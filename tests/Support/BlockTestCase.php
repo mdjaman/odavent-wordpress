@@ -35,6 +35,7 @@ abstract class BlockTestCase extends RenderTestCase {
 		$this->repo_calls      = array();
 		$this->enqueued_scripts = array();
 
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array() );
 		Functions\when( 'wp_script_is' )->justReturn( true );
 		Functions\when( 'wp_enqueue_script' )->alias(
 			function ( $handle ) {
@@ -122,6 +123,7 @@ abstract class BlockTestCase extends RenderTestCase {
 		$options = Mockery::mock( Options::class );
 		$options->shouldReceive( 'default_event_id' )->andReturn( $default_event );
 		$options->shouldReceive( 'load_css' )->andReturn( $load_css );
+		$options->shouldReceive( 'appearance' )->andReturn( \Odavent\Events\Settings\Appearance::DEFAULTS );
 
 		return $options;
 	}

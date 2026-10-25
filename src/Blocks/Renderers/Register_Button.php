@@ -14,7 +14,8 @@ use Odavent\Events\Render\Template;
  * When the event is ended, paused, cancelled, archived or a draft preview, the registry's lifecycle notice
  * above this block says why, so the block itself renders nothing. A live event whose registration is
  * closed, a chosen ticket that cannot be bought, or an event whose tickets are all sold out or off sale
- * gets a short status line instead of the button. A stale copy gets the stale notice instead.
+ * gets a short status line instead of the button. A stale copy gets the stale notice instead, except on an
+ * event page, which prints that notice once for the whole page: there the block renders nothing.
  */
 final class Register_Button implements Renderer {
 
@@ -22,6 +23,9 @@ final class Register_Button implements Renderer {
 		$status       = '';
 		$url          = '';
 		$stale_notice = Lifecycle::stale_notice_html( $view );
+		if ( '' !== $stale_notice && Attributes::flag( $atts, Event_Page::IN_PAGE, false ) ) {
+			return '';
+		}
 
 		// A stale copy never offers Register (can_register() is false): the template shows the stale notice.
 		if ( '' === $stale_notice ) {

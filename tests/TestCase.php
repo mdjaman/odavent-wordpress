@@ -18,6 +18,10 @@ abstract class TestCase extends PHPUnitTestCase {
 		Monkey\setUp();
 		Functions\stubTranslationFunctions();
 		Functions\stubEscapeFunctions();
+		// Remembered for the request: every test is a new request.
+		if ( class_exists( \Odavent\Events\Widgets\Widgets::class ) ) {
+			\Odavent\Events\Widgets\Widgets::reset();
+		}
 	}
 
 	protected function tearDown(): void {

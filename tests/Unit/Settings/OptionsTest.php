@@ -3,6 +3,7 @@ namespace Odavent\Events\Tests\Unit\Settings;
 
 use Brain\Monkey\Functions;
 use Odavent\Events\Plugin;
+use Odavent\Events\Settings\Appearance;
 use Odavent\Events\Settings\Options;
 use Odavent\Events\Tests\Support\OptionsWithConstant;
 use Odavent\Events\Tests\TestCase;
@@ -30,6 +31,7 @@ class OptionsTest extends TestCase {
 			'cache_ttl'        => 900,
 			'default_event_id' => 0,
 			'load_css'         => true,
+			'appearance'       => Appearance::DEFAULTS,
 		);
 	}
 
@@ -289,6 +291,51 @@ echo class_exists( "Odavent\\\\Events\\\\Settings\\\\Options" ) ? "nested-ok" : 
 		$out = $this->sanitize( array( 'evil' => 'x' ) );
 
 		$this->assertSame( array_keys( $this->defaults() ), array_keys( $out ) );
+	}
+
+	public function test_appearance_survives_a_save_and_a_save_that_omits_it(): void {
+		$saved = $this->sanitize( array( 'appearance' => array( 'accent' => '#FFEB3B', 'radius' => '9999', 'spacing' => 'roomy', 'button_style' => 'outline', 'text' => 'url(x)' ) ) );
+
+		$this->assertSame(
+			array(
+				'accent'       => '#ffeb3b',
+				'contrast'     => '',
+				'text'         => '',
+				'border'       => '',
+				'radius'       => 24,
+				'spacing'      => 'roomy',
+				'button_style' => 'outline',
+			),
+			$saved['appearance']
+		);
+
+		// A save that does not mention appearance (the older form, a programmatic update) keeps what is stored.
+		$again = $this->sanitize( array( 'cache_ttl' => '300' ), $saved );
+		$this->assertSame( $saved['appearance'], $again['appearance'] );
+
+		// A value that is not a list of settings is ignored, not stored.
+		$bad = $this->sanitize( array( 'appearance' => 'red' ), $saved );
+		$this->assertSame( $saved['appearance'], $bad['appearance'] );
+
+		// Saving an empty form resets the fields to "not changed".
+		$reset = $this->sanitize( array( 'appearance' => array() ), $saved );
+		$this->assertSame( Appearance::DEFAULTS, $reset['appearance'] );
+	}
+
+	public function test_appearance_reads_back_validated_and_complete(): void {
+		$this->stored( array( 'appearance' => array( 'accent' => '#ABC', 'radius' => '5000', 'evil' => 'x' ) ) );
+
+		$appearance = ( new Options() )->appearance();
+
+		$this->assertSame( '#aabbcc', $appearance['accent'] );
+		$this->assertSame( 24, $appearance['radius'] );
+		$this->assertSame( array_keys( Appearance::DEFAULTS ), array_keys( $appearance ) );
+
+		$this->stored( array( 'appearance' => 'garbage' ) );
+		$this->assertSame( Appearance::DEFAULTS, ( new Options() )->appearance() );
+
+		$this->stored( array() );
+		$this->assertSame( Appearance::DEFAULTS, ( new Options() )->appearance() );
 	}
 
 	/* ---- ensure_exists ---- */

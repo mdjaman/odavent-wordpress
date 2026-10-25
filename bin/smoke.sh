@@ -10,7 +10,9 @@
 #  2 cancelled event            7 shortcodes == blocks             12 uninstall (on the packaged copy)
 #  3 draft privacy + no-cache   8 hostile payload                  13 the release zip on a fresh WordPress
 #  4 resilience + breaker       9 settings UX + autoload
-#  5 signed live refresh       10 stale view never offers Register
+#  5 signed live refresh       10 stale view never offers Register  14 event page block + shortcode
+#                                                                  15 widget + page cache + refresh
+#                                                                  16 Appearance settings (hostile input)
 set -uo pipefail
 # shellcheck source=lib/dev.sh
 . "$(dirname "$0")/lib/dev.sh"
@@ -22,7 +24,7 @@ trap 'rm -rf "$TMP"' EXIT
 ONLY="${ONLY:-}"
 # A full run prints exactly this many PASS lines. Fewer means a section was skipped (a failed setup step, an
 # early `if` taken): the run fails. Update it when checks are added or removed.
-EXPECTED_PASSES=138
+EXPECTED_PASSES=189
 
 pass() { PASSES=$((PASSES + 1)); printf 'PASS %s\n' "$1"; }
 fail() { FAILS=$((FAILS + 1)); printf 'FAIL %s\n' "$1"; [ -n "${2:-}" ] && printf '     %s\n' "$2"; return 0; }
@@ -81,9 +83,14 @@ set_settings() { # set_settings [key]
 		--format=json --autoload=no >/dev/null
 }
 
+# The dev page cache (check 15) is switched off and emptied on every reset, so a run aborted inside check 15
+# cannot leave it on for the next run (reset_all also runs before check 1).
+CACHE_DIR="/var/www/html/wp-content/odv-dev-cache"
 reset_all() {
 	stub_control '{"reset": true}'
 	set_settings
+	wp_cli option delete odv_dev_page_cache >/dev/null 2>&1 || true
+	wp_exec sh -c "rm -rf '$CACHE_DIR'"
 	wp_cli eval '\Odavent\Events\Plugin::instance()->repository()->purge_all();' >/dev/null
 }
 
@@ -328,8 +335,8 @@ if want 6; then
 	nonce=$(curl -s -b "$COOKIES" "$ODV_SITE/wp-admin/admin-ajax.php?action=rest-nonce")
 	res=$(get rest-admin.json "$ODV_SITE/wp-json/odavent/v1/events" -b "$COOKIES" -H "X-WP-Nonce: $nonce")
 	check "6 REST event list is 200 for the admin with a nonce (${res%% *})" [ "${res%% *}" = "200" ]
-	check "6 REST event list returns the stub events 1, 2, 3, 5" \
-		bash -c "jq -e '[.[].id] | sort == [1,2,3,5]' '$TMP/rest-admin.json' >/dev/null"
+	check "6 REST event list returns the stub events 1, 2, 3, 5, 6, 7" \
+		bash -c "jq -e '[.[].id] | sort == [1,2,3,5,6,7]' '$TMP/rest-admin.json' >/dev/null"
 	check "6 REST event list carries names and statuses" \
 		bash -c "jq -e 'map(select(.id == 2))[0] | .name == \"Cancelled Conference 2026\" and .status == \"cancelled\"' '$TMP/rest-admin.json' >/dev/null"
 	check "6 REST event list never contains the site key" lacks rest-admin.json "$ODV_STUB_KEY"
@@ -390,8 +397,9 @@ fi
 
 # ---- 9. settings UX ------------------------------------------------------------------------------------
 
-settings_post() { # settings_post <base_url> <site key or ''> <out file>: submits the real settings form
+settings_post() { # settings_post <base_url> <site key or ''> <out file> [more curl args]: submits the real settings form
 	local base="$1" key="$2" out="$3" nonce referer
+	shift 3
 	curl -s -b "$COOKIES" "$ODV_SITE/wp-admin/options-general.php?page=odavent-events" >"$TMP/form.html"
 	nonce=$(grep -o 'name="_wpnonce" value="[^"]*"' "$TMP/form.html" | head -1 | sed 's/.*value="//; s/"$//')
 	referer="/wp-admin/options-general.php?page=odavent-events"
@@ -403,7 +411,7 @@ settings_post() { # settings_post <base_url> <site key or ''> <out file>: submit
 		--data-urlencode "odavent_events_settings[default_event_id]=0" \
 		--data-urlencode "odavent_events_settings[cache_ttl]=60" \
 		--data-urlencode "odavent_events_settings[load_css]=1" \
-		"$ODV_SITE/wp-admin/options.php"
+		"$@" "$ODV_SITE/wp-admin/options.php"
 }
 
 autoload_value() {
@@ -489,6 +497,217 @@ if want 11; then
 	reset_all
 	wp_cli transient delete odavent_events_update --network >/dev/null 2>&1 || true
 	wp_cli eval 'delete_site_transient( "update_plugins" );' >/dev/null
+fi
+
+# ---- 14. event page block and shortcode --------------------------------------------------------------
+
+EVENT_PAGE_SECTIONS='["header","countdown","register","tickets","find-registration","speakers","agenda","sponsors","venue","calendar"]'
+EVENT_PAGE_HEADINGS='["Tickets","Speakers","Agenda","Sponsors and partners","Venue"]'
+
+if want 14; then
+	reset_all
+	off=$(log_size "$LOG_PATH")
+
+	# Event 6: published, the full fixture plus a partner of type "both"; its cover and that logo 404 on the stub.
+	res=$(get ep6.html "$ODV_SITE/event-page-6/")
+	check "14 event page (event 6) answers 200 (${res%% *})" [ "${res%% *}" = 200 ]
+	html sections <"$TMP/ep6.html" >"$TMP/ep6-sections.json"
+	check "14 one odv-event-page root for event 6" [ "$(html count 'class="odv-event-page"' <"$TMP/ep6.html")" = 1 ]
+	check "14 the ten default sections render, in order ($(jq -r '[.[].slug] | join(",")' "$TMP/ep6-sections.json"))" \
+		jq -e --argjson want "$EVENT_PAGE_SECTIONS" '[.[].slug] == $want' "$TMP/ep6-sections.json"
+	check "14 headings Tickets, Speakers, Agenda, Sponsors and partners, Venue, in order, on their sections" \
+		jq -e --argjson want "$EVENT_PAGE_HEADINGS" '[.[] | select(.heading != null) | .heading] == $want and ([.[] | select(.heading != null) | .slug] == ["tickets","speakers","agenda","sponsors","venue"])' "$TMP/ep6-sections.json"
+	check "14 every section has its own anchor (odv-<section>-6, unique)" \
+		jq -e '[.[].id] as $ids | ($ids | unique | length) == ($ids | length) and all($ids[]; test("^odv-[a-z-]+-6$"))' "$TMP/ep6-sections.json"
+	check "14 the partner of type 'both' is headed 'Sponsors and exhibitors', never the raw 'Both'" \
+		bash -c "grep -qF '<h3 class=\"odv-sponsors__group-title\">Sponsors and exhibitors</h3>' '$TMP/ep6.html' && ! grep -qiE 'group-title\">both<' '$TMP/ep6.html'"
+	check "14 the live event page has a Register link ($(register_links ep6.html))" [ "$(register_links ep6.html)" -ge 1 ]
+	check "14 the live event page shows no lifecycle notice" [ "$(html notices <"$TMP/ep6.html" | jq length)" = 0 ]
+	errors=$(html parse <"$TMP/ep6.html")
+	check "14 event page HTML parses without errors" [ "$(printf '%s' "$errors" | jq length)" = 0 ]
+
+	html images <"$TMP/ep6.html" >"$TMP/ep6-images.json"
+	check "14 data-odv-img on every image: cover, header logo, 3 speaker photos, 4 sponsor logos ($(jq -r '[.[].kind] | join(",")' "$TMP/ep6-images.json"))" \
+		jq -e '([.[] | select(.kind == "cover" and .class == "odv-header__cover")] | length) == 1
+			and ([.[] | select(.kind == "logo" and .class == "odv-header__logo")] | length) == 1
+			and ([.[] | select(.kind == "photo" and .class == "odv-speakers__photo")] | length) == 3
+			and ([.[] | select(.kind == "logo" and .class == "odv-sponsors__logo")] | length) == 4' "$TMP/ep6-images.json"
+	n=$(grep -o '<img [^>]*class="odv-[^>]*>' "$TMP/ep6.html" | grep -vc 'data-odv-img' || true)
+	check "14 no plugin <img> without data-odv-img (found $n)" [ "$n" = 0 ]
+	check "14 the speaker photos carry their initials for the fallback" \
+		bash -c "[ \"\$(grep -o 'data-odv-img=\"photo\" data-odv-initials=\"[A-Z]\{1,2\}\"' '$TMP/ep6.html' | wc -l | tr -d ' ')\" = 3 ]"
+	code=$(dc exec -T wordpress curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/storage/missing/partner-406.png)
+	check "14 the broken cover and the 'both' logo point at stub URLs that answer 404 ($code)" \
+		bash -c "[ '$code' = 404 ] && jq -e 'map(.src) | index(\"http://127.0.0.1:8081/storage/missing/cover-6.webp\") != null and index(\"http://127.0.0.1:8081/storage/missing/partner-406.png\") != null' '$TMP/ep6-images.json' >/dev/null"
+	scripts=$(html scripts <"$TMP/ep6.html")
+	check "14 the image fallback script is loaded" \
+		bash -c "jq -e 'map(.src) | any(test(\"/assets/js/image-fallback[.]js\"))' >/dev/null <<<\"\$1\"" _ "$scripts"
+
+	# Event 7: the cancelled twin of 6.
+	res=$(get ep7.html "$ODV_SITE/event-page-7/")
+	check "14 cancelled twin (event 7) answers 200 (${res%% *})" [ "${res%% *}" = 200 ]
+	notices=$(html notices <"$TMP/ep7.html")
+	check "14 cancelled twin: exactly one lifecycle notice, the cancelled one ($(printf '%s' "$notices" | jq -c '[.[].text]'))" \
+		bash -c "jq -e 'length == 1 and .[0].text == \"This event has been cancelled.\"' >/dev/null <<<\"\$1\"" _ "$notices"
+	check "14 cancelled twin: 'This event has been cancelled.' appears once in the whole page" \
+		[ "$(html count 'This event has been cancelled.' <"$TMP/ep7.html")" = 1 ]
+	check "14 cancelled twin: no Register link anywhere (found $(register_links ep7.html))" [ "$(register_links ep7.html)" = 0 ]
+	check "14 cancelled twin: no stale-copy notice" lacks ep7.html "Registration details could not be refreshed."
+	html sections <"$TMP/ep7.html" >"$TMP/ep7-sections.json"
+	check "14 cancelled twin keeps its content and drops countdown, register and calendar ($(jq -r '[.[].slug] | join(",")' "$TMP/ep7-sections.json"))" \
+		jq -e '[.[].slug] as $s | (["header","tickets","speakers","agenda","sponsors","venue"] | all(. as $x | $s | index($x) != null)) and (["countdown","register","calendar"] | all(. as $x | $s | index($x) == null))' "$TMP/ep7-sections.json"
+
+	# The shortcode renders the same markup as the block, live and cancelled.
+	for id in 6 7; do
+		get "eps$id.html" "$ODV_SITE/event-page-shortcode-$id/" >/dev/null
+		html fragments <"$TMP/ep$id.html" >"$TMP/frag-ep$id.json"
+		html fragments <"$TMP/eps$id.html" >"$TMP/frag-eps$id.json"
+		if [ "$(jq length "$TMP/frag-ep$id.json")" -ge 1 ] && [ "$(jq -c . "$TMP/frag-ep$id.json")" = "$(jq -c . "$TMP/frag-eps$id.json")" ]; then
+			pass "14 [odavent_event_page event_id=\"$id\"] renders the same as the block ($(jq -r '[.[].block] | join(",")' "$TMP/frag-eps$id.json"))"
+		else
+			fail "14 [odavent_event_page event_id=\"$id\"] renders the same as the block" \
+				"$(diff <(jq -r '.[].html' "$TMP/frag-ep$id.json" | fold -w 160) <(jq -r '.[].html' "$TMP/frag-eps$id.json" | fold -w 160) | head -6 | tr '\n' ' ')"
+		fi
+	done
+	check "14 the shortcode's cancelled twin has no Register link either" [ "$(register_links eps7.html)" = 0 ]
+	check "14 no PHP warnings or notices while rendering the event pages" log_clean_since "$LOG_PATH" "$off"
+fi
+
+# ---- 15. a widget, a page cache and a refresh ping -----------------------------------------------------
+# The dev stack has no page-cache plugin, so docker/mu-plugins/odavent-dev-page-cache.php is one (off unless the
+# option odv_dev_page_cache is 1): it stores anonymous pages, answers X-Odv-Dev-Cache: HIT/MISS, and empties
+# itself on the plugin's whole-site purge (odavent_events_purge_all), counting purges in purge-all.log. The
+# widget sits in the dev widget area (docker/mu-plugins/odavent-dev-widget-area.php) on a page without Odavent
+# content, which only the whole-site purge can refresh.
+
+cache_state() { grep -i '^x-odv-dev-cache:' "$TMP/$1.h" | tr -d '\r' | awk '{ print toupper($2) }'; }
+purges() { wp_exec sh -c "if [ -f '$CACHE_DIR/$1' ]; then wc -l < '$CACHE_DIR/$1'; else echo 0; fi" | tr -d ' \r'; }
+wait_purges() { # wait_purges <log> <more than>: the purge runs on shutdown, after the ping's answer
+	local i
+	for i in $(seq 1 20); do
+		[ "$(purges "$1")" -gt "$2" ] && return 0
+		sleep 0.25
+	done
+	return 1
+}
+ping_event() { # ping_event <event id> <unique second>: a signed refresh ping, echoes the HTTP status
+	local body
+	body=$(printf '{"event_id":%d,"event_slug":"smoke","sent_at":"2026-10-24T10:00:%02d+00:00"}' "$1" "$2")
+	ping "$ODV_SITE" "p-ev$1-$2.json" "$("$ODV_ROOT/bin/sign-ping" "$ODV_STUB_KEY" "$body")" "$body"
+}
+
+if want 15; then
+	reset_all
+	off=$(log_size "$LOG_PATH")
+	wp_exec sh -c "rm -rf '$CACHE_DIR'"
+	wp_cli option update odv_dev_page_cache 1 >/dev/null
+	wp_cli widget add odavent_events_register_button dev-widget-area 1 --title="Get your ticket" --eventId=6 >/dev/null
+	wid=$(wp_cli widget list dev-widget-area --fields=id --format=ids | tr -d '\r')
+	check "15 setup: wp widget add placed the Register button widget in a sidebar ($wid)" \
+		bash -c "case '$wid' in odavent_events_register_button-[0-9]*) exit 0;; *) exit 1;; esac"
+
+	get w1.html "$ODV_SITE/widget-host/" >/dev/null
+	check "15 the widget renders for the live event, with its title and a Register link" \
+		bash -c "grep -qF '<h2 class=\"widget-title\">Get your ticket</h2>' '$TMP/w1.html' && grep -qF 'class=\"widget odavent_events_widget\"' '$TMP/w1.html' && [ \"\$1\" -ge 1 ]" _ "$(register_links w1.html)"
+	check "15 the widget's render loads the plugin stylesheet on a page without Odavent content" \
+		grep -qE "id=['\"]odavent-events-css['\"]" "$TMP/w1.html"
+	get w2.html "$ODV_SITE/widget-host/" >/dev/null
+	check "15 the dev page cache stored the first visitor request ($(cache_state w1.html), then $(cache_state w2.html))" \
+		bash -c "[ '$(cache_state w1.html)' = MISS ] && [ '$(cache_state w2.html)' = HIT ]"
+	get ep6-c1.html "$ODV_SITE/event-page-6/" >/dev/null
+	get ep6-c2.html "$ODV_SITE/event-page-6/" >/dev/null
+	check "15 the event page is cached too ($(cache_state ep6-c2.html)) with its Register link" \
+		bash -c "[ '$(cache_state ep6-c2.html)' = HIT ] && [ \"\$1\" -ge 1 ]" _ "$(register_links ep6-c2.html)"
+
+	stub_control '{"status": {"6": "cancelled"}}'
+	get w3.html "$ODV_SITE/widget-host/" >/dev/null
+	check "15 control: cancelled on Odavent but not pinged yet, the cached page still offers Register ($(cache_state w3.html))" \
+		bash -c "[ '$(cache_state w3.html)' = HIT ] && [ \"\$1\" -ge 1 ]" _ "$(register_links w3.html)"
+
+	before=$(purges purge-all.log)
+	before_post=$(purges purge-post.log)
+	s=$(ping_event 6 1)
+	check "15 a signed refresh ping for event 6 answers 200 ($s)" [ "$s" = 200 ]
+	check "15 the ping fired the whole-site purge (odavent_events_purge_all) because a widget is active" wait_purges purge-all.log "$before"
+	check "15 ... and the per-post purge of the pages using Odavent blocks (odavent_events_purge_post)" wait_purges purge-post.log "$before_post"
+	get w4.html "$ODV_SITE/widget-host/" >/dev/null
+	check "15 after the ping the widget page is rendered again ($(cache_state w4.html)) with no Register link (found $(register_links w4.html))" \
+		bash -c "[ '$(cache_state w4.html)' = MISS ] && [ \"\$1\" = 0 ]" _ "$(register_links w4.html)"
+	check "15 ... and the widget shows the cancelled notice instead" contains w4.html "This event has been cancelled."
+	get ep6-c3.html "$ODV_SITE/event-page-6/" >/dev/null
+	check "15 the event page was purged too ($(cache_state ep6-c3.html)), no Register link (found $(register_links ep6-c3.html))" \
+		bash -c "[ '$(cache_state ep6-c3.html)' = MISS ] && [ \"\$1\" = 0 ]" _ "$(register_links ep6-c3.html)"
+
+	get w-admin.html "$ODV_SITE/widget-host/" -b "$COOKIES" >/dev/null
+	check "15 an editor on a page whose only Odavent content is a widget is not cached (DONOTCACHEPAGE probe)" \
+		grep -qi '^x-odavent-probe-donotcachepage: 1' "$TMP/w-admin.html.h"
+
+	wp_cli widget delete "$wid" >/dev/null
+	wp_cli option delete odv_dev_page_cache >/dev/null
+	wp_exec sh -c "rm -rf '$CACHE_DIR'"
+	get w5.html "$ODV_SITE/widget-host/" >/dev/null
+	check "15 cleanup: the widget is gone and the page is no longer cached" \
+		bash -c "! grep -qF 'odavent_events_widget' '$TMP/w5.html' && ! grep -qi '^x-odv-dev-cache' '$TMP/w5.html.h'"
+	check "15 no PHP warnings or notices with the widget, the cache and the ping" log_clean_since "$LOG_PATH" "$off"
+	reset_all
+fi
+
+# ---- 16. Appearance settings through options.php ---------------------------------------------------------
+
+appearance_json() { (cd "$ODV_ROOT" && bin/wp option pluck odavent_events_settings appearance --format=json) | tr -d '\r'; }
+APPEARANCE_FIELD="odavent_events_settings[appearance]"
+# The Appearance CSS printed after the plugin stylesheet, trimmed (WordPress 6.9+ appends a sourceURL comment).
+inline_css() { html style odavent-events-inline-css <"$TMP/$1" | jq -r '(. // "") | gsub("/\\*# sourceURL=[^*]*\\*/"; "") | gsub("^\\s+|\\s+$"; "")'; }
+
+if want 16; then
+	reset_all
+	off=$(log_size "$LOG_PATH")
+	code=$(settings_post "http://127.0.0.1:8081" "$ODV_STUB_KEY" app-hostile.html \
+		--data-urlencode "${APPEARANCE_FIELD}[accent]=red;}body{display:none}" \
+		--data-urlencode "${APPEARANCE_FIELD}[contrast_auto]=1" \
+		--data-urlencode "${APPEARANCE_FIELD}[contrast]=</style><script>alert(1)</script>" \
+		--data-urlencode "${APPEARANCE_FIELD}[text]=#336699" \
+		--data-urlencode "${APPEARANCE_FIELD}[border]=url(javascript:alert(1))" \
+		--data-urlencode "${APPEARANCE_FIELD}[radius]=999" \
+		--data-urlencode "${APPEARANCE_FIELD}[spacing]=huge;color:red" \
+		--data-urlencode "${APPEARANCE_FIELD}[button_style]=<script>")
+	check "16 saving hostile Appearance values through options.php answers 200 ($code)" [ "$code" = 200 ]
+	stored=$(appearance_json)
+	check "16 only valid values are stored: the colour kept, the radius clamped, the rest default ($stored)" \
+		bash -c "jq -e '. == {\"accent\":\"\",\"contrast\":\"\",\"text\":\"#336699\",\"border\":\"\",\"radius\":24,\"spacing\":\"\",\"button_style\":\"filled\"}' >/dev/null <<<\"\$1\"" _ "$stored"
+	check "16 the connection settings survive an Appearance save" \
+		bash -c "[ \"\$(cd '$ODV_ROOT' && bin/wp option pluck odavent_events_settings base_url)\" = 'http://127.0.0.1:8081' ]"
+	get app-front1.html "$ODV_SITE/all-blocks-1/" >/dev/null
+	css=$(inline_css app-front1.html)
+	check "16 the front end gets the valid values as the plugin stylesheet's inline CSS ($css)" \
+		bash -c "case \"\$1\" in *'--odv-text:#336699;'*'--odv-radius:24px;'*) exit 0;; *) exit 1;; esac" _ "$css"
+	check "16 no --odv-accent anywhere on the page for the invalid accent" lacks app-front1.html "--odv-accent"
+	check "16 nothing of the hostile input reaches the CSS (display, script, javascript, url(, huge, 999)" \
+		bash -c "! printf '%s' \"\$1\" | grep -qiE 'display|script|javascript|url\(|huge|999|red'" _ "$css"
+
+	code=$(settings_post "http://127.0.0.1:8081" "$ODV_STUB_KEY" app-valid.html \
+		--data-urlencode "${APPEARANCE_FIELD}[accent]=#0055AA" \
+		--data-urlencode "${APPEARANCE_FIELD}[contrast_auto]=1" \
+		--data-urlencode "${APPEARANCE_FIELD}[radius]=6" \
+		--data-urlencode "${APPEARANCE_FIELD}[spacing]=roomy" \
+		--data-urlencode "${APPEARANCE_FIELD}[button_style]=outline")
+	stored=$(appearance_json)
+	check "16 a valid accent is stored normalised ($stored)" \
+		bash -c "jq -e '.accent == \"#0055aa\" and .contrast == \"\" and .radius == 6 and .spacing == \"roomy\" and .button_style == \"outline\"' >/dev/null <<<\"\$1\"" _ "$stored"
+	check "16 no contrast warning for a readable pair" lacks app-valid.html "contrast ratio of"
+	get app-front2.html "$ODV_SITE/all-blocks-1/" >/dev/null
+	css=$(inline_css app-front2.html)
+	check "16 the front end now has --odv-accent for the valid colour, with automatic white text (${css%%\}*}})" \
+		bash -c "case \"\$1\" in ':root{--odv-accent:#0055aa;--odv-accent-contrast:#ffffff;--odv-radius:6px;--odv-gap:1.5rem;}'*) exit 0;; *) exit 1;; esac" _ "$css"
+	check "16 the outline button style adds its rule" bash -c "case \"\$1\" in *'background:transparent'*) exit 0;; *) exit 1;; esac" _ "$css"
+
+	code=$(settings_post "http://127.0.0.1:8081" "$ODV_STUB_KEY" app-low.html \
+		--data-urlencode "${APPEARANCE_FIELD}[accent]=#ffff00" \
+		--data-urlencode "${APPEARANCE_FIELD}[contrast]=#ffffff")
+	check "16 a low-contrast pair is saved with a warning that gives the ratio (1.07:1)" \
+		bash -c "grep -qF 'contrast ratio of 1.07:1' '$TMP/app-low.html' && [ \"\$(cd '$ODV_ROOT' && bin/wp option pluck odavent_events_settings appearance contrast)\" = '#ffffff' ]"
+	check "16 no PHP warnings or notices while saving and applying Appearance" log_clean_since "$LOG_PATH" "$off"
+	reset_all
 fi
 
 # ---- 13 (+12). the release zip on a fresh WordPress ---------------------------------------------------

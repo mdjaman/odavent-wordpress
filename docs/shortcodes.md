@@ -151,3 +151,56 @@ archived event.
 | `show_ics` | boolean | `true` |
 
 Example: `[odavent_add_to_calendar event="annual-summit" show_outlook="no"]`
+
+## `[odavent_event_page]`
+
+The whole event page in one shortcode: header, countdown, Register button, tickets, find my registration,
+speakers, agenda, sponsors, venue and calendar links, always in that order. A section with nothing to show
+is left out together with its heading. An ended, paused or cancelled event's notice appears once, at the
+top, and the stale-data notice (when Odavent could not be reached and a saved copy is shown) once, inside
+the page, when `register` or `tickets` is among the chosen sections (it stands in for the missing Register
+links).
+
+| Attribute | Type | Default |
+|---|---|---|
+| `sections` | string | (all sections) |
+| `show_headings` | boolean | `true` |
+| `speakers_columns` | integer | `3` (2 to 4) |
+| `sponsors_columns` | integer | `4` (1 to 6) |
+| `show_speaker_bio` | boolean | `false` |
+| `show_availability` | boolean | `false` |
+
+### How `sections` and the order work
+
+`sections` is a comma list of section names; blank (or no `sections` attribute) means every section:
+
+| Name | Shows | Heading |
+|---|---|---|
+| `header` | Title, dates, cover, logo, description, venue line | (none) |
+| `countdown` | The live countdown | (none) |
+| `register` | The Register button | (none) |
+| `tickets` | The ticket types | Tickets |
+| `find-registration` | The "find my registration" link | (none) |
+| `speakers` | The speakers | Speakers |
+| `agenda` | The agenda | Agenda |
+| `sponsors` | Sponsors, exhibitors and partners | Sponsors and partners |
+| `venue` | Venue, address and map link | Venue |
+| `calendar` | The add-to-calendar links | (none) |
+
+* The order is **fixed** (the order of the table), never the order you type: `sections="agenda,speakers"`
+  shows speakers first. To arrange the parts differently, use the individual shortcodes or blocks (the
+  **Full event page** block pattern inserts them in page order).
+* Names are case-insensitive and may have spaces around the commas. Unknown names are ignored; a list that
+  names no known section means every section.
+* `show_headings="no"` removes the headings above tickets, speakers, agenda, sponsors and venue.
+* `speakers_columns`, `sponsors_columns`, `show_speaker_bio` and `show_availability` are the speakers'
+  `columns` and `show_bio`, the sponsors' `columns` and the tickets' `show_availability`. The other options of
+  those sections keep their defaults; use the individual shortcode when you need more control.
+* In the block editor the `sections` list is a set of toggles; the shortcode and the
+  [Event page widget](widgets.md#the-event-page-widget-and-its-sections) use the comma list.
+
+Examples:
+
+* `[odavent_event_page event="annual-summit"]` (everything)
+* `[odavent_event_page event="annual-summit" sections="speakers,agenda" show_headings="no" speakers_columns="2"]`
+* `[odavent_event_page event_id="42" sections="header,register,tickets,venue" show_availability="yes"]`

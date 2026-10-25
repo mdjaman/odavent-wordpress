@@ -25,6 +25,9 @@ Open <http://localhost:8089> (log in as `admin` / `admin`). The test pages:
 | `/draft-3/` | the ten blocks for event 3 (draft: visitors see nothing, editors a preview) |
 | `/hostile-5/` | the ten blocks for event 5 (the hostile fixture: XSS strings, bad URLs, a 50 KB description) |
 | `/slug-only/` | the ten blocks with only `eventSlug` |
+| `/event-page-6/`, `/event-page-shortcode-6/` | the event page block / shortcode for event 6 (a partner of type `both`, a cover and a logo that 404) |
+| `/event-page-7/`, `/event-page-shortcode-7/` | the same for event 7, the cancelled twin of 6 |
+| `/widget-host/` | no Odavent content; the smoke test places a widget in the dev widget area and watches this page |
 
 Other helpers: `bin/wp ...` runs WP-CLI in the stack (`bin/wp option get odavent_events_settings`),
 `bin/sign-ping <key> <body>` prints the `X-Odavent-Signature` header Odavent sends with a refresh ping.
@@ -45,9 +48,16 @@ stub and `localhost:8089` is the site (Apache listens on 8089 inside the contain
 loopback requests work). The plugin accepts the `http://127.0.0.1:8081` address only because the environment
 type is `local`.
 
-`docker/mu-plugins/odavent-dev-probe.php` (dev stack only, never shipped) adds an
-`X-Odavent-Probe-Donotcachepage: 1` header when `DONOTCACHEPAGE` is defined before the theme renders, so the
-smoke test can see the early no-cache layer from outside.
+`docker/mu-plugins/` (dev stack only, never shipped):
+
+* `odavent-dev-probe.php` adds an `X-Odavent-Probe-Donotcachepage: 1` header when `DONOTCACHEPAGE` is defined
+  before the theme renders, so the smoke test can see the early no-cache layer from outside.
+* `odavent-dev-widget-area.php` registers a widget area, `dev-widget-area`, printed in the footer of every page
+  while it holds a widget (the default block themes have no widget areas): `bin/wp widget add odavent_events_speakers dev-widget-area 1 --eventId=1`.
+* `odavent-dev-page-cache.php` is a minimal full-page cache, off unless the option `odv_dev_page_cache` is `1`:
+  it stores anonymous pages in `wp-content/odv-dev-cache/`, answers `X-Odv-Dev-Cache: HIT` or `MISS`, and empties
+  itself on the plugin's purge actions (`odavent_events_purge_all`, `odavent_events_purge_post`), counting them in
+  `purge-all.log` / `purge-post.log` there, the way a page-cache plugin would.
 
 ### The stub Odavent API
 
@@ -56,10 +66,11 @@ the same envelope (`{success, message, data}`) and error shape (`{success: false
 
 | Route | Answer |
 |---|---|
-| `GET /api/v1/wordpress/site/events` | Bearer `odv_wp_stubkey_for_dev_0123456789`, else 401 `invalid_key`. Events 1, 2, 3, 5 |
-| `GET /api/v1/wordpress/site/events/{id}` | 1 published, 2 cancelled, 3 draft, 5 hostile (published), anything else 404 `not_found` |
+| `GET /api/v1/wordpress/site/events` | Bearer `odv_wp_stubkey_for_dev_0123456789`, else 401 `invalid_key`. Events 1, 2, 3, 5, 6, 7 |
+| `GET /api/v1/wordpress/site/events/{id}` | 1 published, 2 cancelled, 3 draft, 5 hostile (published), 6 published (event 1's content plus a partner of type `both`; its cover and that partner's logo 404), 7 the cancelled twin of 6; anything else 404 `not_found` |
 | `GET /api/v1/wordpress/events/{slug}` | public, published events only, else 404 `not_found` |
 | `GET /api/v1/wordpress/plugin-update` | version `9.9.9`, the pinned GitHub download URL |
+| `GET /storage/missing/...` | 404 (event 6's broken images: `http://127.0.0.1:8081/storage/missing/cover-6.webp`, `.../partner-406.png`) |
 
 `?locale=fr` appends ` (fr)` to the event, session, speaker and ticket names. Test controls (not part of the real
 API) change behaviour at runtime, from inside the stack:
@@ -114,9 +125,21 @@ non-blocking for now).
     transient left.
 13. the release zip (`bin/build-zip 0.1.0`) installed into a fresh WordPress at `/pkg`: checks 1 and 5 again,
     and in `fr_FR` the Register button reads "S’inscrire".
+14. event page block (event 6): the ten default sections in order, the five headings, unique anchors, the
+    `both` partners headed "Sponsors and exhibitors", every image marked `data-odv-img` and the fallback script
+    loaded; the cancelled twin (event 7): exactly one lifecycle notice, the cancelled text once, no Register link;
+    `[odavent_event_page]` renders the same markup as the block for both.
+15. a Register button widget (`wp widget add`, dev widget area) on a page without Odavent content, behind the
+    dev page cache: it renders for the live event and is cached (HIT); cancelled on Odavent, the cached page still
+    offers Register until a signed ping, which fires `odavent_events_purge_all` (and the per-post purge); the next
+    request is rendered again with the cancelled notice and no Register link; an editor's view of that page is
+    not cached (`DONOTCACHEPAGE`).
+16. Appearance through `options.php`: hostile values are stored as valid ones only (colour kept, radius clamped,
+    the rest default), the front end has `--odv-accent` only for a valid colour (with automatic contrast), the
+    outline style adds its rule, and a low-contrast pair is saved with a warning giving the ratio.
 
 `wp-content/debug.log` is read by check 0 (after install and activation), 4 (during the failures), 8 (hostile
-event), 11 (update checks), 13 (the packaged site's log and the dev site's meanwhile) and a final check over the
+event), 11 (update checks), 14, 15, 16, 13 (the packaged site's log and the dev site's meanwhile) and a final check over the
 whole run: a PHP warning, notice, deprecation or fatal there fails. Check 0 (and 13 for the packaged site) first
 writes a canary line through `error_log()` and requires it in the log, and a missing log fails these checks, so
 they cannot pass on a site whose logging is broken. A full run must print `EXPECTED_PASSES` PASS lines (set at
@@ -139,9 +162,16 @@ WordPress container's network and installs `@playwright/test` inside the contain
   is listed in the test's annotations. Any console error or warning fails a test, except a few exact core
   messages listed with their WordPress version in `tests/e2e/specs/helpers.js`. `bin/e2e` stores the admin's
   editor preferences first (no welcome guide, no "Choose a pattern" modal for new pages).
+* editor (event page): the Event page block from the inserter previews event 6; turning the Speakers section
+  off in the inspector drops it (and its heading) from the server-side preview, back on stores `sections` as
+  empty; the "Full event page" pattern inserts the ten blocks in page order.
 * front end: the agenda track filter (`aria-pressed`, `hidden`, rooms follow their parent); the countdown
-  ticks without `NaN`; a paused event's countdown hides itself once the start passes; full-page screenshots at
-  390 and 1280 px (light mode) in `tests/e2e/artifacts/` for a human to look at.
+  ticks without `NaN`; a paused event's countdown hides itself once the start passes; on `/event-page-6/` the
+  404 cover is removed and the 404 logo of the `both` partner becomes its name (the expected "Failed to load
+  resource" messages for exactly those two URLs are allowed, see `expected404` in `helpers.js`); full-page
+  screenshots at 390 and 1280 px (light mode) in `tests/e2e/artifacts/` for a human to look at.
+* settings: the Appearance preview follows the accent typed in the colour picker (the preview button's computed
+  colours), and shows the ratio and the warning for white text on yellow (1.07:1).
 
 ## Pointing the plugin at a real local Odavent
 

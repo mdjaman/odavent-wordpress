@@ -22,10 +22,10 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <section class="<?php echo esc_attr( $classes ); ?>" data-odv-event="<?php echo esc_attr( (string) $event_id ); ?>">
 <?php if ( '' !== $cover_url ) : ?>
-	<img class="odv-header__cover" src="<?php echo esc_url( $cover_url ); ?>" alt="" decoding="async">
+	<img class="odv-header__cover" src="<?php echo esc_url( $cover_url ); ?>" alt="" decoding="async" data-odv-img="cover">
 <?php endif; ?>
 <?php if ( '' !== $logo_url ) : ?>
-	<img class="odv-header__logo" src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $name ); ?>" decoding="async">
+	<img class="odv-header__logo" src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $name ); ?>" decoding="async" data-odv-img="logo">
 <?php endif; ?>
 <?php if ( '' !== $name ) : ?>
 	<h2 class="odv-header__title"><?php echo esc_html( $name ); ?></h2>

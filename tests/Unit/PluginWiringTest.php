@@ -203,7 +203,7 @@ class PluginWiringTest extends TestCase {
 		// init: text domain (1), then the blocks at exactly 10, then the shortcodes at exactly 11.
 		$this->assertSame( array( 1, 10, 11 ), $priorities['init'], 'init priorities: text domain, blocks, shortcodes' );
 
-		foreach ( array( 'init', 'rest_api_init', 'template_redirect', 'wp_enqueue_scripts', 'enqueue_block_editor_assets' ) as $hook ) {
+		foreach ( array( 'init', 'widgets_init', 'rest_api_init', 'template_redirect', 'wp_enqueue_scripts', 'enqueue_block_editor_assets' ) as $hook ) {
 			$this->assertArrayHasKey( $hook, $actions, $hook );
 		}
 		$this->assertArrayHasKey( 'block_categories_all', $filters );
@@ -232,6 +232,14 @@ class PluginWiringTest extends TestCase {
 		Functions\when( 'wp_add_inline_script' )->justReturn( true );
 		Functions\when( 'wp_set_script_translations' )->justReturn( true );
 		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
+		$patterns = array();
+		Functions\when( 'register_block_pattern_category' )->justReturn( true );
+		Functions\when( 'register_block_pattern' )->alias(
+			function ( $name ) use ( &$patterns ) {
+				$patterns[] = $name;
+				return true;
+			}
+		);
 		Functions\when( 'register_block_type' )->alias(
 			function ( $dir ) use ( &$order ) {
 				$order[] = 'block:' . basename( $dir );
@@ -243,6 +251,7 @@ class PluginWiringTest extends TestCase {
 		$this->assertSame( 'style:odavent-events', $order[0] );
 		$this->assertSame( 'script:odavent-events-editor', $order[1] );
 		$this->assertContains( 'block:event-header', $order );
+		$this->assertSame( array( 'odavent-events/full-event-page' ), $patterns, 'The pattern is registered on init.' );
 
 		$inline = array();
 		Functions\when( 'wp_add_inline_script' )->alias(
@@ -266,10 +275,54 @@ class PluginWiringTest extends TestCase {
 			}
 		);
 		call_user_func( $late_init );
-		$this->assertCount( 10, $tags );
+		$this->assertCount( 11, $tags );
 		$this->assertContains( 'odavent_speakers', $tags );
 		$this->assertInstanceOf( \Odavent\Events\Shortcodes\Shortcodes::class, $plugin->shortcodes() );
 		$this->assertSame( $plugin->shortcodes(), $plugin->shortcodes() );
+	}
+
+	public function test_widgets_init_loads_the_text_domain_once_and_registers_a_widget_per_block(): void {
+		Functions\when( 'is_admin' )->justReturn( false );
+		$actions = array();
+		Functions\when( 'add_action' )->alias(
+			function ( $hook, $callback, $priority = 10 ) use ( &$actions ) {
+				$actions[] = array( $hook, $callback, $priority );
+				return true;
+			}
+		);
+		$loads = 0;
+		Functions\when( 'load_plugin_textdomain' )->alias(
+			function () use ( &$loads ) {
+				++$loads;
+				return true;
+			}
+		);
+		$widgets = array();
+		Functions\when( 'register_widget' )->alias(
+			function ( $widget ) use ( &$widgets ) {
+				$widgets[] = $widget;
+			}
+		);
+		Functions\expect( 'get_option' )->never();
+
+		$plugin = $this->fresh_plugin();
+		$plugin->boot();
+
+		$hooks = array_column( $actions, 0 );
+		$this->assertSame( 1, count( array_keys( $hooks, 'widgets_init', true ) ) );
+		$widgets_init = $actions[ array_search( 'widgets_init', $hooks, true ) ][1];
+
+		// WordPress fires widgets_init inside init priority 1, before the plugin's own init callbacks.
+		( $widgets_init )();
+		$this->assertSame( 1, $loads, 'Widget names are built after the translations are loaded.' );
+		$this->assertCount( 11, $widgets );
+		$this->assertContainsOnlyInstancesOf( \Odavent\Events\Widgets\Block_Widget::class, $widgets );
+		$this->assertInstanceOf( \Odavent\Events\Widgets\Widgets::class, $plugin->widgets() );
+		$this->assertSame( $plugin->widgets(), $plugin->widgets() );
+
+		$init = array_values( array_filter( $actions, function ( $action ) { return 'init' === $action[0] && 1 === $action[2]; } ) );
+		( $init[0][1] )();
+		$this->assertSame( 1, $loads, 'Loaded once per request.' );
 	}
 
 	/**
@@ -295,6 +348,8 @@ class PluginWiringTest extends TestCase {
 		Functions\when( 'wp_register_script' )->justReturn( true );
 		Functions\when( 'wp_set_script_translations' )->justReturn( true );
 		Functions\when( 'register_block_type' )->justReturn( true );
+		Functions\when( 'register_block_pattern_category' )->justReturn( true );
+		Functions\when( 'register_block_pattern' )->justReturn( true );
 		Functions\when( 'add_shortcode' )->justReturn( true );
 		Functions\expect( 'get_option' )->never();
 

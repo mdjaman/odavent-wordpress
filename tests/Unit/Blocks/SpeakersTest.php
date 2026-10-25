@@ -55,6 +55,28 @@ class SpeakersTest extends BlockTestCase {
 		$this->assertStringContainsString( '<span class="odv-speakers__photo odv-speakers__photo--placeholder" aria-hidden="true">KM</span>', $html );
 	}
 
+	public function test_a_photo_carries_the_fallback_markers_and_a_placeholder_does_not(): void {
+		$html = $this->render( $this->payload() );
+
+		$this->assertMatchesRegularExpression( '#<img class="odv-speakers__photo" src="https://odavent\.com/storage/media/61/marcel-medium\.webp"[^>]* data-odv-img="photo" data-odv-initials="MD"#', $html );
+		$this->assertSame( 3, substr_count( $html, 'data-odv-img="photo"' ), 'one per <img>, none on the placeholder span' );
+		$this->assertSame( 3, substr_count( $html, 'data-odv-initials=' ) );
+		$this->assertDoesNotMatchRegularExpression( '#<span[^>]*data-odv-img#', $html );
+	}
+
+	public function test_the_image_fallback_script_is_enqueued_only_when_a_photo_is_rendered(): void {
+		$this->registry( $this->payload() )->render_block( 'odavent-events/speakers', array( 'eventId' => 42 ) );
+		$this->assertSame( array( 'odavent-events-image-fallback' ), $this->enqueued_scripts );
+
+		$this->enqueued_scripts = array();
+		$payload                = $this->payload();
+		foreach ( $payload['speakers'] as $i => $speaker ) {
+			$payload['speakers'][ $i ]['photo_url'] = null;
+		}
+		$this->registry( $payload )->render_block( 'odavent-events/speakers', array( 'eventId' => 42 ) );
+		$this->assertSame( array(), $this->enqueued_scripts );
+	}
+
 	public function initials(): array {
 		return array(
 			'two words'        => array( 'Aïcha Koné', 'AK' ),

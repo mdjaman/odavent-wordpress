@@ -8,14 +8,17 @@ Put the code in a small must-use plugin or your child theme's `functions.php`.
 | Hook | Type | Purpose |
 |---|---|---|
 | [`odavent_events_allowed_html`](#odavent_events_allowed_html) | filter | Tags and attributes kept in organizer-written text. |
+| [`odavent_events_appearance_css`](#odavent_events_appearance_css) | filter | The CSS generated from the Appearance settings. |
 | [`odavent_events_locale`](#odavent_events_locale) | filter | Language requested from Odavent. |
 | [`odavent_events_now`](#odavent_events_now) | filter | The current time used by the countdown. |
 | [`odavent_events_page_has_content`](#odavent_events_page_has_content) | filter | Whether a page uses Odavent content (early stylesheet, no page cache for editors). |
 | [`odavent_events_preview_capability`](#odavent_events_preview_capability) | filter | Who sees draft previews and editor notices. |
+| [`odavent_events_purge_all_on_widget`](#odavent_events_purge_all_on_widget) | filter | Whether the whole-site page cache is purged while an Odavent widget is active. |
 | [`odavent_events_purge_post_ids`](#odavent_events_purge_post_ids) | filter | Which posts have their page cache purged when an event changes. |
 | [`odavent_events_template`](#odavent_events_template) | filter | The template file used for a block. |
 | [`odavent_events_update_package_prefix`](#odavent_events_update_package_prefix) | filter | Where plugin update packages may come from. |
 | [`odavent_events_view_data`](#odavent_events_view_data) | filter | The variables handed to a template. |
+| [`odavent_events_purge_all`](#odavent_events_purge_all) | action | Purge the whole site in a page cache the plugin does not know. |
 | [`odavent_events_purge_post`](#odavent_events_purge_post) | action | Purge a post in a page cache the plugin does not know. |
 | [`odavent_events_refreshed`](#odavent_events_refreshed) | action | A signed refresh from Odavent was processed. |
 
@@ -45,6 +48,29 @@ add_filter( 'odavent_events_allowed_html', function ( array $allowed ): array {
 
 	return $allowed;
 } );
+```
+
+### `odavent_events_appearance_css`
+
+```php
+apply_filters( 'odavent_events_appearance_css', string $css, array $appearance ): string
+```
+
+The final CSS generated from the Appearance settings, added after the plugin's stylesheet (so it only exists
+while "Load default styles" is on). `$appearance` holds the validated values (`accent`, `contrast`, `text`,
+`border`, `radius`, `spacing`, `button_style`; an empty string means the organizer did not change it).
+The filter is not applied while nothing is changed (`$css` would be empty). A return value that is not a
+string is ignored. You are responsible for anything you add: the plugin only guarantees its own output
+contains hex colours, fixed `rem` gaps and a `px` radius (a whole number from 0 to 24), and fixed keywords.
+
+The settings write custom properties on `:root`, so CSS of your own that is declared closer (on a wrapper)
+or later still wins; the plugin never uses `!important` here.
+
+```php
+add_filter( 'odavent_events_appearance_css', function ( string $css, array $appearance ): string {
+	// Keep the chosen accent, but square off the buttons on this site.
+	return $css . '.odv-register .odv-register__button{border-radius:0}';
+}, 10, 2 );
 ```
 
 ### `odavent_events_locale`
@@ -105,10 +131,17 @@ stylesheet in the page head (so blocks do not flash unstyled) and to send no-cac
 who may see a draft preview.
 
 `$has` is `true` when the current singular post's own content contains an `odavent-events/` block or an
-`[odavent_` shortcode. `$post` is that post, or `null` when the request is not a singular page.
+`[odavent_` shortcode, or when a widget area holds Odavent content: one of the plugin's classic widgets, or
+an Odavent block or shortcode inside a block widget, a Text widget or a Custom HTML widget placed in an
+active sidebar (widgets can show on any page, so this holds on non-singular pages too). `$post` is the
+current singular post, or `null` when the request is not a singular page.
 
-The check only reads the post's own content. It cannot see blocks that live elsewhere: synced patterns,
-template parts and block-theme templates, widget areas, ACF fields. Return `true` for those pages:
+Widgets also matter for the page cache: while such a widget is active, a refresh from Odavent purges the
+whole-site cache (see [`odavent_events_purge_all_on_widget`](#odavent_events_purge_all_on_widget)).
+
+It does **not** detect blocks that live in a block theme's templates or template parts (header, footer,
+sidebar parts of the Site Editor), in synced patterns, or in custom fields such as ACF. Return `true` for
+those pages:
 
 ```php
 add_filter( 'odavent_events_page_has_content', function ( bool $has, $post ): bool {
@@ -157,6 +190,24 @@ add_filter( 'odavent_events_purge_post_ids', function ( array $post_ids, int $ev
 
 	return $post_ids;
 }, 10, 2 );
+```
+
+### `odavent_events_purge_all_on_widget`
+
+```php
+apply_filters( 'odavent_events_purge_all_on_widget', bool $purge, int $event_id ): bool
+```
+
+A widget is not post content and can show on any page, so while a sidebar holds Odavent content (one of
+the plugin's classic widgets, or an Odavent block or shortcode in a block, Text or Custom HTML widget) the plugin purges the whole-site page cache when a signed refresh arrives for `$event_id`
+(WP Rocket `rocket_clean_domain()`, else W3 Total Cache `w3tc_flush_posts()` (its page cache only, not
+its object, database, minify or CDN caches), else WP Super Cache `wp_cache_clear_cache()` (this site only on
+a multisite network), plus the `litespeed_purge_all` action and
+[`odavent_events_purge_all`](#odavent_events_purge_all)). Default: `true`. Return `false` when the
+widgets sit in an area your cache never stores, or when you would rather purge by hand.
+
+```php
+add_filter( 'odavent_events_purge_all_on_widget', '__return_false' );
 ```
 
 ### `odavent_events_template`
@@ -226,6 +277,22 @@ add_filter( 'odavent_events_view_data', function ( array $vars, string $name ): 
 
 ## Actions
 
+### `odavent_events_purge_all`
+
+```php
+do_action( 'odavent_events_purge_all' )
+```
+
+Fires once after an Odavent event changed while an Odavent widget is active (unless
+[`odavent_events_purge_all_on_widget`](#odavent_events_purge_all_on_widget) turned it off), after the
+built-in whole-site purges. Use it to purge a page cache or CDN the plugin does not know.
+
+```php
+add_action( 'odavent_events_purge_all', function (): void {
+	my_cdn_purge_everything();
+} );
+```
+
 ### `odavent_events_purge_post`
 
 ```php
@@ -262,4 +329,7 @@ add_action( 'odavent_events_refreshed', function ( int $event_id, string $slug )
 
 For completeness, when an event changes the plugin calls these if they exist: `rocket_clean_post()`
 (WP Rocket), `w3tc_flush_post()` (W3 Total Cache), `wp_cache_post_change()` (WP Super Cache), and the
-`litespeed_purge_post` action (LiteSpeed Cache), each with the post ID, after `clean_post_cache()`.
+`litespeed_purge_post` action (LiteSpeed Cache), each with the post ID, after `clean_post_cache()`. While an
+Odavent widget is active it also calls the first of `rocket_clean_domain()`, `w3tc_flush_posts()` and
+`wp_cache_clear_cache()` that exists (without arguments, except `wp_cache_clear_cache( get_current_blog_id() )`
+on a multisite network), and fires the `litespeed_purge_all` action.

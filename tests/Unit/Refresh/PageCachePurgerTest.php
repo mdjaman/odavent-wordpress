@@ -59,6 +59,8 @@ class PageCachePurgerTest extends TestCase {
 				'talk' => 'talk',
 			)
 		);
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array() );
+		Functions\when( 'get_option' )->justReturn( array() );
 		Functions\when( 'clean_post_cache' )->alias(
 			function ( $id ) {
 				$this->cleaned[] = $id;
@@ -162,5 +164,174 @@ class PageCachePurgerTest extends TestCase {
 
 		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
 		$this->assertFalse( function_exists( 'w3tc_flush_post' ) );
+	}
+
+	// ---- widgets are not post content: an active one needs the whole site purged ----------------
+
+	/** An Odavent classic widget in a sidebar, or none. */
+	private function widgets_active( bool $active ): void {
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array( 'sidebar-1' => $active ? array( 'search-2', 'odavent_events_countdown-2' ) : array( 'search-2' ) ) );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_an_active_widget_purges_the_whole_site_cache(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\expect( 'rocket_clean_domain' )->once();
+		Actions\expectDone( 'litespeed_purge_all' )->once();
+		Actions\expectDone( 'odavent_events_purge_all' )->once();
+		Filters\expectApplied( 'odavent_events_purge_all_on_widget' )->once()->with( true, 7 )->andReturn( true );
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	/**
+	 * Only the first plugin function that exists runs: WP Super Cache's is not called after W3 Total Cache's.
+	 * W3 Total Cache flushes its page cache only (w3tc_flush_posts), never its object, database, minify or
+	 * CDN caches (w3tc_flush_all).
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_only_the_first_existing_whole_site_function_runs(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		$this->assertFalse( function_exists( 'rocket_clean_domain' ) );
+		Functions\expect( 'w3tc_flush_all' )->never();
+		Functions\expect( 'w3tc_flush_posts' )->once()->withNoArgs();
+		Functions\expect( 'wp_cache_clear_cache' )->never();
+
+		( new Page_Cache_Purger() )->purge_event( 7 );
+	}
+
+	/**
+	 * WP Super Cache on a multisite network: this site's cache only. With no argument wp_cache_clear_cache()
+	 * prunes every site of the network.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_wp_super_cache_clears_only_this_site_of_a_network(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		$this->assertFalse( function_exists( 'rocket_clean_domain' ) );
+		$this->assertFalse( function_exists( 'w3tc_flush_posts' ) );
+		Functions\when( 'is_multisite' )->justReturn( true );
+		Functions\when( 'get_current_blog_id' )->justReturn( 3 );
+		Functions\expect( 'wp_cache_clear_cache' )->once()->with( 3 );
+		Actions\expectDone( 'odavent_events_purge_all' )->once();
+
+		( new Page_Cache_Purger() )->purge_event( 7 );
+	}
+
+	/**
+	 * WP Super Cache on a single site: no argument (a blog id there would reach get_blog_option(), a
+	 * multisite-only function).
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_wp_super_cache_on_a_single_site_is_called_without_a_blog_id(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'is_multisite' )->justReturn( false );
+		Functions\when( 'get_current_blog_id' )->justReturn( 1 );
+		Functions\expect( 'wp_cache_clear_cache' )->once()->withNoArgs();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	public function test_the_filter_can_turn_the_whole_site_purge_off(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+		Filters\expectApplied( 'odavent_events_purge_all_on_widget' )->once()->andReturn( false );
+		Actions\expectDone( 'litespeed_purge_all' )->never();
+		Actions\expectDone( 'odavent_events_purge_all' )->never();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	public function test_no_widget_means_no_whole_site_purge(): void {
+		$this->widgets_active( false );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+		Actions\expectDone( 'litespeed_purge_all' )->never();
+		Actions\expectDone( 'odavent_events_purge_all' )->never();
+		Filters\expectApplied( 'odavent_events_purge_all_on_widget' )->never();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	public function test_an_active_widget_purges_the_whole_site_even_when_no_post_qualifies(): void {
+		$this->widgets_active( true );
+		$this->ids = array();
+		Actions\expectDone( 'odavent_events_purge_all' )->once();
+
+		$this->assertSame( 0, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	/**
+	 * A block placed straight in a block widget area is not a classic Odavent widget and not in any post.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_a_block_in_a_block_widget_area_purges_the_whole_site_cache(): void {
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array( 'sidebar-1' => array( 'block-3' ) ) );
+		Functions\when( 'get_option' )->alias(
+			static function ( $name, $default = false ) {
+				return 'widget_block' === $name ? array( 3 => array( 'content' => '<!-- wp:odavent-events/tickets /-->' ) ) : $default;
+			}
+		);
+		Functions\expect( 'rocket_clean_domain' )->once();
+		Actions\expectDone( 'odavent_events_purge_all' )->once();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_a_shortcode_in_a_text_widget_purges_the_whole_site_cache(): void {
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+		Functions\when( 'wp_get_sidebars_widgets' )->justReturn( array( 'footer-1' => array( 'text-5' ) ) );
+		Functions\when( 'get_option' )->alias(
+			static function ( $name, $default = false ) {
+				return 'widget_text' === $name ? array( 5 => array( 'text' => '[odavent_tickets]' ) ) : $default;
+			}
+		);
+		Actions\expectDone( 'odavent_events_purge_all' )->once();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
+	}
+
+	/**
+	 * With both WP Rocket's and W3 Total Cache's whole-site functions present, only the first runs.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_with_two_whole_site_functions_only_the_first_runs(): void {
+		$this->widgets_active( true );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+		Functions\expect( 'rocket_clean_domain' )->once()->withNoArgs();
+		Functions\expect( 'w3tc_flush_posts' )->never();
+		Functions\expect( 'wp_cache_clear_cache' )->never();
+
+		$this->assertSame( 2, ( new Page_Cache_Purger() )->purge_event( 7 ) );
 	}
 }

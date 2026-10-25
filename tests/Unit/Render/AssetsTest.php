@@ -4,6 +4,7 @@ namespace Odavent\Events\Tests\Unit\Render;
 use Brain\Monkey\Functions;
 use Mockery;
 use Odavent\Events\Render\Assets;
+use Odavent\Events\Settings\Appearance;
 use Odavent\Events\Settings\Options;
 use Odavent\Events\Tests\Support\RenderTestCase;
 
@@ -15,9 +16,10 @@ class AssetsTest extends RenderTestCase {
 		Functions\when( 'is_admin' )->justReturn( false );
 	}
 
-	private function options( bool $load_css ): Options {
+	private function options( bool $load_css, array $appearance = Appearance::DEFAULTS ): Options {
 		$options = Mockery::mock( Options::class );
 		$options->shouldReceive( 'load_css' )->andReturn( $load_css );
+		$options->shouldReceive( 'appearance' )->andReturn( $appearance );
 
 		return $options;
 	}
@@ -54,6 +56,7 @@ class AssetsTest extends RenderTestCase {
 		return array(
 			'countdown'     => array( 'countdown' ),
 			'agenda filter' => array( 'agenda-filter' ),
+			'image fallback' => array( 'image-fallback' ),
 		);
 	}
 
@@ -95,6 +98,7 @@ class AssetsTest extends RenderTestCase {
 	public function test_the_script_files_exist(): void {
 		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/js/countdown.js' );
 		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/js/agenda-filter.js' );
+		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/js/image-fallback.js' );
 		$this->assertFileExists( dirname( __DIR__, 3 ) . '/assets/css/odavent.css' );
 	}
 
@@ -132,5 +136,70 @@ class AssetsTest extends RenderTestCase {
 		Functions\expect( 'wp_enqueue_style' )->never();
 
 		( new Assets( $this->options( false ) ) )->enqueue_styles();
+	}
+
+	public function test_inline_style_is_added_only_when_default_styles_are_on_and_something_is_set(): void {
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\when( 'wp_register_style' )->justReturn( true );
+		Functions\when( 'wp_enqueue_style' )->justReturn( true );
+		$set = array_merge( Appearance::DEFAULTS, array( 'accent' => '#ffeb3b' ) );
+
+		// Something set, styles on: the generated CSS rides on the plugin's handle.
+		Functions\expect( 'wp_add_inline_style' )->once()->with( 'odavent-events', ':root{--odv-accent:#ffeb3b;--odv-accent-contrast:#000000;}' );
+		( new Assets( $this->options( true, $set ) ) )->enqueue_styles();
+	}
+
+	public function test_no_inline_style_when_nothing_is_set(): void {
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\when( 'wp_register_style' )->justReturn( true );
+		Functions\when( 'wp_enqueue_style' )->justReturn( true );
+		Functions\expect( 'wp_add_inline_style' )->never();
+
+		( new Assets( $this->options( true ) ) )->enqueue_styles();
+	}
+
+	public function test_no_inline_style_at_all_when_default_styles_are_off(): void {
+		$set = array_merge( Appearance::DEFAULTS, array( 'accent' => '#ffeb3b' ) );
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\expect( 'wp_register_style' )->never();
+		Functions\expect( 'wp_enqueue_style' )->never();
+		Functions\expect( 'wp_add_inline_style' )->never();
+
+		// Front end, then the block editor in wp-admin.
+		( new Assets( $this->options( false, $set ) ) )->enqueue_styles();
+		Functions\when( 'is_admin' )->justReturn( true );
+		( new Assets( $this->options( false, $set ) ) )->register_styles();
+	}
+
+	public function test_the_block_editor_gets_the_inline_style_on_the_registered_handle(): void {
+		Functions\when( 'is_admin' )->justReturn( true );
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\when( 'wp_register_style' )->justReturn( true );
+		Functions\expect( 'wp_add_inline_style' )->once()->with( 'odavent-events', ':root{--odv-gap:1.5rem;}' );
+
+		( new Assets( $this->options( true, array_merge( Appearance::DEFAULTS, array( 'spacing' => 'roomy' ) ) ) ) )->register_styles();
+	}
+
+	public function test_the_inline_style_is_added_once_however_many_blocks_ask_for_the_stylesheet(): void {
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\when( 'wp_register_style' )->justReturn( true );
+		Functions\when( 'wp_enqueue_style' )->justReturn( true );
+		Functions\expect( 'wp_add_inline_style' )->once();
+		$assets = new Assets( $this->options( true, array_merge( Appearance::DEFAULTS, array( 'radius' => 4 ) ) ) );
+
+		$assets->enqueue_styles();
+		$assets->enqueue_styles();
+		$assets->enqueue_styles();
+	}
+
+	public function test_a_front_end_registration_alone_adds_no_inline_style_and_reads_no_settings(): void {
+		Functions\when( 'wp_style_is' )->justReturn( false );
+		Functions\when( 'wp_register_style' )->justReturn( true );
+		Functions\expect( 'wp_add_inline_style' )->never();
+		$options = Mockery::mock( Options::class );
+		$options->shouldNotReceive( 'load_css' );
+		$options->shouldNotReceive( 'appearance' );
+
+		( new Assets( $options ) )->register_styles();
 	}
 }

@@ -66,6 +66,35 @@ if ( ! class_exists( 'WP_Block_Type_Registry' ) ) {
 	}
 }
 
+// Minimal stand-in for WordPress's WP_Widget: the constructor arguments and the field id/name helpers,
+// built the way WordPress builds them. Defined here (not in Support\WpStubs) because the plugin's widget
+// class extends it, so it must exist before the plugin autoloader loads that class.
+if ( ! class_exists( 'WP_Widget' ) ) {
+	class WP_Widget {
+
+		public $id_base;
+		public $name;
+		public $widget_options;
+		public $control_options;
+		public $number = false;
+
+		public function __construct( $id_base, $name, $widget_options = array(), $control_options = array() ) {
+			$this->id_base         = strtolower( (string) $id_base );
+			$this->name            = $name;
+			$this->widget_options  = array_merge( array( 'classname' => 'widget_' . $this->id_base ), (array) $widget_options );
+			$this->control_options = array_merge( array( 'id_base' => $this->id_base ), (array) $control_options );
+		}
+
+		public function get_field_name( $field_name ) {
+			return 'widget-' . $this->id_base . '[' . $this->number . '][' . $field_name . ']';
+		}
+
+		public function get_field_id( $field_name ) {
+			return 'widget-' . $this->id_base . '-' . $this->number . '-' . trim( str_replace( array( '[]', '[', ']' ), array( '', '-', '' ), $field_name ), '-' );
+		}
+	}
+}
+
 // Minimal stand-ins for the REST request/response classes. Header names are canonicalised the
 // way WordPress does it (lowercase, dashes to underscores).
 if ( ! class_exists( 'WP_REST_Request' ) ) {

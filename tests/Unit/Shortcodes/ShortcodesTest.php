@@ -88,10 +88,10 @@ class ShortcodesTest extends BlockTestCase {
 			$expected[] = 'odavent_' . str_replace( '-', '_', $slug );
 		}
 
-		$this->assertCount( 10, $expected );
+		$this->assertCount( 11, $expected );
 		$this->assertEqualsCanonicalizing( $expected, array_keys( $this->registered ) );
 		$this->assertEqualsCanonicalizing(
-			array( 'odavent_event_header', 'odavent_register_button', 'odavent_tickets', 'odavent_find_registration', 'odavent_speakers', 'odavent_agenda', 'odavent_sponsors', 'odavent_countdown', 'odavent_venue', 'odavent_add_to_calendar' ),
+			array( 'odavent_event_header', 'odavent_register_button', 'odavent_tickets', 'odavent_find_registration', 'odavent_speakers', 'odavent_agenda', 'odavent_sponsors', 'odavent_countdown', 'odavent_venue', 'odavent_add_to_calendar', 'odavent_event_page' ),
 			array_keys( $this->registered )
 		);
 	}
@@ -104,7 +104,8 @@ class ShortcodesTest extends BlockTestCase {
 			$this->assertIsString( $out );
 			$this->assertStringContainsString( 'odv-speakers', $out );
 		}
-		$this->assertSame( array(), array_filter( $this->enqueued_scripts ) );
+		// The speakers carry photos, so only the image script (never the agenda or countdown ones) is asked for.
+		$this->assertSame( array( 'odavent-events-image-fallback' ), array_values( array_unique( $this->enqueued_scripts ) ) );
 	}
 
 	public function test_each_shortcode_renders_the_same_html_as_its_block(): void {
@@ -371,7 +372,7 @@ class ShortcodesTest extends BlockTestCase {
 	public function test_the_reference_lists_every_shortcode_with_snake_case_attributes(): void {
 		$reference = $this->shortcodes()->reference();
 
-		$this->assertCount( 10, $reference );
+		$this->assertCount( 11, $reference );
 		$this->assertArrayHasKey( 'odavent_speakers', $reference );
 		$speakers = $reference['odavent_speakers'];
 		$this->assertSame( 'speakers', $speakers['block'] );
@@ -450,6 +451,24 @@ class ShortcodesTest extends BlockTestCase {
 				$snake = strtolower( preg_replace( '/([A-Z])/', '_$1', $attribute ) );
 				$this->assertStringContainsString( '`' . $snake . '`', $section, $json['name'] . ': ' . $snake );
 			}
+		}
+	}
+
+	public function test_the_event_page_section_explains_the_sections_and_their_order(): void {
+		$docs    = (string) file_get_contents( dirname( __DIR__, 3 ) . '/docs/shortcodes.md' );
+		$section = $this->docs_section( $docs, '[odavent_event_page]' );
+
+		// The section table: names are listed there in page order (earlier mentions are prose).
+		$table    = substr( $section, (int) strpos( $section, '### How' ) );
+		$previous = -1;
+		foreach ( \Odavent\Events\Blocks\Renderers\Event_Page::DEFAULT_SECTIONS as $name ) {
+			$at = strpos( $table, '`' . $name . '`' );
+			$this->assertNotFalse( $at, 'the section list names ' . $name );
+			$this->assertGreaterThan( $previous, $at, $name . ' is listed in page order' );
+			$previous = $at;
+		}
+		foreach ( array( 'order', 'blank', 'show_headings', 'Full event page' ) as $fact ) {
+			$this->assertStringContainsString( $fact, $section, $fact );
 		}
 	}
 

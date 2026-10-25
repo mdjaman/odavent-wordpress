@@ -41,6 +41,27 @@ class SponsorsTest extends BlockTestCase {
 		$this->assertSame( 5, substr_count( $html, '<li class="odv-sponsors__item' ) );
 	}
 
+	public function test_type_both_gets_a_translated_heading_between_sponsors_and_exhibitors(): void {
+		$payload = $this->with_partners(
+			array(
+				$this->partner( array( 'id' => 1, 'name' => 'Ex Co', 'type' => 'exhibitor' ) ),
+				$this->partner( array( 'id' => 2, 'name' => 'Both Co', 'type' => 'both' ) ),
+				$this->partner( array( 'id' => 3, 'name' => 'Spons Co', 'type' => 'sponsor' ) ),
+			)
+		);
+		$html    = $this->render( $payload );
+
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $html, $m );
+		$this->assertSame( array( 'Sponsors', 'Sponsors and exhibitors', 'Exhibitors' ), $m[1] );
+	}
+
+	public function test_an_unknown_type_still_gets_the_humanised_fallback(): void {
+		$html = $this->render( $this->with_partners( array( $this->partner( array( 'type' => 'vip-guest' ) ) ) ) );
+
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $html, $m );
+		$this->assertSame( array( 'Vip guest' ), $m[1] );
+	}
+
 	public function test_payload_order_is_kept_inside_a_group_with_featured_first(): void {
 		$payload = $this->with_partners(
 			array(
@@ -225,6 +246,24 @@ class SponsorsTest extends BlockTestCase {
 		$item = $this->item( $this->render( $this->payload() ), 'Société Générale' );
 
 		$this->assertMatchesRegularExpression( '#<a class="odv-sponsors__link" href="https://societegenerale\.ci" rel="sponsored noopener"><img class="odv-sponsors__logo" src="https://odavent\.com/storage/partners/sg\.png" alt="Société Générale" loading="lazy"[^>]*></a>#', $item );
+	}
+
+	public function test_a_logo_carries_the_fallback_marker_and_a_name_span_does_not(): void {
+		$html = $this->render( $this->payload() );
+
+		$this->assertMatchesRegularExpression( '#<img class="odv-sponsors__logo" src="https://odavent\.com/storage/partners/sg\.png" alt="Société Générale"[^>]* data-odv-img="logo">#', $html );
+		$this->assertSame( substr_count( $html, '<img ' ), substr_count( $html, 'data-odv-img="logo"' ) );
+		$this->assertDoesNotMatchRegularExpression( '#<span[^>]*data-odv-img#', $html );
+	}
+
+	public function test_the_image_fallback_script_is_enqueued_only_when_a_logo_is_rendered(): void {
+		$this->registry( $this->payload() )->render_block( 'odavent-events/sponsors', array( 'eventId' => 42 ) );
+		$this->assertSame( array( 'odavent-events-image-fallback' ), $this->enqueued_scripts );
+
+		$this->enqueued_scripts = array();
+		$payload                = $this->with_partners( array( $this->partner( array( 'logo_url' => null ) ) ) );
+		$this->registry( $payload )->render_block( 'odavent-events/sponsors', array( 'eventId' => 42 ) );
+		$this->assertSame( array(), $this->enqueued_scripts );
 	}
 
 	public function test_a_partner_without_a_logo_shows_its_name_as_text(): void {
