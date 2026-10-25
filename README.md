@@ -137,6 +137,8 @@ minutes by default).
 
 * This needs **pretty permalinks** (any setting except "Plain").
 * Security plugins and firewalls must let `POST /wp-json/odavent/v1/refresh` through.
+* Elementor 4.x pages are covered (Shortcode widget and Odavent widgets); Theme Builder templates and other
+  page builders are not specifically detected: see [docs/operations.md](docs/operations.md#page-builders).
 * Blocks inside synced patterns or block-theme templates are not detected for cache purging: see
   [docs/operations.md](docs/operations.md#page-caches). Odavent widgets, and Odavent blocks or shortcodes in
   a widget area, are detected and purge the whole site's page cache: see [docs/widgets.md](docs/widgets.md#page-caches).

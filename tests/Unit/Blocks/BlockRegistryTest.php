@@ -3,6 +3,7 @@ namespace Odavent\Events\Tests\Unit\Blocks;
 
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
+use Mockery;
 use Odavent\Events\Blocks\Block_Registry;
 use Odavent\Events\Blocks\Renderer;
 use Odavent\Events\Blocks\Renderers\Event_Header;
@@ -699,6 +700,95 @@ class BlockRegistryTest extends BlockTestCase {
 		$this->registry( null )->enqueue_early_styles();
 
 		$this->assertSame( array(), $this->enqueued_styles );
+	}
+
+	// ---- Elementor keeps its widgets in the _elementor_data meta, not in post_content ---------------
+
+	/**
+	 * @param mixed $meta What get_post_meta() answers for `_elementor_data`.
+	 */
+	private function on_elementor_post( $meta ): void {
+		$this->on_post( '' );
+		$post     = get_post();
+		$post->ID = 77;
+		Functions\when( 'get_post_meta' )->alias(
+			static function ( $id, $key, $single ) use ( $meta ) {
+				return 77 === $id && '_elementor_data' === $key && true === $single ? $meta : '';
+			}
+		);
+	}
+
+	public function elementor_data(): array {
+		return array(
+			'widget'    => array( '[{"id":"a1","elType":"widget","widgetType":"wp-widget-odavent_events_speakers","settings":{}}]' ),
+			'shortcode' => array( '[{"id":"a1","elType":"widget","widgetType":"shortcode","settings":{"shortcode":"[odavent_tickets event=\"42\"]"}}]' ),
+		);
+	}
+
+	/**
+	 * @dataProvider elementor_data
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_an_elementor_widget_counts_as_odavent_content_and_editors_get_no_cache( string $meta ): void {
+		define( 'ELEMENTOR_VERSION', '4.3.5' );
+		$this->editor = true;
+		$this->on_elementor_post( $meta );
+		Functions\expect( 'nocache_headers' )->once();
+
+		$this->assertTrue( Block_Registry::page_has_odavent_content() );
+		$this->registry( null )->enqueue_early_styles();
+		$this->assertSame( array( 'odavent-events' ), $this->enqueued_styles );
+
+		$this->assertFalse( defined( 'DONOTCACHEPAGE' ) );
+		$this->registry( null )->prevent_preview_caching();
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) );
+	}
+
+	public function non_string_elementor_meta(): array {
+		return array(
+			'missing' => array( '' ),
+			'false'   => array( false ),
+			'null'    => array( null ),
+			'array'   => array( array( 'wp-widget-odavent_events_speakers' ) ),
+			'int'     => array( 5 ),
+			'object'  => array( new \stdClass() ),
+			'other'   => array( '[{"widgetType":"heading","settings":{"title":"odavent"}}]' ),
+		);
+	}
+
+	/**
+	 * @dataProvider non_string_elementor_meta
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 * @param mixed $meta
+	 */
+	public function test_missing_or_unusable_elementor_meta_is_not_odavent_content( $meta ): void {
+		define( 'ELEMENTOR_VERSION', '4.3.5' );
+		$this->on_elementor_post( $meta );
+
+		$this->assertFalse( Block_Registry::page_has_odavent_content() );
+	}
+
+	public function test_without_elementor_the_meta_is_not_even_read(): void {
+		$this->assertFalse( defined( 'ELEMENTOR_VERSION' ) );
+		$this->on_post( '<p>Hello</p>' );
+		get_post()->ID = 77;
+		Functions\expect( 'get_post_meta' )->never();
+
+		$this->assertFalse( Block_Registry::page_has_odavent_content() );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_the_filter_still_has_the_last_word_on_an_elementor_page(): void {
+		define( 'ELEMENTOR_VERSION', '4.3.5' );
+		$this->on_elementor_post( '[{"widgetType":"wp-widget-odavent_events_speakers"}]' );
+		Filters\expectApplied( 'odavent_events_page_has_content' )->once()->with( true, Mockery::type( \stdClass::class ) )->andReturn( false );
+
+		$this->assertFalse( Block_Registry::page_has_odavent_content() );
 	}
 
 	// ---- widgets are not post content ------------------------------------------------------------

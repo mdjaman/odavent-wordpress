@@ -5,6 +5,12 @@ All notable changes to this plugin are documented here. The format follows
 [Semantic Versioning](https://semver.org/). The section of a version is used as the body of its
 GitHub release (see "Releasing" in the README).
 
+## [Unreleased]
+
+### Fixed
+
+- A page built with Elementor's Odavent widgets is now found by the page-cache purge and the editor-preview protection (Elementor keeps those widgets in post meta, not in the post content).
+
 ## [0.1.0] - 2026-10-25
 
 ### Added

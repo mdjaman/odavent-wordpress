@@ -539,6 +539,8 @@ class Block_Registry {
 	 * classic widgets, or an Odavent block/shortcode inside a block, Text or Custom HTML widget; a widget is not
 	 * post content and may show on any page, singular or not; see Widgets::any_active()).
 	 *
+	 * With Elementor active, the post's `_elementor_data` meta (where Elementor keeps its widgets) is checked too.
+	 *
 	 * NOT detected: blocks in a block theme's templates and template parts, synced patterns, custom fields.
 	 * Filter `odavent_events_page_has_content` (bool $has, object|null $post) to cover those.
 	 */
@@ -550,6 +552,12 @@ class Block_Registry {
 			$post    = get_post();
 			$content = is_object( $post ) && isset( $post->post_content ) && is_string( $post->post_content ) ? $post->post_content : '';
 			$has     = false !== strpos( $content, '<!-- wp:' . self::NAMESPACE_PREFIX ) || false !== strpos( $content, '[odavent_' );
+
+			// Elementor keeps its widgets only in the `_elementor_data` meta (post_content stays empty).
+			if ( ! $has && defined( 'ELEMENTOR_VERSION' ) && is_object( $post ) && isset( $post->ID ) ) {
+				$data = get_post_meta( $post->ID, '_elementor_data', true );
+				$has  = is_string( $data ) && ( false !== strpos( $data, 'wp-widget-odavent_events_' ) || false !== strpos( $data, '[odavent_' ) );
+			}
 		}
 
 		$has = $has || Widgets::any_active();

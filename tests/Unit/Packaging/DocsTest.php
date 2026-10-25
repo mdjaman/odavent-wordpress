@@ -218,7 +218,7 @@ class DocsTest extends TestCase {
 	public function test_the_changelog_and_the_wordpress_readme_announce_the_release_content(): void {
 		$changelog = $this->doc( 'CHANGELOG.md' );
 		$this->assertMatchesRegularExpression( '/^## \[0\.1\.0\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$/m', $changelog );
-		$this->assertDoesNotMatchRegularExpression( '/^## \[Unreleased\]$/m', $changelog, 'The first release has no pending section' );
+		// A pending `## [Unreleased]` section may sit above it; the 0.1.0 section keeps announcing the release.
 		preg_match( '/^## \[0\.1\.0\][^\n]*\n(.*?)(?=^## \[|\z)/ms', $changelog, $m );
 		$this->assertMatchesRegularExpression( '/^### Added$/m', $m[1] ?? '' );
 		foreach ( array( 'event page', 'widget', 'Appearance', 'Broken-image fallback' ) as $announced ) {
