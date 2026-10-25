@@ -215,16 +215,18 @@ class DocsTest extends TestCase {
 		$this->assertStringContainsString( '`[odavent_event_page]`', $readme, 'the blocks table lists the event page' );
 	}
 
-	public function test_the_changelog_and_the_wordpress_readme_announce_the_unreleased_work(): void {
+	public function test_the_changelog_and_the_wordpress_readme_announce_the_release_content(): void {
 		$changelog = $this->doc( 'CHANGELOG.md' );
-		$this->assertMatchesRegularExpression( '/^## \[Unreleased\]$/m', $changelog );
-		$this->assertLessThan( strpos( $changelog, '## [0.1.0]' ), strpos( $changelog, '## [Unreleased]' ), 'Unreleased comes first' );
-		preg_match( '/^## \[Unreleased\]\n(.*?)(?=^## \[)/ms', $changelog, $m );
+		$this->assertMatchesRegularExpression( '/^## \[0\.1\.0\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$/m', $changelog );
+		$this->assertDoesNotMatchRegularExpression( '/^## \[Unreleased\]$/m', $changelog, 'The first release has no pending section' );
+		preg_match( '/^## \[0\.1\.0\][^\n]*\n(.*?)(?=^## \[|\z)/ms', $changelog, $m );
 		$this->assertMatchesRegularExpression( '/^### Added$/m', $m[1] ?? '' );
-		$this->assertMatchesRegularExpression( '/^### Fixed$/m', $m[1] ?? '' );
-		$this->assertStringContainsString( 'Both', $m[1] ?? '' );
+		foreach ( array( 'event page', 'widget', 'Appearance', 'Broken-image fallback' ) as $announced ) {
+			$this->assertStringContainsString( $announced, $m[1] ?? '', "The 0.1.0 section does not announce: {$announced}" );
+		}
 
 		$readme = $this->doc( 'readme.txt' );
+		$this->assertStringNotContainsString( '= Unreleased =', $readme );
 		$this->assertStringContainsString( 'Event page', $readme );
 		$this->assertStringContainsString( 'Appearance', $readme );
 		$this->assertStringContainsString( 'widgets', $readme );
