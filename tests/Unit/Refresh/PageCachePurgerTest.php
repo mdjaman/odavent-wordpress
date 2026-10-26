@@ -33,7 +33,8 @@ class PageCachePurgerTest extends TestCase {
 		require_once dirname( __DIR__, 3 ) . '/odavent-events.php';
 
 		$this->wpdb        = Mockery::mock( 'wpdb' );
-		$this->wpdb->posts = 'wp_posts';
+		$this->wpdb->posts    = 'wp_posts';
+		$this->wpdb->postmeta = 'wp_postmeta';
 		$this->wpdb->shouldReceive( 'esc_like' )->andReturnUsing(
 			static function ( $text ) {
 				return addcslashes( $text, '_%\\' );
@@ -103,6 +104,52 @@ class PageCachePurgerTest extends TestCase {
 		$this->assertStringEndsWith( 'ORDER BY ID DESC LIMIT 500', trim( $query ), 'the most recent posts win when the cap bites' );
 		$this->assertStringNotContainsString( 'odavent', $query, 'patterns are passed as prepared arguments, never inlined' );
 		$this->assertSame( array( 'post', 'page', 'talk', '%wp:odavent-events/%', '%[odavent\\_%' ), $args );
+	}
+
+	public function test_without_elementor_the_query_has_no_postmeta_condition(): void {
+		$this->assertFalse( defined( 'ELEMENTOR_VERSION' ) );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+
+		( new Page_Cache_Purger() )->purge_event( 7 );
+
+		$this->assertStringNotContainsString( 'postmeta', $this->prepared[0] );
+		$this->assertStringNotContainsString( '_elementor_data', $this->prepared[0] );
+		$this->assertCount( 6, $this->prepared, 'query + three types + two content patterns, exactly as before' );
+	}
+
+	/**
+	 * Elementor keeps a widget only in the `_elementor_data` post meta and leaves post_content empty, so with
+	 * Elementor active the same single query also matches posts through that meta.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_with_elementor_the_same_query_also_matches_the_elementor_data_meta(): void {
+		define( 'ELEMENTOR_VERSION', '4.3.5' );
+		Functions\when( 'rocket_clean_post' )->justReturn( null );
+		Functions\when( 'w3tc_flush_post' )->justReturn( null );
+		Functions\when( 'wp_cache_post_change' )->justReturn( null );
+		$this->ids = array( 42, 11 );
+
+		$count = ( new Page_Cache_Purger() )->purge_event( 7 );
+
+		$query = $this->prepared[0];
+		$args  = array_slice( $this->prepared, 1 );
+
+		$this->assertSame( 2, $count );
+		$this->assertSame( array( 42, 11 ), $this->cleaned, 'a post found only through the meta is purged' );
+		$this->assertStringContainsString( 'post_content LIKE %s OR post_content LIKE %s', $query );
+		$this->assertStringContainsString( 'wp_postmeta', $query );
+		$this->assertStringContainsString( "meta_key = '_elementor_data'", $query );
+		$this->assertStringContainsString( 'meta_value LIKE %s OR meta_value LIKE %s', $query );
+		$this->assertStringEndsWith( 'ORDER BY ID DESC LIMIT 500', trim( $query ), 'still one query, newest first, capped' );
+		$this->assertStringNotContainsString( 'odavent', $query, 'patterns stay prepared arguments' );
+		$this->assertSame(
+			array( 'post', 'page', 'talk', '%wp:odavent-events/%', '%[odavent\\_%', '%wp-widget-odavent\\_events\\_%', '%[odavent\\_%' ),
+			$args
+		);
 	}
 
 	public function test_post_ids_are_looked_up_once_per_request(): void {

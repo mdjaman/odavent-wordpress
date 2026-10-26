@@ -131,7 +131,7 @@ stylesheet in the page head (so blocks do not flash unstyled) and to send no-cac
 who may see a draft preview.
 
 `$has` is `true` when the current singular post's own content contains an `odavent-events/` block or an
-`[odavent_` shortcode, or when a widget area holds Odavent content: one of the plugin's classic widgets, or
+`[odavent_` shortcode (with Elementor active, also in the post's `_elementor_data` meta), or when a widget area holds Odavent content: one of the plugin's classic widgets, or
 an Odavent block or shortcode inside a block widget, a Text widget or a Custom HTML widget placed in an
 active sidebar (widgets can show on any page, so this holds on non-singular pages too). `$post` is the
 current singular post, or `null` when the request is not a singular page.
@@ -179,8 +179,8 @@ apply_filters( 'odavent_events_purge_post_ids', int[] $post_ids, int $event_id )
 ```
 
 The posts whose cached page is purged when a signed refresh arrives for `$event_id`. `$post_ids` holds
-the published posts of public post types whose content contains an Odavent block or shortcode (at most
-500). Add posts that show Odavent content without containing it themselves, or narrow the list. Returned
+the published posts of public post types whose content contains an Odavent block or shortcode (with Elementor
+active, also in its `_elementor_data` meta; at most 500). Add posts that show Odavent content without containing it themselves, or narrow the list. Returned
 values are cleaned to unique positive integers; anything else is dropped.
 
 ```php

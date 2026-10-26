@@ -81,6 +81,19 @@ The early stylesheet and the no-cache protection for editors only look at the po
 see [`odavent_events_page_has_content`](hooks.md#odavent_events_page_has_content). Pages with such blocks
 still work; the stylesheet is simply loaded a little later.
 
+### Page builders
+
+Tested with **Elementor 4.x**. Both ways of putting Odavent content on an Elementor page are covered by the
+purge and preview detection above: a shortcode in the Shortcode widget (Elementor writes it into the post
+content), and the Odavent widgets from the "WordPress" widgets in Elementor's panel (Elementor keeps those
+only in the `_elementor_data` post meta, so with Elementor active the plugin looks there too).
+
+Not specifically detected or tested: Elementor **Theme Builder** templates (headers, footers and popups are
+`elementor_library` posts, not the page that shows them) and other builders (WPBakery, Divi, Beaver Builder).
+Their shortcodes work wherever shortcodes run; for cache purging and the early stylesheet, list the pages with
+the [`odavent_events_purge_post_ids`](hooks.md#odavent_events_purge_post_ids) and
+[`odavent_events_page_has_content`](hooks.md#odavent_events_page_has_content) filters as shown above.
+
 A CDN that caches whole HTML pages needs its own purge in the `odavent_events_purge_post` action (for
 example a call to the CDN's API with `get_permalink( $post_id )`).
 

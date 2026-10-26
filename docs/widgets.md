@@ -49,6 +49,17 @@ section names, separated by commas: `header`, `countdown`, `register`, `tickets`
 for every section. Unknown names are ignored, and the order on the page is always the one listed here, not
 the order you typed. A sidebar is narrow: this widget is best for a short selection of sections.
 
+## Page builders
+
+Tested with Elementor 4.x. The Odavent widgets that appear under the "WordPress" widgets in Elementor's panel
+render styled, and so does the Shortcode widget with an Odavent shortcode. Both are detected on the page for
+cache purging and for keeping editors' previews out of page caches (Elementor stores its widgets in post
+meta, which the plugin reads when Elementor is active). Elementor Theme Builder templates and other builders
+(WPBakery, Divi, Beaver Builder) are not specifically detected or tested: their shortcodes work wherever
+shortcodes run, and the filters [`odavent_events_purge_post_ids`](hooks.md#odavent_events_purge_post_ids) and
+[`odavent_events_page_has_content`](hooks.md#odavent_events_page_has_content) cover the rest, see
+[operations.md](operations.md#page-builders).
+
 ## Page caches
 
 A widget is not part of a post's content and can appear on every page. So when a signed refresh arrives from

@@ -9,8 +9,9 @@ use Odavent\Events\Widgets\Widgets;
  * Which posts show a given event cannot be known cheaply (blocks fall back to the default event,
  * shortcodes may name it by slug), so every published post of a public type containing an
  * Odavent block (`wp:odavent-events/`) or shortcode (`[odavent_`) is purged: correctness over
- * precision. Sites with special needs adjust the list with the `odavent_events_purge_post_ids`
- * filter. When more than LIMIT posts qualify, the most recent ones (highest ids) are purged.
+ * precision. With Elementor active, posts whose `_elementor_data` meta holds an Odavent widget
+ * (`wp-widget-odavent_events_`) or shortcode are included too. Sites with special needs adjust the
+ * list with the `odavent_events_purge_post_ids` filter. When more than LIMIT posts qualify, the most recent ones (highest ids) are purged.
  *
  * A widget is not post content and shows on any page, so while an Odavent widget is active the whole-site
  * cache is purged too (filter `odavent_events_purge_all_on_widget`).
@@ -133,8 +134,6 @@ class Page_Cache_Purger {
 		}
 
 		$placeholders = implode( ', ', array_fill( 0, count( $types ), '%s' ) );
-		$sql          = "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders})"
-			. ' AND (post_content LIKE %s OR post_content LIKE %s) ORDER BY ID DESC LIMIT ' . self::LIMIT;
 		$args         = array_merge(
 			$types,
 			array(
@@ -142,6 +141,25 @@ class Page_Cache_Purger {
 				'%' . $wpdb->esc_like( '[odavent_' ) . '%',
 			)
 		);
+		$conditions   = 'post_content LIKE %s OR post_content LIKE %s';
+
+		// Elementor keeps its widgets only in the `_elementor_data` meta and leaves post_content empty. One
+		// condition on the same query (so the cap and the ordering stay those of the whole list), and only
+		// with Elementor active: other sites pay nothing.
+		if ( defined( 'ELEMENTOR_VERSION' ) ) {
+			$conditions .= " OR ID IN ( SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_elementor_data'"
+				. ' AND (meta_value LIKE %s OR meta_value LIKE %s) )';
+			$args        = array_merge(
+				$args,
+				array(
+					'%' . $wpdb->esc_like( 'wp-widget-odavent_events_' ) . '%',
+					'%' . $wpdb->esc_like( '[odavent_' ) . '%',
+				)
+			);
+		}
+
+		$sql = "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders})"
+			. " AND ({$conditions}) ORDER BY ID DESC LIMIT " . self::LIMIT;
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholders only.
 		$ids = $wpdb->get_col( $wpdb->prepare( $sql, ...$args ) );
