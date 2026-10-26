@@ -7,6 +7,13 @@ GitHub release (see "Releasing" in the README).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-26
+
+### Added
+
+- Sponsors can be grouped by **tier** (Gold, Silver... as typed on each partner in Odavent): `group_by="tier"` (block setting "Group by"). Tiers appear in the organizer's partner order, untiered partners come last, and `tier="Gold"` shows a single tier so each level can have its own columns. `group_by="none"` gives a flat list; `group_by_type="no"` still works.
+- The agenda can show a single session (`session_id`), a single track (`track`) or a single day (`day="YYYY-MM-DD"`), alone or combined.
+
 ### Fixed
 
 - A page built with Elementor's Odavent widgets is now found by the page-cache purge and the editor-preview protection (Elementor keeps those widgets in post meta, not in the post content).

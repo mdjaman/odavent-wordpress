@@ -4,7 +4,7 @@ Tags: events, conference, speakers, agenda, tickets
 Requires at least: 6.1
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,11 @@ Yes. Every block is also a widget ("Odavent: Speakers", "Odavent: Countdown"...)
 No. Registration, payment and the attendee list stay on Odavent.
 
 == Changelog ==
+
+= 0.2.0 =
+* Sponsors can be grouped by tier (Gold, Silver...) as typed on each partner in Odavent, or shown as a flat list; show a single tier with the new Tier setting.
+* The agenda can show a single session, a single track or a single day.
+* A page built with Elementor's Odavent widgets is now found by the page-cache purge and the editor-preview protection.
 
 = 0.1.0 =
 * First release: ten blocks, shortcodes and widgets (event header, register button, tickets, find my registration, speakers, agenda, sponsors, countdown, venue, add to calendar) plus an Event page that shows the whole event page from one piece, with a "Full event page" block pattern.

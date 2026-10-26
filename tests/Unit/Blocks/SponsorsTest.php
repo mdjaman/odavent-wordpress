@@ -337,4 +337,78 @@ class SponsorsTest extends BlockTestCase {
 			$this->assertStringContainsString( 'odv-sponsors__item', $html, $state );
 		}
 	}
+
+	/**
+	 * Group headings in order.
+	 *
+	 * @return string[]
+	 */
+	private function titles( string $html ): array {
+		preg_match_all( '#<h3 class="odv-sponsors__group-title">(.*?)</h3>#', $html, $m );
+
+		return $m[1];
+	}
+
+	private function tiered(): array {
+		return $this->with_partners(
+			array(
+				$this->partner( array( 'id' => 1, 'name' => 'Gold One', 'tier' => 'Gold' ) ),
+				$this->partner( array( 'id' => 2, 'name' => 'Silver One', 'tier' => 'Silver' ) ),
+				$this->partner( array( 'id' => 3, 'name' => 'Gold Two', 'tier' => 'gold', 'type' => 'exhibitor' ) ),
+				$this->partner( array( 'id' => 4, 'name' => 'Plain Co', 'tier' => null ) ),
+			)
+		);
+	}
+
+	public function test_group_by_tier_makes_one_group_per_tier_in_payload_order_with_untiered_last(): void {
+		$html = $this->render( $this->tiered(), array( 'groupBy' => 'tier' ) );
+
+		$this->assertSame( array( 'Gold', 'Silver', 'Other partners' ), $this->titles( $html ) );
+		$this->assertLessThan( strpos( $html, 'Silver One' ), strpos( $html, 'Gold Two' ), 'the lower-case spelling joins the first Gold group' );
+		$this->assertLessThan( strpos( $html, 'Plain Co' ), strpos( $html, 'Silver One' ) );
+		$this->assertSame( 4, substr_count( $html, '<li class="odv-sponsors__item' ) );
+	}
+
+	public function test_group_by_tier_without_any_tier_stays_a_flat_list(): void {
+		$html = $this->render( $this->with_partners( array( $this->partner(), $this->partner( array( 'id' => 2, 'name' => 'B Co' ) ) ) ), array( 'groupBy' => 'tier' ) );
+
+		$this->assertSame( array(), $this->titles( $html ) );
+		$this->assertSame( 2, substr_count( $html, '<li class="odv-sponsors__item' ) );
+	}
+
+	public function test_the_tier_attribute_shows_only_that_tier_ignoring_case(): void {
+		$html = $this->render( $this->tiered(), array( 'groupBy' => 'none', 'tier' => ' GOLD ' ) );
+
+		$this->assertStringContainsString( 'Gold One', $html );
+		$this->assertStringContainsString( 'Gold Two', $html );
+		$this->assertStringNotContainsString( 'Silver One', $html );
+		$this->assertStringNotContainsString( 'Plain Co', $html );
+	}
+
+	public function test_a_tier_nobody_has_leaves_nothing_to_show(): void {
+		$this->assertSame( '', $this->render( $this->tiered(), array( 'tier' => 'Platinum' ) ) );
+	}
+
+	public function test_group_by_none_and_the_older_group_by_type_switch_off_give_a_flat_list(): void {
+		$this->assertSame( array(), $this->titles( $this->render( $this->tiered(), array( 'groupBy' => 'none' ) ) ) );
+		$this->assertSame( array(), $this->titles( $this->render( $this->tiered(), array( 'groupBy' => '', 'groupByType' => false ) ) ) );
+	}
+
+	public function test_an_explicit_tier_grouping_wins_over_a_group_by_type_switched_off(): void {
+		$this->assertSame( array( 'Gold', 'Silver', 'Other partners' ), $this->titles( $this->render( $this->tiered(), array( 'groupBy' => 'tier', 'groupByType' => false ) ) ) );
+	}
+
+	public function test_an_explicit_group_by_type_wins_over_the_older_switch(): void {
+		$this->assertSame( array( 'Sponsors', 'Exhibitors' ), $this->titles( $this->render( $this->tiered(), array( 'groupBy' => 'type', 'groupByType' => false ) ) ) );
+	}
+
+	public function test_an_unknown_group_by_value_falls_back_to_type(): void {
+		$this->assertSame( array( 'Sponsors', 'Exhibitors' ), $this->titles( $this->render( $this->tiered(), array( 'groupBy' => 'level' ) ) ) );
+	}
+
+	public function test_a_hostile_tier_is_escaped_in_its_heading(): void {
+		$html = $this->render( $this->with_partners( array( $this->partner( array( 'tier' => '<script>alert(1)</script>Gold' ) ) ) ), array( 'groupBy' => 'tier' ) );
+
+		$this->assertStringNotContainsString( '<script>', $html );
+	}
 }

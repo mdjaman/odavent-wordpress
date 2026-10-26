@@ -239,7 +239,12 @@ class Block_Widget extends \WP_Widget {
 		);
 		foreach ( $choices as $choice ) {
 			if ( is_scalar( $choice ) ) {
-				printf( '<option value="%1$s"%2$s>%1$s</option>', esc_attr( (string) $choice ), $choice === $current ? ' selected' : '' );
+				printf(
+					'<option value="%1$s"%2$s>%3$s</option>',
+					esc_attr( (string) $choice ),
+					$choice === $current ? ' selected' : '',
+					esc_html( '' === $choice ? __( 'Default', 'odavent-events' ) : (string) $choice )
+				);
 			}
 		}
 		echo '</select></p>';

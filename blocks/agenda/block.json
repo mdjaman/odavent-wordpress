@@ -35,6 +35,19 @@
 		"trackFilter": {
 			"type": "boolean",
 			"default": true
+		},
+		"sessionId": {
+			"type": "integer",
+			"default": 0,
+			"minimum": 0
+		},
+		"track": {
+			"type": "string",
+			"default": ""
+		},
+		"day": {
+			"type": "string",
+			"default": ""
 		}
 	},
 	"supports": {

@@ -5,7 +5,7 @@
 	"title": "Sponsors",
 	"category": "odavent-events",
 	"icon": "awards",
-	"description": "Sponsors, exhibitors and partners with their logos, grouped by type.",
+	"description": "Sponsors, exhibitors and partners with their logos, grouped by type or by tier.",
 	"keywords": [
 		"odavent",
 		"event",
@@ -27,6 +27,20 @@
 		"groupByType": {
 			"type": "boolean",
 			"default": true
+		},
+		"groupBy": {
+			"type": "string",
+			"default": "",
+			"enum": [
+				"",
+				"type",
+				"tier",
+				"none"
+			]
+		},
+		"tier": {
+			"type": "string",
+			"default": ""
 		},
 		"showDescription": {
 			"type": "boolean",

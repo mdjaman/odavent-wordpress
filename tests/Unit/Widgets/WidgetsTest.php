@@ -418,6 +418,8 @@ class WidgetsTest extends BlockTestCase {
 					if ( isset( $definition['maximum'] ) ) {
 						$this->assertSame( (string) $definition['maximum'], $control->getAttribute( 'max' ) );
 					}
+				} elseif ( isset( $definition['enum'] ) ) {
+					$this->assertSame( 'select', $control->nodeName, $slug . '.' . $name );
 				} else {
 					$this->assertSame( 'text', $control->getAttribute( 'type' ), $slug . '.' . $name );
 				}

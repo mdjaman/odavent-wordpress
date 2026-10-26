@@ -12,6 +12,9 @@ use Odavent\Events\Render\Template;
  * The event agenda: sessions grouped by day (the event's day, not UTC), sorted by start time, with
  * breakout rooms nested under their parent session and optional track filter buttons.
  *
+ * The agenda can be narrowed to one session (`sessionId`, with its rooms), one track or one day (`day`,
+ * YYYY-MM-DD in the event's timezone). Rooms follow their parent session, as the track filter buttons do.
+ *
  * Without JavaScript everything is visible; assets/js/agenda-filter.js only hides sessions on request.
  */
 final class Agenda implements Renderer {
@@ -56,7 +59,10 @@ final class Agenda implements Renderer {
 			return '';
 		}
 
-		$top_level = self::nest( $nodes );
+		$top_level = self::narrow( self::nest( $nodes ), $atts );
+		if ( array() === $top_level ) {
+			return '';
+		}
 
 		$days = array();
 		foreach ( $top_level as $node ) {
@@ -89,6 +95,69 @@ final class Agenda implements Renderer {
 				'view'     => $view,
 			)
 		);
+	}
+
+	/**
+	 * Applies the `sessionId`, `track` and `day` attributes to the nested sessions. An id that matches a
+	 * breakout room shows that room alone. A value that is not usable (a day that is not YYYY-MM-DD, an id
+	 * that is not a number) is ignored, like any other bad attribute; a usable one that matches nothing
+	 * leaves nothing to show.
+	 *
+	 * @param array[] $top_level Nested sessions.
+	 * @param array   $atts      Attributes.
+	 * @return array[]
+	 */
+	private static function narrow( array $top_level, array $atts ): array {
+		$session_id = Attributes::positive_int( $atts, 'sessionId' );
+		if ( $session_id > 0 ) {
+			$found = self::find( $top_level, $session_id );
+
+			return null === $found ? array() : array( $found );
+		}
+
+		$track = self::fold( Attributes::text( $atts, 'track' ) );
+		$day   = Attributes::text( $atts, 'day' );
+		$day   = 1 === preg_match( '/^[0-9]{4}-[0-9]{2}-[0-9]{2}\z/', $day ) ? $day : '';
+
+		return array_values(
+			array_filter(
+				$top_level,
+				static function ( $node ) use ( $track, $day ) {
+					return ( '' === $track || self::fold( $node['track'] ) === $track )
+						&& ( '' === $day || $node['day_key'] === $day );
+				}
+			)
+		);
+	}
+
+	/**
+	 * The session with this id anywhere in the tree (rooms included), or null.
+	 *
+	 * @param array[] $nodes Nested sessions.
+	 * @param int     $id    Session id.
+	 */
+	private static function find( array $nodes, int $id ): ?array {
+		foreach ( $nodes as $node ) {
+			if ( $node['id'] === $id ) {
+				return $node;
+			}
+			$room = self::find( $node['rooms'], $id );
+			if ( null !== $room ) {
+				return $room;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Trimmed text with ASCII letters lower-cased (never strtolower(): it depends on the process locale and
+	 * must not touch UTF-8 bytes), for comparing a track name.
+	 *
+	 * @param string $text Text.
+	 */
+	private static function fold( string $text ): string {
+		return strtr( trim( $text ), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz' );
 	}
 
 	/**
