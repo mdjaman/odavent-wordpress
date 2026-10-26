@@ -98,8 +98,19 @@ The sessions grouped by day, with an optional track filter.
 | `show_speakers` | boolean | `true` |
 | `show_description` | boolean | `false` |
 | `track_filter` | boolean | `true` |
+| `session_id` | integer | `0` (all sessions) |
+| `track` | string | (blank: all tracks) |
+| `day` | string | (blank: all days) |
 
-Example: `[odavent_agenda event="annual-summit" show_description="true" track_filter="off"]`
+`session_id` shows one session with its breakout rooms (the ID of a room shows that room alone). `track`
+shows the sessions of one track (case does not matter, rooms follow their parent). `day` is a date written
+`YYYY-MM-DD`, in the event's timezone; anything else is ignored. `track` and `day` can be combined, so
+`track="Workshop" day="2026-11-12"` is that day's workshop track. `session_id` wins over both. A value that
+matches nothing shows nothing. To show a track's agenda without its filter buttons, they are already hidden
+once a single track is left.
+
+Examples: `[odavent_agenda event="annual-summit" show_description="true" track_filter="off"]`,
+`[odavent_agenda event="annual-summit" day="2026-11-13"]`, `[odavent_agenda event_id="42" session_id="318"]`
 
 ## `[odavent_sponsors]`
 
@@ -107,16 +118,35 @@ Sponsors, exhibitors and other partners.
 
 | Attribute | Type | Default |
 |---|---|---|
+| `group_by` | string | (blank: by type) |
+| `tier` | string | (blank: all tiers) |
 | `group_by_type` | boolean | `true` |
 | `show_description` | boolean | `false` |
 | `columns` | integer | `4` |
 
-With `group_by_type` on, partners are shown in one group per type. Groups that hold a featured (paid)
-placement come first, then the others, each part in the order sponsors, exhibitors, media partners, partners,
-then any other type; inside a group the order is Odavent's (featured first). With it off, one list in
-Odavent's order.
+`group_by` is `type`, `tier` or `none`. Blank or anything else leaves `group_by_type` in charge (see the end of this section).
 
-Example: `[odavent_sponsors event="annual-summit" columns="3" group_by_type="no"]`
+With `group_by="type"` (the default), partners are shown in one group per type. Groups that hold a featured
+(paid) placement come first, then the others, each part in the order sponsors, exhibitors, media partners,
+partners, then any other type; inside a group the order is Odavent's (featured first).
+
+With `group_by="tier"`, partners are shown in one group per **tier**, the level an organizer types on each
+partner in Odavent (Gold, Silver, Bronze...). The heading is the tier as typed ("gold" and "Gold" are one
+tier). The tiers appear in the order of their first partner in Odavent's list, so the organizer's own
+ordering of the partners decides whether Gold comes before Silver, and a tier holding a featured partner
+comes first. Partners without a tier come last under "Other partners". When no partner has a tier, the list
+is not grouped.
+
+With `group_by="none"`, one list in Odavent's order.
+
+`tier` shows only the partners of one tier (case does not matter), which lets you give each tier its own
+look: one shortcode per tier, each with its own `columns`. `group_by_type="no"` is the older way to ask for
+`group_by="none"` and still works, but only while `group_by` is blank: a `group_by` of `type`, `tier` or `none`
+always wins.
+
+Examples: `[odavent_sponsors event="annual-summit" columns="3" group_by="none"]`,
+`[odavent_sponsors event="annual-summit" group_by="tier"]`,
+`[odavent_sponsors event="annual-summit" tier="Gold" columns="2" group_by="none"]`
 
 ## `[odavent_countdown]`
 

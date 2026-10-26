@@ -394,4 +394,54 @@ class AgendaTest extends BlockTestCase {
 		$this->registry( $this->payload() )->render_block( 'odavent-events/agenda', array( 'eventId' => 42, 'trackFilter' => false ) );
 		$this->assertSame( array(), $this->enqueued_scripts );
 	}
+
+	private function filterable(): array {
+		return $this->with_sessions(
+			array(
+				$this->session( 1, array( 'name' => 'Opening', 'track' => 'Main', 'starts_at' => '2026-11-12T09:00:00+00:00' ) ),
+				$this->session( 2, array( 'name' => 'Deep dive', 'track' => 'Workshop', 'starts_at' => '2026-11-12T11:00:00+00:00' ) ),
+				$this->session( 3, array( 'name' => 'Room A', 'track' => 'Workshop', 'parent_id' => 2, 'starts_at' => '2026-11-12T11:00:00+00:00' ) ),
+				$this->session( 4, array( 'name' => 'Closing', 'track' => 'Main', 'starts_at' => '2026-11-13T16:00:00+00:00', 'ends_at' => '2026-11-13T17:00:00+00:00' ) ),
+			)
+		);
+	}
+
+	public function test_session_id_shows_that_session_with_its_rooms(): void {
+		$names = $this->names( $this->render( $this->filterable(), array( 'sessionId' => 2 ) ) );
+
+		$this->assertSame( array( 'Deep dive', 'Room A' ), $names );
+	}
+
+	public function test_session_id_of_a_room_shows_that_room_alone(): void {
+		$this->assertSame( array( 'Room A' ), $this->names( $this->render( $this->filterable(), array( 'sessionId' => '3' ) ) ) );
+	}
+
+	public function test_session_id_nobody_has_leaves_nothing_to_show(): void {
+		$this->assertSame( '', $this->render( $this->filterable(), array( 'sessionId' => 999 ) ) );
+	}
+
+	public function test_track_shows_only_that_track_with_rooms_and_ignores_case(): void {
+		$html = $this->render( $this->filterable(), array( 'track' => ' workshop ' ) );
+
+		$this->assertSame( array( 'Deep dive', 'Room A' ), $this->names( $html ) );
+		$this->assertStringNotContainsString( 'odv-agenda__filter', $html, 'one track left: nothing to filter between' );
+	}
+
+	public function test_a_track_nobody_has_leaves_nothing_to_show(): void {
+		$this->assertSame( '', $this->render( $this->filterable(), array( 'track' => 'Keynote' ) ) );
+	}
+
+	public function test_day_shows_only_that_day_in_the_event_timezone(): void {
+		$this->assertSame( array( 'Closing' ), $this->names( $this->render( $this->filterable(), array( 'day' => '2026-11-13' ) ) ) );
+		$this->assertSame( array( 'Opening', 'Deep dive', 'Room A' ), $this->names( $this->render( $this->filterable(), array( 'day' => '2026-11-12' ) ) ) );
+	}
+
+	public function test_a_day_that_is_not_a_date_is_ignored(): void {
+		$this->assertCount( 4, $this->names( $this->render( $this->filterable(), array( 'day' => 'tomorrow' ) ) ) );
+	}
+
+	public function test_track_and_day_combine(): void {
+		$this->assertSame( array( 'Closing' ), $this->names( $this->render( $this->filterable(), array( 'track' => 'Main', 'day' => '2026-11-13' ) ) ) );
+		$this->assertSame( '', $this->render( $this->filterable(), array( 'track' => 'Workshop', 'day' => '2026-11-13' ) ) );
+	}
 }

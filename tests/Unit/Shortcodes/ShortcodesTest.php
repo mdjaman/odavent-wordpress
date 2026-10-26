@@ -222,6 +222,8 @@ class ShortcodesTest extends BlockTestCase {
 		$this->assertSame( array( 'ticketId' => 9 ), $sc->to_block_attributes( 'register-button', array( 'ticket_id' => '9' ) ) );
 		$this->assertSame( array( 'showJsonLd' => false ), $sc->to_block_attributes( 'event-header', array( 'show_json_ld' => 'no' ) ) );
 		$this->assertSame( array( 'groupByType' => false ), $sc->to_block_attributes( 'sponsors', array( 'group_by_type' => '0' ) ) );
+		$this->assertSame( array( 'groupBy' => 'tier', 'tier' => 'Gold' ), $sc->to_block_attributes( 'sponsors', array( 'group_by' => 'tier', 'tier' => 'Gold' ) ) );
+		$this->assertSame( array( 'sessionId' => 12, 'track' => 'Main', 'day' => '2026-11-12' ), $sc->to_block_attributes( 'agenda', array( 'session_id' => '12', 'track' => 'Main', 'day' => '2026-11-12' ) ) );
 	}
 
 	public function test_an_attribute_of_another_block_is_unknown_here(): void {

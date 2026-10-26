@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-24T22:55:50+00:00\n"
+"POT-Creation-Date: 2026-10-26T12:27:18+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: odavent-events\n"
@@ -89,127 +89,147 @@ msgstr ""
 msgid "Odavent could not be reached and there is no saved copy of this event yet. Visitors see nothing here until it is back."
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:650
+#: src/Blocks/Block_Registry.php:658
 msgid "Link text"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:651
+#: src/Blocks/Block_Registry.php:659
 #: assets/js/editor.js:190
 #: assets/js/editor.js:355
 msgid "Event"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:652
+#: src/Blocks/Block_Registry.php:660
 #: assets/js/editor.js:180
 msgid "Event slug"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:653
+#: src/Blocks/Block_Registry.php:661
 msgid "Show cover image"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:654
+#: src/Blocks/Block_Registry.php:662
 msgid "Show logo"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:655
+#: src/Blocks/Block_Registry.php:663
 msgid "Show description"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:656
+#: src/Blocks/Block_Registry.php:664
 msgid "Show venue"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:657
+#: src/Blocks/Block_Registry.php:665
 msgid "Add structured data for search engines"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:658
-#: src/Blocks/Block_Registry.php:661
+#: src/Blocks/Block_Registry.php:666
+#: src/Blocks/Block_Registry.php:669
 msgid "Button text"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:659
+#: src/Blocks/Block_Registry.php:667
 msgid "Preselect ticket (ID, 0 for none)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:660
+#: src/Blocks/Block_Registry.php:668
 msgid "Show remaining places"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:662
+#: src/Blocks/Block_Registry.php:670
 msgid "Columns"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:663
+#: src/Blocks/Block_Registry.php:671
 msgid "Show biography"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:664
+#: src/Blocks/Block_Registry.php:672
 msgid "Show company"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:665
+#: src/Blocks/Block_Registry.php:673
 msgid "Maximum number to show (0 for all)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:666
+#: src/Blocks/Block_Registry.php:674
 msgid "Show only one speaker (ID, 0 for all)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:667
+#: src/Blocks/Block_Registry.php:675
 msgid "Show speakers"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:668
+#: src/Blocks/Block_Registry.php:676
 msgid "Show track filter buttons"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:669
+#: src/Blocks/Block_Registry.php:677
 msgid "Group by type (sponsors, exhibitors...)"
 msgstr ""
 
-#: src/Blocks/Block_Registry.php:670
-msgid "Text while the event is live (blank for the default)"
-msgstr ""
-
-#: src/Blocks/Block_Registry.php:671
-msgid "Text once the event has ended (blank for the default)"
-msgstr ""
-
-#: src/Blocks/Block_Registry.php:672
-msgid "Show map link"
-msgstr ""
-
-#: src/Blocks/Block_Registry.php:673
-msgid "Google Calendar link"
-msgstr ""
-
-#: src/Blocks/Block_Registry.php:674
-msgid "Outlook link"
-msgstr ""
-
-#: src/Blocks/Block_Registry.php:675
-msgid "Calendar file (.ics) link"
-msgstr ""
-
-#: src/Blocks/Block_Registry.php:676
-msgid "Sections to show"
-msgstr ""
-
-#: src/Blocks/Block_Registry.php:677
-msgid "Show section headings"
-msgstr ""
-
 #: src/Blocks/Block_Registry.php:678
-msgid "Speaker columns"
+msgid "Group by (type, tier or not grouped)"
 msgstr ""
 
 #: src/Blocks/Block_Registry.php:679
-msgid "Sponsor columns"
+msgid "Show only one tier, e.g. Gold (blank for all)"
 msgstr ""
 
 #: src/Blocks/Block_Registry.php:680
+msgid "Show only one session (ID, 0 for all)"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:681
+msgid "Show only one track (blank for all)"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:682
+msgid "Show only one day (YYYY-MM-DD, blank for all)"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:683
+msgid "Text while the event is live (blank for the default)"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:684
+msgid "Text once the event has ended (blank for the default)"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:685
+msgid "Show map link"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:686
+msgid "Google Calendar link"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:687
+msgid "Outlook link"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:688
+msgid "Calendar file (.ics) link"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:689
+msgid "Sections to show"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:690
+msgid "Show section headings"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:691
+msgid "Speaker columns"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:692
+msgid "Sponsor columns"
+msgstr ""
+
+#: src/Blocks/Block_Registry.php:693
 msgid "Show speaker biographies"
 msgstr ""
 
@@ -258,17 +278,17 @@ msgstr ""
 
 #. translators: 1: start time, 2: end time (a session's time range).
 #. translators: 1: start date and time, 2: end date and time.
-#: src/Blocks/Renderers/Agenda.php:195
+#: src/Blocks/Renderers/Agenda.php:264
 #: src/Render/Format.php:116
 #, php-format
 msgid "%1$s – %2$s"
 msgstr ""
 
-#: src/Blocks/Renderers/Countdown.php:72
+#: src/Blocks/Renderers/Countdown.php:75
 msgid "Live now"
 msgstr ""
 
-#: src/Blocks/Renderers/Countdown.php:73
+#: src/Blocks/Renderers/Countdown.php:76
 msgid "Event ended"
 msgstr ""
 
@@ -339,24 +359,28 @@ msgstr ""
 msgid "Registration and payment are handled securely by Odavent."
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:139
+#: src/Blocks/Renderers/Sponsors.php:177
+msgid "Other partners"
+msgstr ""
+
+#: src/Blocks/Renderers/Sponsors.php:226
 msgid "Sponsors"
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:141
+#: src/Blocks/Renderers/Sponsors.php:228
 msgid "Sponsors and exhibitors"
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:143
+#: src/Blocks/Renderers/Sponsors.php:230
 msgid "Exhibitors"
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:145
+#: src/Blocks/Renderers/Sponsors.php:232
 msgid "Media partners"
 msgstr ""
 
-#: src/Blocks/Renderers/Sponsors.php:147
-#: src/Blocks/Renderers/Sponsors.php:152
+#: src/Blocks/Renderers/Sponsors.php:234
+#: src/Blocks/Renderers/Sponsors.php:239
 msgid "Partners"
 msgstr ""
 
@@ -713,6 +737,11 @@ msgstr ""
 msgid "Section names separated by commas: %s. Leave empty to show all of them."
 msgstr ""
 
+#: src/Widgets/Block_Widget.php:246
+#: assets/js/editor.js:264
+msgid "Default"
+msgstr ""
+
 #: templates/agenda.php:57
 msgid "Filter by track"
 msgstr ""
@@ -979,7 +1008,7 @@ msgstr ""
 
 #: blocks/sponsors/block.json
 msgctxt "block description"
-msgid "Sponsors, exhibitors and partners with their logos, grouped by type."
+msgid "Sponsors, exhibitors and partners with their logos, grouped by type or by tier."
 msgstr ""
 
 #: blocks/sponsors/block.json

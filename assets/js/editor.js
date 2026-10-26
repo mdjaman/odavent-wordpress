@@ -261,7 +261,7 @@
 						label: label,
 						value: value || '',
 						options: schema[ 'enum' ].map( function ( option ) {
-							return { label: String( option ), value: String( option ) };
+							return { label: '' === option ? __( 'Default', 'odavent-events' ) : String( option ), value: String( option ) };
 						} ),
 						onChange: onChange
 					} );

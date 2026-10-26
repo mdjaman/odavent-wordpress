@@ -981,8 +981,8 @@ msgstr "Sponsors"
 
 #: blocks/sponsors/block.json
 msgctxt "block description"
-msgid "Sponsors, exhibitors and partners with their logos, grouped by type."
-msgstr "Les sponsors, exposants et partenaires avec leurs logos, regroupés par type."
+msgid "Sponsors, exhibitors and partners with their logos, grouped by type or by tier."
+msgstr "Les sponsors, exposants et partenaires avec leurs logos, regroupés par type ou par niveau."
 
 #: blocks/sponsors/block.json
 msgctxt "block keyword"
@@ -1033,3 +1033,26 @@ msgstr "adresse"
 msgctxt "block keyword"
 msgid "map"
 msgstr "carte"
+
+msgid "Group by (type, tier or not grouped)"
+msgstr "Regrouper par (type, niveau ou sans regroupement)"
+
+msgid "Show only one tier, e.g. Gold (blank for all)"
+msgstr "Afficher un seul niveau, par ex. Or (vide pour tous)"
+
+msgid "Show only one session (ID, 0 for all)"
+msgstr "Afficher une seule session (ID, 0 pour toutes)"
+
+msgid "Show only one track (blank for all)"
+msgstr "Afficher un seul parcours (vide pour tous)"
+
+msgid "Show only one day (YYYY-MM-DD, blank for all)"
+msgstr "Afficher un seul jour (AAAA-MM-JJ, vide pour tous)"
+
+msgid "Other partners"
+msgstr "Autres partenaires"
+
+#: src/Widgets/Block_Widget.php:246
+#: assets/js/editor.js:264
+msgid "Default"
+msgstr "Par défaut"
