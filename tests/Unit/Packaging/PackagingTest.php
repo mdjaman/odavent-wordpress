@@ -73,6 +73,15 @@ class PackagingTest extends TestCase {
 	}
 
 	/**
+	 * The plugin's own version (the header build-zip.php insists on), so a release bump needs no edit here.
+	 */
+	private static function version(): string {
+		preg_match( '/^\s*\*\s*Version:\s*(\S+)\s*$/m', (string) file_get_contents( self::$root . '/odavent-events.php' ), $m );
+
+		return $m[1] ?? '';
+	}
+
+	/**
 	 * Runs bin/build-zip.php.
 	 *
 	 * @return array{0: int, 1: string, 2: string} Exit code, output, output directory.
@@ -109,9 +118,9 @@ class PackagingTest extends TestCase {
 	private function built_zip(): string {
 		static $path = null;
 		if ( null === $path ) {
-			list( $code, $output, $out ) = $this->build( '0.1.0' );
+			list( $code, $output, $out ) = $this->build( self::version() );
 			$this->assertSame( 0, $code, $output );
-			$path = $out . '/odavent-events-0.1.0.zip';
+			$path = $out . '/odavent-events-' . self::version() . '.zip';
 		}
 		$this->assertFileExists( $path );
 
@@ -231,9 +240,9 @@ class PackagingTest extends TestCase {
 		$this->assertTrue( symlink( $copy . '/src/Plugin.php', $copy . '/src/Linked.php' ) );
 		$this->assertTrue( symlink( $copy . '/secret.php', $copy . '/assets/js/linked.js' ) );
 
-		list( $code, $output, $out ) = $this->build( '0.1.0', $copy );
+		list( $code, $output, $out ) = $this->build( self::version(), $copy );
 		$this->assertSame( 0, $code, $output );
-		$names = $this->entries( $out . '/odavent-events-0.1.0.zip' );
+		$names = $this->entries( $out . '/odavent-events-' . self::version() . '.zip' );
 
 		$this->assertContains( 'odavent-events/src/Plugin.php', $names );
 		$this->assertContains( 'odavent-events/assets/images/logo.svg', $names, 'An allow-listed type in a new folder ships.' );
@@ -276,15 +285,15 @@ class PackagingTest extends TestCase {
 
 	public function test_a_failure_after_the_archive_was_opened_leaves_no_partial_file(): void {
 		$out = sys_get_temp_dir() . '/odv-out-' . bin2hex( random_bytes( 4 ) );
-		mkdir( $out . '/odavent-events-0.1.0.zip', 0777, true ); // The final name is taken by a folder: the last step fails.
-		file_put_contents( $out . '/odavent-events-0.1.0.zip/keep', 'x' );
+		mkdir( $out . '/odavent-events-' . self::version() . '.zip', 0777, true ); // The final name is taken by a folder: the last step fails.
+		file_put_contents( $out . '/odavent-events-' . self::version() . '.zip/keep', 'x' );
 		self::$cleanup[] = $out;
 
-		list( $code, $output ) = $this->build( '0.1.0', null, $out );
+		list( $code, $output ) = $this->build( self::version(), null, $out );
 
 		$this->assertNotSame( 0, $code, $output );
 		$this->assertStringContainsString( 'Cannot move the archive', $output );
-		$this->assertFileDoesNotExist( $out . '/odavent-events-0.1.0.zip.partial' );
+		$this->assertFileDoesNotExist( $out . '/odavent-events-' . self::version() . '.zip.partial' );
 		$this->assertSame( array(), glob( $out . '/*.partial' ) ?: array() );
 	}
 
@@ -295,7 +304,7 @@ class PackagingTest extends TestCase {
 		$zip->close();
 
 		$this->assertSame( 1, preg_match( '/^\s*\*\s*Version:\s*(\S+)\s*$/m', $main, $m ) );
-		$this->assertSame( '0.1.0', $m[1] );
+		$this->assertSame( self::version(), $m[1] );
 	}
 
 	public function test_the_compiled_mo_round_trips_the_french_translation(): void {
@@ -331,13 +340,13 @@ class PackagingTest extends TestCase {
 		list( $code, $output, $out ) = $this->build( '9.9.9' );
 
 		$this->assertNotSame( 0, $code );
-		$this->assertStringContainsString( '0.1.0', $output );
+		$this->assertStringContainsString( self::version(), $output );
 		$this->assertStringContainsString( '9.9.9', $output );
 		$this->assertFileDoesNotExist( $out . '/odavent-events-9.9.9.zip' );
 	}
 
 	public function test_it_refuses_a_malformed_version(): void {
-		foreach ( array( '', 'v0.1.0', '0.1', '0.1.0/../x', '0.1.0 ' ) as $bad ) {
+		foreach ( array( '', 'v' . self::version(), '0.1', self::version() . '/../x', self::version() . ' ' ) as $bad ) {
 			list( $code, , $out ) = $this->build( $bad );
 			$this->assertNotSame( 0, $code, "Accepted version '{$bad}'" );
 			$this->assertSame( array(), glob( $out . '/*' ) ?: array() );
@@ -347,9 +356,9 @@ class PackagingTest extends TestCase {
 	public function test_it_refuses_when_the_version_constant_differs_from_the_header(): void {
 		$copy = self::copy_tree();
 		$file = $copy . '/odavent-events.php';
-		file_put_contents( $file, str_replace( "define( 'ODAVENT_EVENTS_VERSION', '0.1.0' )", "define( 'ODAVENT_EVENTS_VERSION', '0.0.9' )", (string) file_get_contents( $file ) ) );
+		file_put_contents( $file, str_replace( "define( 'ODAVENT_EVENTS_VERSION', '" . self::version() . "' )", "define( 'ODAVENT_EVENTS_VERSION', '0.0.9' )", (string) file_get_contents( $file ) ) );
 
-		list( $code, $output ) = $this->build( '0.1.0', $copy );
+		list( $code, $output ) = $this->build( self::version(), $copy );
 
 		$this->assertNotSame( 0, $code );
 		$this->assertStringContainsString( 'ODAVENT_EVENTS_VERSION', $output );
@@ -360,7 +369,7 @@ class PackagingTest extends TestCase {
 		$file = $copy . '/languages/odavent-events-fr_FR.po';
 		file_put_contents( $file, preg_replace( '/msgstr "S’inscrire"/u', 'msgstr ""', (string) file_get_contents( $file ), 1 ) );
 
-		list( $code, $output ) = $this->build( '0.1.0', $copy );
+		list( $code, $output ) = $this->build( self::version(), $copy );
 
 		$this->assertNotSame( 0, $code );
 		$this->assertStringContainsString( 'Register', $output );
